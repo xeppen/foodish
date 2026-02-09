@@ -2,6 +2,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { SignOutButton } from "@/components/sign-out-button";
 import { getMeals } from "@/lib/actions/meals";
+import { getCurrentWeekPlan } from "@/lib/actions/plans";
 import Link from "next/link";
 
 export default async function DashboardPage() {
@@ -12,6 +13,7 @@ export default async function DashboardPage() {
   }
 
   const meals = await getMeals();
+  const currentPlan = await getCurrentWeekPlan();
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -34,6 +36,12 @@ export default async function DashboardPage() {
                   className="text-gray-600 hover:text-gray-900"
                 >
                   My Meals
+                </Link>
+                <Link
+                  href="/plan"
+                  className="text-gray-600 hover:text-gray-900"
+                >
+                  Weekly Plan
                 </Link>
               </div>
             </div>
@@ -65,13 +73,27 @@ export default async function DashboardPage() {
             </div>
           </Link>
 
-          <div className="bg-white rounded-lg shadow-md p-6 opacity-60">
-            <h2 className="text-xl font-semibold mb-2">Weekly Plan</h2>
-            <p className="text-gray-600 mb-4">
-              Auto-generated weekly dinner plan
-            </p>
-            <span className="text-sm text-gray-500">Coming soon...</span>
-          </div>
+          <Link href="/plan" className="block">
+            <div className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow">
+              <h2 className="text-xl font-semibold mb-2">Weekly Plan</h2>
+              <p className="text-gray-600 mb-4">
+                Auto-generated weekly dinner plan
+              </p>
+              <div className="flex items-center justify-between">
+                {currentPlan ? (
+                  <>
+                    <span className="text-green-600 font-medium">Plan ready</span>
+                    <span className="text-sm text-gray-500">5 meals planned</span>
+                  </>
+                ) : (
+                  <>
+                    <span className="text-gray-500 font-medium">No plan yet</span>
+                    <span className="text-sm text-gray-500">Click to generate</span>
+                  </>
+                )}
+              </div>
+            </div>
+          </Link>
         </div>
       </main>
     </div>

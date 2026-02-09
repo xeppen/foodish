@@ -1,22 +1,20 @@
 import { getCurrentUser } from "@/lib/auth";
 import { redirect } from "next/navigation";
-import { getMeals, initializeStarterMeals } from "@/lib/actions/meals";
+import { getCurrentWeekPlan, getWeekInfo } from "@/lib/actions/plans";
 import { SignOutButton } from "@/components/sign-out-button";
-import { AddMealForm } from "@/components/add-meal-form";
-import { MealList } from "@/components/meal-list";
+import { GeneratePlanButton } from "@/components/generate-plan-button";
+import { WeeklyPlanView } from "@/components/weekly-plan-view";
 import Link from "next/link";
 
-export default async function MealsPage() {
+export default async function PlanPage() {
   const user = await getCurrentUser();
 
   if (!user) {
     redirect("/auth/signin");
   }
 
-  // Initialize starter meals if first time
-  await initializeStarterMeals();
-
-  const meals = await getMeals();
+  const plan = await getCurrentWeekPlan();
+  const weekInfo = await getWeekInfo();
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -36,13 +34,13 @@ export default async function MealsPage() {
                 </Link>
                 <Link
                   href="/meals"
-                  className="text-blue-600 font-medium"
+                  className="text-gray-600 hover:text-gray-900"
                 >
                   My Meals
                 </Link>
                 <Link
                   href="/plan"
-                  className="text-gray-600 hover:text-gray-900"
+                  className="text-blue-600 font-medium"
                 >
                   Weekly Plan
                 </Link>
@@ -56,33 +54,25 @@ export default async function MealsPage() {
         </div>
       </nav>
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-8">
-          <h1 className="text-3xl font-bold mb-2">My Meals</h1>
+          <h1 className="text-3xl font-bold mb-2">Weekly Dinner Plan</h1>
           <p className="text-gray-600">
-            Manage your personal meal list. These meals will be used to generate your weekly plans.
+            Week of {weekInfo.weekStart} to {weekInfo.weekEnd}
           </p>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          <div className="lg:col-span-2">
-            <div className="bg-white rounded-lg shadow-md p-6">
-              <h2 className="text-xl font-semibold mb-4">Your Meals ({meals.length})</h2>
-              {meals.length === 0 ? (
-                <p className="text-gray-500">No meals yet. Add your first meal below!</p>
-              ) : (
-                <MealList meals={meals} />
-              )}
-            </div>
+        {!plan ? (
+          <div className="bg-white rounded-lg shadow-md p-8 text-center">
+            <h2 className="text-xl font-semibold mb-4">No plan for this week yet</h2>
+            <p className="text-gray-600 mb-6">
+              Generate your weekly dinner plan with one click. We&apos;ll automatically select 5 meals from your list.
+            </p>
+            <GeneratePlanButton />
           </div>
-
-          <div>
-            <div className="bg-white rounded-lg shadow-md p-6 sticky top-8">
-              <h2 className="text-xl font-semibold mb-4">Add New Meal</h2>
-              <AddMealForm />
-            </div>
-          </div>
-        </div>
+        ) : (
+          <WeeklyPlanView plan={plan} weekInfo={weekInfo} />
+        )}
       </main>
     </div>
   );
