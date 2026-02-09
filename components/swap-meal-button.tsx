@@ -13,13 +13,17 @@ export function SwapMealButton({ day }: { day: Day }) {
     setLoading(true);
     setError(null);
 
-    const result = await swapDayMeal(day);
+    try {
+      const result = await swapDayMeal(day);
 
-    if (result.error) {
-      setError(result.error);
+      if (result.error) {
+        setError(result.error);
+      }
+    } catch (err) {
+      setError("Failed to swap meal. Please try again.");
+    } finally {
+      setLoading(false);
     }
-
-    setLoading(false);
   }
 
   return (

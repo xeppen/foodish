@@ -2,19 +2,29 @@
 
 import { addMeal } from "@/lib/actions/meals";
 import { useRef, useState } from "react";
+import { ErrorMessage } from "./error-message";
 
 export function AddMealForm() {
   const formRef = useRef<HTMLFormElement>(null);
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
   async function handleSubmit(formData: FormData) {
     setError(null);
-    const result = await addMeal(formData);
+    setLoading(true);
 
-    if (result.error) {
-      setError(result.error);
-    } else {
-      formRef.current?.reset();
+    try {
+      const result = await addMeal(formData);
+
+      if (result.error) {
+        setError(result.error);
+      } else {
+        formRef.current?.reset();
+      }
+    } catch (err) {
+      setError("Failed to add meal. Please try again.");
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -31,18 +41,18 @@ export function AddMealForm() {
           placeholder="e.g., Spaghetti Bolognese"
           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
           required
+          disabled={loading}
         />
       </div>
 
-      {error && (
-        <p className="text-sm text-red-600">{error}</p>
-      )}
+      {error && <ErrorMessage message={error} />}
 
       <button
         type="submit"
-        className="w-full bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md font-medium transition-colors"
+        disabled={loading}
+        className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white px-4 py-2 rounded-md font-medium transition-colors"
       >
-        Add Meal
+        {loading ? "Adding..." : "Add Meal"}
       </button>
     </form>
   );

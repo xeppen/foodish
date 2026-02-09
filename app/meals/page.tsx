@@ -4,6 +4,7 @@ import { getMeals, initializeStarterMeals } from "@/lib/actions/meals";
 import { SignOutButton } from "@/components/sign-out-button";
 import { AddMealForm } from "@/components/add-meal-form";
 import { MealList } from "@/components/meal-list";
+import { EmptyState } from "@/components/empty-state";
 import Link from "next/link";
 
 export default async function MealsPage() {
@@ -69,7 +70,10 @@ export default async function MealsPage() {
             <div className="bg-white rounded-lg shadow-md p-6">
               <h2 className="text-xl font-semibold mb-4">Your Meals ({meals.length})</h2>
               {meals.length === 0 ? (
-                <p className="text-gray-500">No meals yet. Add your first meal below!</p>
+                <EmptyState
+                  title="No meals yet"
+                  description="Add your first meal using the form on the right. We've pre-filled some common meals to get you started!"
+                />
               ) : (
                 <MealList meals={meals} />
               )}
