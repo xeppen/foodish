@@ -1,3 +1,5 @@
+import { SwapMealButton } from "./swap-meal-button";
+
 type WeeklyPlan = {
   id: string;
   monday: string | null;
@@ -52,6 +54,9 @@ export function WeeklyPlanView({
                   </div>
                   <p className="text-gray-900 mt-2 text-lg">{meal || "No meal"}</p>
                 </div>
+                <div>
+                  <SwapMealButton day={key} />
+                </div>
               </div>
             </div>
           );
@@ -60,7 +65,7 @@ export function WeeklyPlanView({
 
       <div className="p-6 bg-gray-50 border-t border-gray-200">
         <p className="text-sm text-gray-600 text-center">
-          Your plan is automatically saved and will persist across sessions.
+          Your plan is automatically saved. Click &quot;Swap&quot; to change any day&apos;s meal.
         </p>
       </div>
     </div>
