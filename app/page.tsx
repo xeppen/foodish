@@ -1,6 +1,7 @@
 import { getCurrentUser } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 
 export default async function Home() {
   const user = await getCurrentUser();
@@ -9,82 +10,91 @@ export default async function Home() {
     redirect("/dashboard");
   }
 
-  return (
-    <div className="min-h-screen texture-overlay">
-      {/* Hero Section */}
-      <div className="relative min-h-screen flex items-center justify-center px-4 overflow-hidden">
-        {/* Decorative background elements */}
-        <div className="absolute top-20 right-10 w-64 h-64 rounded-full opacity-20 blur-3xl" style={{ background: 'radial-gradient(circle, var(--terracotta) 0%, transparent 70%)' }}></div>
-        <div className="absolute bottom-20 left-10 w-96 h-96 rounded-full opacity-15 blur-3xl" style={{ background: 'radial-gradient(circle, var(--sage) 0%, transparent 70%)' }}></div>
+  const previewMeals = [
+    { day: "Monday", meal: "Taco Dinner" },
+    { day: "Tuesday", meal: "Roast Chicken" },
+    { day: "Wednesday", meal: "Pasta Night" },
+    { day: "Thursday", meal: "Tomato Soup" },
+    { day: "Friday", meal: "Homemade Pizza" },
+    { day: "Saturday", meal: "Pancakes" },
+  ];
 
-        <div className="relative z-10 text-center max-w-4xl mx-auto">
-          {/* Badge */}
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/80 backdrop-blur-sm border border-[var(--terracotta)]/20 mb-8 animate-fade-in-up">
-            <svg className="w-4 h-4 text-[var(--terracotta)]" fill="currentColor" viewBox="0 0 20 20">
-              <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-            </svg>
-            <span className="text-sm font-semibold text-[var(--charcoal)]">Plan dinners in under 60 seconds</span>
+  return (
+    <main className="relative min-h-screen overflow-hidden">
+      <div className="absolute inset-0">
+        <Image
+          src="/hero-dinner.png"
+          alt="Family dinner table"
+          fill
+          priority
+          className="object-cover"
+        />
+      </div>
+
+      <div className="absolute inset-0 bg-zinc-700/55" />
+      <div className="absolute inset-0 bg-gradient-to-b from-zinc-800/35 via-zinc-900/45 to-zinc-900/70" />
+
+      <section className="relative z-10 mx-auto flex min-h-screen w-full max-w-7xl flex-col justify-end px-4 py-8 sm:px-6 lg:px-8">
+        <div className="mx-auto w-full max-w-6xl rounded-[2rem] border border-white/15 bg-zinc-500/35 p-4 shadow-2xl backdrop-blur-md sm:p-6 lg:p-8">
+          <div className="mb-6 flex items-center justify-center gap-3 sm:justify-end">
+            <span className="rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-white/90">
+              Preview mode
+            </span>
+            <Link
+              href="/auth/sign-in"
+              className="rounded-full bg-white px-4 py-1.5 text-xs font-bold uppercase tracking-[0.15em] text-zinc-800 transition hover:bg-zinc-100"
+            >
+              Log in
+            </Link>
           </div>
 
-          {/* Hero heading */}
-          <h1 className="text-6xl md:text-7xl lg:text-8xl font-bold mb-6 text-[var(--charcoal)] leading-[1.1] animate-fade-in-up delay-100">
-            What&apos;s for <br />
-            <span className="text-[var(--terracotta)] italic">Dinner?</span>
+          <h1 className="mb-7 text-center text-3xl font-semibold uppercase tracking-[0.08em] text-white sm:text-4xl lg:text-5xl">
+            Your Weekly Meal Planner
           </h1>
 
-          <p className="text-xl md:text-2xl text-[var(--warm-gray)] mb-6 max-w-2xl mx-auto font-medium animate-fade-in-up delay-200">
-            Stop overthinking meals. Get your personalized weekly dinner plan instantly.
-          </p>
-
-          <p className="text-base md:text-lg text-[var(--warm-gray)]/80 mb-10 max-w-xl mx-auto animate-fade-in-up delay-300">
-            Maintain your meal list, auto-generate plans, and swap dinners with one click. No more decision fatigue.
-          </p>
-
-          {/* CTA Button */}
-          <div className="flex flex-col sm:flex-row gap-4 justify-center items-center animate-fade-in-up delay-400">
-            <Link href="/auth/sign-in" className="btn-primary inline-flex items-center gap-2 group">
-              Get Started Free
-              <svg className="w-5 h-5 transition-transform group-hover:translate-x-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
-              </svg>
-            </Link>
-            <span className="text-sm text-[var(--warm-gray)]">No credit card required</span>
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
+            {previewMeals.map((item) => (
+              <article
+                key={item.day}
+                className="flex items-center gap-3 rounded-2xl border border-black/5 bg-white/90 px-3 py-3 shadow-md"
+              >
+                <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-xl bg-zinc-200">
+                  <Image
+                    src="/hero-dinner.png"
+                    alt={`${item.meal} preview`}
+                    fill
+                    className="object-cover object-center"
+                  />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-extrabold uppercase tracking-[0.08em] text-zinc-600">
+                    {item.day}
+                  </p>
+                  <p className="truncate text-lg font-semibold text-zinc-800">
+                    {item.meal}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  className="rounded-full bg-lime-300 px-3 py-1 text-xs font-bold uppercase tracking-[0.08em] text-zinc-700"
+                >
+                  Swap
+                </button>
+              </article>
+            ))}
           </div>
 
-          {/* Feature highlights */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-20 max-w-3xl mx-auto">
-            <div className="card p-6 text-left animate-scale-in delay-200">
-              <div className="w-12 h-12 rounded-xl bg-[var(--terracotta)]/10 flex items-center justify-center mb-4">
-                <svg className="w-6 h-6 text-[var(--terracotta)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                </svg>
-              </div>
-              <h3 className="font-bold text-lg mb-2">Build Your List</h3>
-              <p className="text-[var(--warm-gray)] text-sm">Start with 18 pre-filled meals or add your own favorites</p>
-            </div>
-
-            <div className="card p-6 text-left animate-scale-in delay-300">
-              <div className="w-12 h-12 rounded-xl bg-[var(--sage)]/20 flex items-center justify-center mb-4">
-                <svg className="w-6 h-6 text-[var(--olive)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                </svg>
-              </div>
-              <h3 className="font-bold text-lg mb-2">Auto-Generate</h3>
-              <p className="text-[var(--warm-gray)] text-sm">Get a 5-day plan instantly, avoiding recent meals</p>
-            </div>
-
-            <div className="card p-6 text-left animate-scale-in delay-400">
-              <div className="w-12 h-12 rounded-xl bg-[var(--terracotta)]/10 flex items-center justify-center mb-4">
-                <svg className="w-6 h-6 text-[var(--terracotta)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
-                </svg>
-              </div>
-              <h3 className="font-bold text-lg mb-2">Easy Swaps</h3>
-              <p className="text-[var(--warm-gray)] text-sm">Not feeling Monday's meal? Swap it with one click</p>
-            </div>
+          <div className="mt-7 flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
+            <div className="h-1.5 w-40 rounded-full bg-white/50" />
+            <Link
+              href="/auth/sign-in"
+              className="rounded-full border border-white/30 bg-white/20 px-6 py-2 text-sm font-semibold uppercase tracking-[0.08em] text-white transition hover:bg-white/30"
+            >
+              View Full Menu
+            </Link>
           </div>
         </div>
-      </div>
-    </div>
+      </section>
+    </main>
   );
 }

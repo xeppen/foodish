@@ -1,4 +1,4 @@
-import { SwapMealButton } from "./swap-meal-button";
+import { MealCard } from "./meal-card";
 
 type WeeklyPlan = {
   id: string;
@@ -33,39 +33,27 @@ export function WeeklyPlanView({
   weekInfo: WeekInfo;
 }) {
   return (
-    <div className="bg-white rounded-lg shadow-md overflow-hidden">
-      <div className="p-6 bg-blue-50 border-b border-blue-100">
-        <h2 className="text-xl font-semibold text-blue-900">Your Weekly Plan</h2>
-        <p className="text-sm text-blue-700 mt-1">5 weekday dinners ready to go</p>
-      </div>
+    <div className="w-full">
+      <div className="flex items-center justify-between mb-6 text-white px-2"></div>
 
-      <div className="divide-y divide-gray-200">
+      {/* Responsive Grid/Scroll Container */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6 pb-4">
         {DAYS.map(({ key, label }) => {
           const meal = plan[key];
           const date = weekInfo[key];
 
           return (
-            <div key={key} className="p-6 hover:bg-gray-50 transition-colors">
-              <div className="flex items-center justify-between">
-                <div className="flex-1">
-                  <div className="flex items-center gap-3">
-                    <h3 className="font-semibold text-lg">{label}</h3>
-                    <span className="text-sm text-gray-500">{date}</span>
-                  </div>
-                  <p className="text-gray-900 mt-2 text-lg">{meal || "No meal"}</p>
-                </div>
-                <div>
-                  <SwapMealButton day={key} />
-                </div>
-              </div>
+            <div key={key} className="h-full">
+              <MealCard day={key} dateStr={date} mealName={meal} />
             </div>
           );
         })}
       </div>
 
-      <div className="p-6 bg-gray-50 border-t border-gray-200">
-        <p className="text-sm text-gray-600 text-center">
-          Your plan is automatically saved. Click &quot;Swap&quot; to change any day&apos;s meal.
+      <div className="mt-8 p-4 rounded-xl bg-white/10 backdrop-blur-md border border-white/20 text-center">
+        <p className="text-sm text-[var(--cream)] font-medium">
+          💡 Tip: Click "Swap" to instantly replace any meal with another random
+          option from your list.
         </p>
       </div>
     </div>
