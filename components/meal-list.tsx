@@ -38,52 +38,60 @@ export function MealList({ meals }: { meals: Meal[] }) {
   }
 
   return (
-    <ul className="space-y-2">
-      {meals.map((meal) => (
+    <ul className="space-y-3">
+      {meals.map((meal, index) => (
         <li
           key={meal.id}
-          className="flex items-center justify-between p-3 bg-gray-50 rounded-md hover:bg-gray-100 transition-colors"
+          className="group animate-slide-in-right"
+          style={{ animationDelay: `${index * 0.05}s` }}
         >
           {editingId === meal.id ? (
-            <div className="flex-1 flex gap-2">
+            <div className="flex gap-2 p-4 bg-white border-2 border-[var(--terracotta)] rounded-xl">
               <input
                 type="text"
                 value={editValue}
                 onChange={(e) => setEditValue(e.target.value)}
-                className="flex-1 px-2 py-1 border border-gray-300 rounded"
+                className="flex-1"
                 autoFocus
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleUpdate(meal.id);
+                  if (e.key === 'Escape') cancelEditing();
+                }}
               />
               <button
                 onClick={() => handleUpdate(meal.id)}
-                className="px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
+                className="btn-primary px-4 py-2 text-sm"
               >
                 Save
               </button>
               <button
                 onClick={cancelEditing}
-                className="px-3 py-1 bg-gray-300 text-gray-700 rounded text-sm hover:bg-gray-400"
+                className="btn-secondary px-4 py-2 text-sm"
               >
                 Cancel
               </button>
             </div>
           ) : (
-            <>
-              <span className="text-gray-900">{meal.name}</span>
-              <div className="flex gap-2">
+            <div className="flex items-center justify-between p-4 bg-white/60 hover:bg-white border border-[var(--cream-dark)] rounded-xl hover:border-[var(--terracotta)]/30 transition-all hover:shadow-sm">
+              <div className="flex items-center gap-3">
+                <div className="w-2 h-2 rounded-full bg-[var(--sage)]"></div>
+                <span className="font-medium text-[var(--charcoal)]">{meal.name}</span>
+              </div>
+              <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                 <button
                   onClick={() => startEditing(meal)}
-                  className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+                  className="px-3 py-1.5 text-sm font-semibold text-[var(--terracotta)] hover:bg-[var(--terracotta)]/10 rounded-lg transition-colors"
                 >
                   Edit
                 </button>
                 <button
                   onClick={() => handleDelete(meal.id)}
-                  className="text-red-600 hover:text-red-800 text-sm font-medium"
+                  className="px-3 py-1.5 text-sm font-semibold text-[var(--warm-gray)] hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                 >
                   Delete
                 </button>
               </div>
-            </>
+            </div>
           )}
         </li>
       ))}
