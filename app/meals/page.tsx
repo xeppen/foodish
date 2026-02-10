@@ -11,7 +11,7 @@ export default async function MealsPage() {
   const user = await getCurrentUser();
 
   if (!user) {
-    redirect("/auth/signin");
+    redirect("/auth/sign-in");
   }
 
   // Initialize starter meals if first time

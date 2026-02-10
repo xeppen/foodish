@@ -20,7 +20,7 @@ export default async function Home() {
           Stop overthinking dinner. Maintain your personal meal list, get auto-generated weekly plans, and swap meals with one click.
         </p>
         <Link
-          href="/auth/signin"
+          href="/auth/sign-in"
           className="inline-block bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-md font-medium transition-colors"
         >
           Get Started

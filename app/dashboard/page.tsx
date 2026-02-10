@@ -9,7 +9,7 @@ export default async function DashboardPage() {
   const user = await getCurrentUser();
 
   if (!user) {
-    redirect("/auth/signin");
+    redirect("/auth/sign-in");
   }
 
   const meals = await getMeals();

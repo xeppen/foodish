@@ -10,7 +10,7 @@ export default async function PlanPage() {
   const user = await getCurrentUser();
 
   if (!user) {
-    redirect("/auth/signin");
+    redirect("/auth/sign-in");
   }
 
   const plan = await getCurrentWeekPlan();
