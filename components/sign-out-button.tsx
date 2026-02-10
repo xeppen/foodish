@@ -10,7 +10,7 @@ export function SignOutButton() {
   return (
     <button
       onClick={() => signOut(() => router.push("/"))}
-      className="bg-gray-200 hover:bg-gray-300 px-4 py-2 rounded-md text-sm font-medium transition-colors"
+      className="btn-secondary text-sm"
     >
       Sign Out
     </button>

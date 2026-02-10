@@ -2,23 +2,35 @@ import { SignUp } from "@clerk/nextjs";
 
 export default function SignUpPage() {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
+    <div className="min-h-screen flex items-center justify-center texture-overlay px-4">
       <div className="max-w-md w-full">
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold mb-2">What&apos;s for Dinner?</h1>
-          <p className="text-gray-600 mb-8">
+        <div className="text-center mb-8 animate-fade-in-up">
+          <h1 className="text-4xl md:text-5xl font-bold mb-3 text-[var(--charcoal)]">
+            What&apos;s for <span className="text-[var(--terracotta)] italic">Dinner?</span>
+          </h1>
+          <p className="text-lg text-[var(--warm-gray)]">
             Weekly dinner planning in under 60 seconds
           </p>
         </div>
 
-        <SignUp
-          appearance={{
-            elements: {
-              rootBox: "mx-auto",
-              card: "shadow-md",
-            },
-          }}
-        />
+        <div className="animate-scale-in delay-100">
+          <SignUp
+            appearance={{
+              elements: {
+                rootBox: "mx-auto",
+                card: "card !shadow-lg",
+                headerTitle: "font-['Playfair_Display'] !text-2xl",
+                headerSubtitle: "!text-[var(--warm-gray)]",
+                socialButtonsBlockButton: "!bg-white hover:!bg-[var(--cream-dark)] !border-2 !border-[var(--cream-dark)] hover:!border-[var(--terracotta)] !text-[var(--charcoal)] !shadow-sm hover:!shadow-md !transition-all",
+                formButtonPrimary: "btn-primary !shadow-md hover:!shadow-lg",
+                footerActionLink: "!text-[var(--terracotta)] hover:!text-[var(--terracotta-dark)]",
+                formFieldInput: "!border-2 !border-[var(--cream-dark)] focus:!border-[var(--terracotta)] !rounded-xl",
+                dividerLine: "!bg-[var(--cream-dark)]",
+                dividerText: "!text-[var(--warm-gray)]",
+              },
+            }}
+          />
+        </div>
       </div>
     </div>
   );
