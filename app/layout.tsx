@@ -7,7 +7,7 @@ export const metadata: Metadata = {
   description: "Weekly dinner planning in under 60 seconds",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
