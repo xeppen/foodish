@@ -104,21 +104,6 @@ export default async function DashboardPage() {
 
               <div className="relative">
                 <div className="flex items-start justify-between mb-6">
-                  <div className="w-16 h-16 rounded-2xl bg-[var(--terracotta)]/20 flex items-center justify-center group-hover:scale-110 transition-transform text-white">
-                    <svg
-                      className="w-8 h-8 text-[var(--terracotta-light)]"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"
-                      />
-                    </svg>
-                  </div>
                   <span className="px-3 py-1 rounded-full bg-black/40 text-white/90 text-sm font-medium border border-white/10">
                     {meals.length} meals
                   </span>
@@ -154,21 +139,6 @@ export default async function DashboardPage() {
 
               <div className="relative">
                 <div className="flex items-start justify-between mb-6">
-                  <div className="w-16 h-16 rounded-2xl bg-[var(--sage)]/20 flex items-center justify-center group-hover:scale-110 transition-transform text-white">
-                    <svg
-                      className="w-8 h-8 text-[var(--sage-light)]"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
-                      />
-                    </svg>
-                  </div>
                   {currentPlan ? (
                     <span className="px-3 py-1 rounded-full bg-[var(--sage)]/30 text-[var(--sage-light)] text-sm font-medium border border-[var(--sage)]/20">
                       ✓ Ready

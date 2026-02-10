@@ -1,26 +1,19 @@
-import { getCurrentUser } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 
-export default async function Home() {
-  const user = await getCurrentUser();
-
-  if (user) {
-    redirect("/dashboard");
-  }
-
-  const previewMeals = [
-    { day: "Monday", meal: "Taco Dinner" },
-    { day: "Tuesday", meal: "Roast Chicken" },
-    { day: "Wednesday", meal: "Pasta Night" },
-    { day: "Thursday", meal: "Tomato Soup" },
-    { day: "Friday", meal: "Homemade Pizza" },
-    { day: "Saturday", meal: "Pancakes" },
+export default function Home() {
+  const sampleMeals = [
+    { day: "Måndag", meal: "Taco Dinner", image: "/food-plate-1.png" },
+    { day: "Tisdag", meal: "Pasta Carbonara", image: "/food-plate-2.png" },
+    { day: "Onsdag", meal: "Grilled Salmon", image: "/food-plate-3.png" },
+    { day: "Torsdag", meal: "Chicken Curry", image: "/food-plate-1.png" },
+    { day: "Fredag", meal: "Pizza Night", image: "/food-plate-2.png" },
   ];
 
   return (
     <main className="relative min-h-screen overflow-hidden">
+      {/* Full-screen Hero Background */}
       <div className="absolute inset-0">
         <Image
           src="/hero-dinner.png"
@@ -31,52 +24,65 @@ export default async function Home() {
         />
       </div>
 
-      <div className="absolute inset-0 bg-zinc-700/55" />
-      <div className="absolute inset-0 bg-gradient-to-b from-zinc-800/35 via-zinc-900/45 to-zinc-900/70" />
+      {/* Grey Overlay */}
+      <div className="absolute inset-0 bg-black/40" />
 
+      {/* Gradient Overlay - darker at bottom */}
+      <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-black/30 to-black/60" />
+
+      {/* Content Container */}
       <section className="relative z-10 mx-auto flex min-h-screen w-full max-w-7xl flex-col justify-end px-4 py-8 sm:px-6 lg:px-8">
-        <div className="mx-auto w-full max-w-6xl rounded-[2rem] border border-white/15 bg-zinc-500/35 p-4 shadow-2xl backdrop-blur-md sm:p-6 lg:p-8">
-          <div className="mb-6 flex items-center justify-center gap-3 sm:justify-end">
-            <span className="rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-white/90">
-              Preview mode
+        {/* Frosted Bottom Overlay with Meal Cards */}
+        <div className="mx-auto w-full max-w-6xl rounded-[2rem] border border-white/15 bg-white/10 p-4 shadow-2xl backdrop-blur-xl sm:p-6 lg:p-8">
+          {/* Header with Login Button */}
+          <div className="mb-6 flex items-center justify-between">
+            <span className="rounded-full border border-white/20 bg-white/10 px-4 py-1.5 text-sm font-semibold uppercase tracking-wider text-white/90">
+              Preview Mode
             </span>
             <Link
               href="/auth/sign-in"
-              className="rounded-full bg-white px-4 py-1.5 text-xs font-bold uppercase tracking-[0.15em] text-zinc-800 transition hover:bg-zinc-100"
+              className="rounded-full bg-white px-6 py-2 text-sm font-bold uppercase tracking-wide text-zinc-800 transition hover:bg-zinc-100"
             >
-              Log in
+              Log In
             </Link>
           </div>
 
-          <h1 className="mb-7 text-center text-3xl font-semibold uppercase tracking-[0.08em] text-white sm:text-4xl lg:text-5xl">
+          {/* Title */}
+          <h1 className="mb-8 text-center text-3xl font-bold uppercase tracking-wide text-white sm:text-4xl lg:text-5xl">
             Your Weekly Meal Planner
           </h1>
 
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
-            {previewMeals.map((item) => (
+          {/* 5 Meal Cards - Swedish Weekdays */}
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+            {sampleMeals.map((item) => (
               <article
                 key={item.day}
-                className="flex items-center gap-3 rounded-2xl border border-black/5 bg-white/90 px-3 py-3 shadow-md"
+                className="flex flex-col gap-3 rounded-2xl border border-white/10 bg-white/95 p-3 shadow-lg backdrop-blur-sm"
               >
-                <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-xl bg-zinc-200">
+                {/* Meal Image */}
+                <div className="relative aspect-square w-full overflow-hidden rounded-xl bg-zinc-200">
                   <Image
-                    src="/hero-dinner.png"
-                    alt={`${item.meal} preview`}
+                    src={item.image}
+                    alt={item.meal}
                     fill
-                    className="object-cover object-center"
+                    className="object-cover"
                   />
                 </div>
-                <div className="min-w-0 flex-1">
-                  <p className="text-xs font-extrabold uppercase tracking-[0.08em] text-zinc-600">
+
+                {/* Day and Meal Info */}
+                <div className="flex-1">
+                  <p className="text-xs font-bold uppercase tracking-wider text-zinc-600">
                     {item.day}
                   </p>
-                  <p className="truncate text-lg font-semibold text-zinc-800">
+                  <p className="mt-1 text-base font-semibold text-zinc-800">
                     {item.meal}
                   </p>
                 </div>
+
+                {/* Swap Button */}
                 <button
                   type="button"
-                  className="rounded-full bg-lime-300 px-3 py-1 text-xs font-bold uppercase tracking-[0.08em] text-zinc-700"
+                  className="rounded-lg bg-[var(--sage)] px-3 py-1.5 text-xs font-bold uppercase tracking-wide text-white transition hover:bg-[var(--olive)]"
                 >
                   Swap
                 </button>
@@ -84,11 +90,12 @@ export default async function Home() {
             ))}
           </div>
 
-          <div className="mt-7 flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
-            <div className="h-1.5 w-40 rounded-full bg-white/50" />
+          {/* Bottom CTA */}
+          <div className="mt-8 flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
+            <div className="h-1 w-32 rounded-full bg-white/30" />
             <Link
               href="/auth/sign-in"
-              className="rounded-full border border-white/30 bg-white/20 px-6 py-2 text-sm font-semibold uppercase tracking-[0.08em] text-white transition hover:bg-white/30"
+              className="rounded-full border border-white/30 bg-white/20 px-6 py-2.5 text-sm font-semibold uppercase tracking-wide text-white transition hover:bg-white/30"
             >
               View Full Menu
             </Link>
