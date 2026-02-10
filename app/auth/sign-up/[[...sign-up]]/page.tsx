@@ -18,8 +18,6 @@ export default function SignUpPage() {
               card: "shadow-md",
             },
           }}
-          signInUrl="/auth/signin"
-          forceRedirectUrl="/dashboard"
         />
       </div>
     </div>
