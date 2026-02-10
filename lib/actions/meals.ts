@@ -82,7 +82,7 @@ export async function addMeal(formData: FormData) {
   const validation = mealSchema.safeParse({ name });
 
   if (!validation.success) {
-    return { error: validation.error.errors[0].message };
+    return { error: validation.error.issues[0].message };
   }
 
   await prisma.meal.create({
@@ -106,7 +106,7 @@ export async function updateMeal(id: string, formData: FormData) {
   const validation = mealSchema.safeParse({ name });
 
   if (!validation.success) {
-    return { error: validation.error.errors[0].message };
+    return { error: validation.error.issues[0].message };
   }
 
   // Verify ownership
