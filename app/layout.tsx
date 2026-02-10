@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import { ClerkProvider } from "@clerk/nextjs";
+import { ClerkProviderWrapper } from "@/components/clerk-provider-wrapper";
 
 export const metadata: Metadata = {
   title: "What's for Dinner?",
@@ -15,7 +15,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className="antialiased">
-        <ClerkProvider>{children}</ClerkProvider>
+        <ClerkProviderWrapper>{children}</ClerkProviderWrapper>
       </body>
     </html>
   );
