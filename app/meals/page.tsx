@@ -31,6 +31,7 @@ export default async function MealsPage() {
           className="object-cover opacity-60"
           quality={100}
           priority
+          sizes="100vw"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-black/60" />
       </div>
@@ -43,27 +44,27 @@ export default async function MealsPage() {
                 href="/dashboard"
                 className="text-2xl font-bold text-white hover:text-[var(--terracotta-light)] transition-colors drop-shadow-md"
               >
-                What&apos;s for{" "}
-                <span className="italic text-[var(--terracotta)]">Dinner?</span>
+                Vad blir det till{" "}
+                <span className="italic text-[var(--terracotta)]">middag?</span>
               </Link>
               <div className="hidden md:flex gap-1">
                 <Link
                   href="/dashboard"
                   className="px-4 py-2 rounded-lg font-medium text-white/80 hover:text-white hover:bg-white/10 transition-colors"
                 >
-                  Dashboard
+                  Översikt
                 </Link>
                 <Link
                   href="/meals"
                   className="px-4 py-2 rounded-lg font-bold text-white bg-white/20 backdrop-blur-md border border-white/10 shadow-lg"
                 >
-                  My Meals
+                  Mina måltider
                 </Link>
                 <Link
                   href="/plan"
                   className="px-4 py-2 rounded-lg font-medium text-white/80 hover:text-white hover:bg-white/10 transition-colors"
                 >
-                  Weekly Plan
+                  Veckoplan
                 </Link>
               </div>
             </div>
@@ -102,19 +103,19 @@ export default async function MealsPage() {
             </div>
             <div>
               <h1 className="text-4xl font-bold text-white drop-shadow-lg">
-                My Meals
+                Mina måltider
               </h1>
               <p className="text-white/80 mt-1">
-                Build your personal collection •{" "}
+                Bygg din personliga samling •{" "}
                 <span className="font-semibold text-[var(--terracotta-light)]">
-                  {meals.length} meals
+                  {meals.length} måltider
                 </span>
               </p>
             </div>
           </div>
           <p className="text-white/70 max-w-2xl">
-            These meals will be used to generate your weekly plans. Add your
-            favorites, and we'll help you decide what's for dinner.
+            Dessa rätter används för att skapa dina veckoplaner. Lägg till dina
+            favoriter så hjälper vi dig att bestämma vad ni ska äta.
           </p>
         </div>
 
@@ -123,14 +124,14 @@ export default async function MealsPage() {
             <div className="bg-white/95 backdrop-blur-sm rounded-3xl p-8 shadow-xl border border-white/20">
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-2xl font-bold text-[var(--charcoal)]">
-                  Your Collection
+                  Din samling
                 </h2>
-                <span className="badge">{meals.length} total</span>
+                <span className="badge">{meals.length} totalt</span>
               </div>
               {meals.length === 0 ? (
                 <EmptyState
-                  title="No meals yet"
-                  description="Add your first meal using the form on the right. We've included 18 starter meals to get you going!"
+                  title="Inga måltider ännu"
+                  description="Lägg till din första rätt med formuläret till höger. Vi har lagt in 18 förslag för att få igång dig!"
                 />
               ) : (
                 <MealList meals={meals} />
@@ -156,7 +157,7 @@ export default async function MealsPage() {
                     />
                   </svg>
                 </div>
-                <h2 className="text-xl font-bold text-white">Add New Meal</h2>
+                <h2 className="text-xl font-bold text-white">Lägg till ny rätt</h2>
               </div>
               <div className="bg-white/5 rounded-2xl p-2">
                 <div className="bg-white rounded-xl p-4 shadow-inner">

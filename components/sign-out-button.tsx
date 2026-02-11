@@ -12,7 +12,7 @@ export function SignOutButton() {
       onClick={() => signOut(() => router.push("/"))}
       className="btn-secondary text-sm"
     >
-      Sign Out
+      Logga ut
     </button>
   );
 }

@@ -83,7 +83,7 @@ export async function getCurrentWeekPlan() {
 export async function generateWeeklyPlan() {
   const user = await getCurrentUser();
   if (!user) {
-    return { error: "Unauthorized" };
+    return { error: "Ej behörig" };
   }
 
   const weekStart = getWeekStart();
@@ -144,7 +144,7 @@ export async function generateWeeklyPlan() {
 
   if (selectedMeals.length < 5) {
     return {
-      error: "You need at least 5 meals in your list to generate a plan. Please add more meals.",
+      error: "Du behöver minst 5 rätter i din lista för att kunna skapa en plan. Lägg till fler rätter.",
     };
   }
 
@@ -195,7 +195,7 @@ export async function getWeekInfo() {
 export async function swapDayMeal(day: "monday" | "tuesday" | "wednesday" | "thursday" | "friday") {
   const user = await getCurrentUser();
   if (!user) {
-    return { error: "Unauthorized" };
+    return { error: "Ej behörig" };
   }
 
   const weekStart = getWeekStart();
@@ -211,7 +211,7 @@ export async function swapDayMeal(day: "monday" | "tuesday" | "wednesday" | "thu
   });
 
   if (!plan) {
-    return { error: "No plan found for this week" };
+    return { error: "Ingen plan hittades för den här veckan" };
   }
 
   // Get all meals currently in the plan
@@ -275,7 +275,7 @@ export async function swapDayMeal(day: "monday" | "tuesday" | "wednesday" | "thu
   const newMeals = await selectRandomMeals(user.id, 1, mealsToAvoid);
 
   if (newMeals.length === 0) {
-    return { error: "No alternative meals available" };
+    return { error: "Inga alternativa rätter tillgängliga" };
   }
 
   const newMeal = newMeals[0];

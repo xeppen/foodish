@@ -20,7 +20,7 @@ export function SwapMealButton({ day }: { day: Day }) {
         setError(result.error);
       }
     } catch (err) {
-      setError("Failed to swap meal. Please try again.");
+      setError("Kunde inte byta måltiden. Försök igen.");
     } finally {
       setLoading(false);
     }
@@ -33,7 +33,7 @@ export function SwapMealButton({ day }: { day: Day }) {
         disabled={loading}
         className="text-blue-600 hover:text-blue-800 disabled:text-blue-400 text-sm font-medium"
       >
-        {loading ? "Swapping..." : "Swap"}
+        {loading ? "Byter..." : "Byt"}
       </button>
       {error && (
         <p className="text-xs text-red-600 mt-1">{error}</p>

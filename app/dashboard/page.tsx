@@ -27,6 +27,7 @@ export default async function DashboardPage() {
           className="object-cover opacity-60"
           quality={100}
           priority
+          sizes="100vw"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-black/60" />
       </div>
@@ -40,27 +41,27 @@ export default async function DashboardPage() {
                 href="/dashboard"
                 className="text-2xl font-bold text-white hover:text-[var(--terracotta-light)] transition-colors drop-shadow-md"
               >
-                What&apos;s for{" "}
-                <span className="italic text-[var(--terracotta)]">Dinner?</span>
+                Vad blir det till{" "}
+                <span className="italic text-[var(--terracotta)]">middag?</span>
               </Link>
               <div className="hidden md:flex gap-1">
                 <Link
                   href="/dashboard"
                   className="px-4 py-2 rounded-lg font-bold text-white bg-white/20 backdrop-blur-md border border-white/10 shadow-lg"
                 >
-                  Dashboard
+                  Översikt
                 </Link>
                 <Link
                   href="/meals"
                   className="px-4 py-2 rounded-lg font-medium text-white/80 hover:text-white hover:bg-white/10 transition-colors"
                 >
-                  My Meals
+                  Mina måltider
                 </Link>
                 <Link
                   href="/plan"
                   className="px-4 py-2 rounded-lg font-medium text-white/80 hover:text-white hover:bg-white/10 transition-colors"
                 >
-                  Weekly Plan
+                  Veckoplan
                 </Link>
               </div>
             </div>
@@ -82,14 +83,14 @@ export default async function DashboardPage() {
       <main className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 w-full">
         <div className="mb-12 animate-fade-in-up">
           <h1 className="text-4xl md:text-5xl font-bold mb-3 text-white drop-shadow-lg">
-            Welcome back,{" "}
+            Välkommen tillbaka,{" "}
             <span className="text-[var(--terracotta)] italic">
               {user.name?.split(" ")[0] || user.name}
             </span>
             !
           </h1>
           <p className="text-lg text-white/80 drop-shadow-md">
-            Your weekly dinner planning dashboard
+            Din kontrollpanel för veckans middagar
           </p>
         </div>
 
@@ -105,15 +106,15 @@ export default async function DashboardPage() {
               <div className="relative">
                 <div className="flex items-start justify-between mb-6">
                   <span className="px-3 py-1 rounded-full bg-black/40 text-white/90 text-sm font-medium border border-white/10">
-                    {meals.length} meals
+                    {meals.length} måltider
                   </span>
                 </div>
-                <h2 className="text-2xl font-bold mb-2 text-white">My Meals</h2>
+                <h2 className="text-2xl font-bold mb-2 text-white">Mina måltider</h2>
                 <p className="text-white/70 mb-6">
-                  Manage your personal meal collection
+                  Hantera din personliga samling av favoriträtter
                 </p>
                 <div className="flex items-center gap-2 text-[var(--terracotta-light)] font-semibold group-hover:gap-3 transition-all">
-                  <span>View meals</span>
+                  <span>Visa måltider</span>
                   <svg
                     className="w-5 h-5"
                     fill="none"
@@ -141,24 +142,24 @@ export default async function DashboardPage() {
                 <div className="flex items-start justify-between mb-6">
                   {currentPlan ? (
                     <span className="px-3 py-1 rounded-full bg-[var(--sage)]/30 text-[var(--sage-light)] text-sm font-medium border border-[var(--sage)]/20">
-                      ✓ Ready
+                      ✓ Klar
                     </span>
                   ) : (
                     <span className="px-3 py-1 rounded-full bg-white/10 text-white/60 text-sm font-medium border border-white/5">
-                      Not started
+                      Inte påbörjad
                     </span>
                   )}
                 </div>
                 <h2 className="text-2xl font-bold mb-2 text-white">
-                  Weekly Plan
+                  Veckoplan
                 </h2>
                 <p className="text-white/70 mb-6">
                   {currentPlan
-                    ? "5 meals planned for this week"
-                    : "Generate your weekly dinner plan"}
+                    ? "5 måltider planerade för veckan"
+                    : "Skapa din veckomeny"}
                 </p>
                 <div className="flex items-center gap-2 text-[var(--sage-light)] font-semibold group-hover:gap-3 transition-all">
-                  <span>{currentPlan ? "View plan" : "Create plan"}</span>
+                  <span>{currentPlan ? "Visa plan" : "Skapa plan"}</span>
                   <svg
                     className="w-5 h-5"
                     fill="none"
@@ -198,21 +199,21 @@ export default async function DashboardPage() {
             </div>
             <div>
               <h3 className="font-bold text-lg mb-2 text-white">
-                Getting Started
+                Kom igång
               </h3>
               <p className="text-white/70 mb-3">
                 {meals.length === 0
-                  ? "Start by adding meals to your list. We've included 18 starter meals to get you going!"
+                  ? "Börja med att lägga till måltider i din lista. Vi har fyllt på med 18 favoriter för att hjälpa dig i gång!"
                   : currentPlan
-                    ? "Your week is planned! View your plan to see what's cooking, or swap any meal you're not feeling."
-                    : "You're all set! Head to Weekly Plan to generate your personalized 5-day dinner schedule."}
+                    ? "Veckan är planerad! Visa planen för att se vad som står på menyn eller byt ut en rätt du inte är sugen på."
+                    : "Allt är redo! Gå till Veckoplan för att skapa ditt personliga femdagarsschema."}
               </p>
               {meals.length === 0 && (
                 <Link
                   href="/meals"
                   className="inline-flex items-center gap-2 text-[var(--terracotta-light)] font-semibold hover:gap-3 transition-all"
                 >
-                  Go to meals
+                  Gå till måltider
                   <svg
                     className="w-4 h-4"
                     fill="none"

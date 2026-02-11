@@ -44,7 +44,7 @@ export function MealCard({ day, dateStr, mealName, imageSrc }: MealCardProps) {
       // The parent page (Dashboard) is a Server Component and should re-render
       // if using router.refresh() or if the action revalidates '/dashboard'
     } catch (error) {
-      console.error("Swap failed", error);
+      console.error("Kunde inte byta måltid", error);
     } finally {
       setLoading(false);
     }
@@ -59,6 +59,7 @@ export function MealCard({ day, dateStr, mealName, imageSrc }: MealCardProps) {
           alt={currentMeal || "Meal"}
           fill
           className="object-cover transition-transform duration-700 group-hover:scale-105"
+          sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
         />
         {/* Day Overlay */}
         <div className="absolute top-3 left-3 bg-white/90 backdrop-blur-sm px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider text-[var(--terracotta)] shadow-sm">
@@ -69,7 +70,7 @@ export function MealCard({ day, dateStr, mealName, imageSrc }: MealCardProps) {
       {/* Content Area */}
       <div className="p-5 flex flex-col flex-grow">
         <h3 className="font-playfair font-bold text-lg text-[var(--charcoal)] mb-1 line-clamp-2 min-h-[3.5rem]">
-          {currentMeal || "No meal planned"}
+          {currentMeal || "Ingen måltid planerad"}
         </h3>
 
         <div className="mt-auto pt-4 flex items-center justify-between">
@@ -104,7 +105,7 @@ export function MealCard({ day, dateStr, mealName, imageSrc }: MealCardProps) {
                 />
               )}
             </svg>
-            Swap
+            {loading ? "Byter..." : "Byt"}
           </button>
         </div>
       </div>

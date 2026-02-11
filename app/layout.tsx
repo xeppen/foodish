@@ -3,8 +3,8 @@ import "./globals.css";
 import { ClerkProviderWrapper } from "@/components/clerk-provider-wrapper";
 
 export const metadata: Metadata = {
-  title: "What's for Dinner?",
-  description: "Weekly dinner planning in under 60 seconds",
+  title: "Vad blir det till middag?",
+  description: "Veckoplanering av middagar på under en minut",
 };
 
 export default function RootLayout({

@@ -18,11 +18,11 @@ type WeekInfo = {
 };
 
 const DAYS = [
-  { key: "monday", label: "Monday" },
-  { key: "tuesday", label: "Tuesday" },
-  { key: "wednesday", label: "Wednesday" },
-  { key: "thursday", label: "Thursday" },
-  { key: "friday", label: "Friday" },
+  { key: "monday", label: "Måndag" },
+  { key: "tuesday", label: "Tisdag" },
+  { key: "wednesday", label: "Onsdag" },
+  { key: "thursday", label: "Torsdag" },
+  { key: "friday", label: "Fredag" },
 ] as const;
 
 export function WeeklyPlanView({
@@ -52,8 +52,8 @@ export function WeeklyPlanView({
 
       <div className="mt-8 p-4 rounded-xl bg-white/10 backdrop-blur-md border border-white/20 text-center">
         <p className="text-sm text-[var(--cream)] font-medium">
-          💡 Tip: Click "Swap" to instantly replace any meal with another random
-          option from your list.
+          💡 Tips: Klicka på &quot;Byt&quot; för att direkt ersätta en rätt med ett annat
+          slumpat alternativ från din lista.
         </p>
       </div>
     </div>

@@ -28,6 +28,7 @@ export default async function PlanPage() {
           className="object-cover opacity-60"
           quality={100}
           priority
+          sizes="100vw"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-black/60" />
       </div>
@@ -41,27 +42,27 @@ export default async function PlanPage() {
                 href="/dashboard"
                 className="text-2xl font-bold text-white hover:text-[var(--terracotta-light)] transition-colors drop-shadow-md"
               >
-                What&apos;s for{" "}
-                <span className="italic text-[var(--terracotta)]">Dinner?</span>
+                Vad blir det till{" "}
+                <span className="italic text-[var(--terracotta)]">middag?</span>
               </Link>
               <div className="hidden md:flex gap-1">
                 <Link
                   href="/dashboard"
                   className="px-4 py-2 rounded-lg font-medium text-white/80 hover:text-white hover:bg-white/10 transition-colors"
                 >
-                  Dashboard
+                  Översikt
                 </Link>
                 <Link
                   href="/meals"
                   className="px-4 py-2 rounded-lg font-medium text-white/80 hover:text-white hover:bg-white/10 transition-colors"
                 >
-                  My Meals
+                  Mina måltider
                 </Link>
                 <Link
                   href="/plan"
                   className="px-4 py-2 rounded-lg font-bold text-white bg-white/20 backdrop-blur-md border border-white/10 shadow-lg"
                 >
-                  Weekly Plan
+                  Veckoplan
                 </Link>
               </div>
             </div>
@@ -86,10 +87,10 @@ export default async function PlanPage() {
           {/* Header */}
           <div className="mb-10 text-center md:text-left">
             <h1 className="text-4xl md:text-5xl font-bold mb-2 text-white drop-shadow-lg">
-              Weekly Dinner Plan
+              Veckans middagsplan
             </h1>
             <p className="text-lg text-white/80 font-medium drop-shadow-md">
-              Week of {weekInfo.weekStart} to {weekInfo.weekEnd}
+              Vecka {weekInfo.weekStart} till {weekInfo.weekEnd}
             </p>
           </div>
 
@@ -111,11 +112,11 @@ export default async function PlanPage() {
                 </svg>
               </div>
               <h2 className="text-3xl font-bold mb-4 text-white">
-                Let&apos;s plan your week
+                Låt oss planera din vecka
               </h2>
               <p className="text-lg text-white/80 mb-8 max-w-lg mx-auto">
-                Generate your personalized 5-day dinner schedule instantly.
-                We&apos;ll pick meals you haven&apos;t had recently.
+                Skapa ditt personliga femdagars middagsschema på direkten.
+                Vi väljer rätter du inte har ätit på ett tag.
               </p>
               <div className="flex justify-center">
                 <GeneratePlanButton />

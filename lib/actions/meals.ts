@@ -6,35 +6,38 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 const mealSchema = z.object({
-  name: z.string().min(1, "Meal name is required").max(100, "Meal name too long"),
+  name: z
+    .string()
+    .min(1, "Måltidsnamnet är obligatoriskt")
+    .max(100, "Måltidsnamnet är för långt"),
 });
 
 // Starter pack meals for first-time users
 const STARTER_MEALS = [
-  "Pasta with tomato sauce",
-  "Chicken stir-fry with rice",
+  "Pasta med tomatsås",
+  "Kycklingwok med ris",
   "Tacos",
-  "Pizza (homemade or takeout)",
-  "Grilled chicken with vegetables",
-  "Spaghetti carbonara",
-  "Fried rice",
-  "Burgers",
-  "Fish with roasted potatoes",
-  "Chicken curry with rice",
+  "Pizza (hemmagjord eller hämtmat)",
+  "Grillad kyckling med grönsaker",
+  "Pasta carbonara",
+  "Stekt ris",
+  "Hamburgare",
+  "Fisk med rostade potatisar",
+  "Kycklingcurry med ris",
   "Quesadillas",
-  "Lasagna",
-  "Salmon with vegetables",
-  "Chicken fajitas",
-  "Stir-fry noodles",
-  "Meatballs with pasta",
-  "Baked chicken with rice",
-  "Vegetable soup with bread",
+  "Lasagne",
+  "Lax med grönsaker",
+  "Kycklingfajitas",
+  "Wokade nudlar",
+  "Köttbullar med pasta",
+  "Ugnsstekt kyckling med ris",
+  "Grönsakssoppa med bröd",
 ];
 
 export async function initializeStarterMeals() {
   const user = await getCurrentUser();
   if (!user) {
-    return { error: "Unauthorized" };
+    return { error: "Ej behörig" };
   }
 
   // Check if user already has meals
@@ -43,7 +46,7 @@ export async function initializeStarterMeals() {
   });
 
   if (existingMeals > 0) {
-    return { success: true, message: "Meals already initialized" };
+    return { success: true, message: "Måltider finns redan" };
   }
 
   // Create starter meals
@@ -55,7 +58,7 @@ export async function initializeStarterMeals() {
   });
 
   revalidatePath("/meals");
-  return { success: true, message: "Starter meals added" };
+  return { success: true, message: "Startmåltider har lagts till" };
 }
 
 export async function getMeals() {
@@ -75,7 +78,7 @@ export async function getMeals() {
 export async function addMeal(formData: FormData) {
   const user = await getCurrentUser();
   if (!user) {
-    return { error: "Unauthorized" };
+    return { error: "Ej behörig" };
   }
 
   const name = formData.get("name") as string;
@@ -99,7 +102,7 @@ export async function addMeal(formData: FormData) {
 export async function updateMeal(id: string, formData: FormData) {
   const user = await getCurrentUser();
   if (!user) {
-    return { error: "Unauthorized" };
+    return { error: "Ej behörig" };
   }
 
   const name = formData.get("name") as string;
@@ -115,7 +118,7 @@ export async function updateMeal(id: string, formData: FormData) {
   });
 
   if (!meal || meal.userId !== user.id) {
-    return { error: "Meal not found" };
+    return { error: "Måltiden hittades inte" };
   }
 
   await prisma.meal.update({
@@ -130,7 +133,7 @@ export async function updateMeal(id: string, formData: FormData) {
 export async function deleteMeal(id: string) {
   const user = await getCurrentUser();
   if (!user) {
-    return { error: "Unauthorized" };
+    return { error: "Ej behörig" };
   }
 
   // Verify ownership
@@ -139,7 +142,7 @@ export async function deleteMeal(id: string) {
   });
 
   if (!meal || meal.userId !== user.id) {
-    return { error: "Meal not found" };
+    return { error: "Måltiden hittades inte" };
   }
 
   await prisma.meal.delete({

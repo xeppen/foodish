@@ -32,7 +32,7 @@ export function MealList({ meals }: { meals: Meal[] }) {
   }
 
   async function handleDelete(id: string) {
-    if (confirm("Are you sure you want to delete this meal?")) {
+    if (confirm("Är du säker på att du vill ta bort den här måltiden?")) {
       await deleteMeal(id);
     }
   }
@@ -54,21 +54,21 @@ export function MealList({ meals }: { meals: Meal[] }) {
                 className="flex-1"
                 autoFocus
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter') handleUpdate(meal.id);
-                  if (e.key === 'Escape') cancelEditing();
+                  if (e.key === "Enter") handleUpdate(meal.id);
+                  if (e.key === "Escape") cancelEditing();
                 }}
               />
               <button
                 onClick={() => handleUpdate(meal.id)}
                 className="btn-primary px-4 py-2 text-sm"
               >
-                Save
+                Spara
               </button>
               <button
                 onClick={cancelEditing}
                 className="btn-secondary px-4 py-2 text-sm"
               >
-                Cancel
+                Avbryt
               </button>
             </div>
           ) : (
@@ -82,13 +82,13 @@ export function MealList({ meals }: { meals: Meal[] }) {
                   onClick={() => startEditing(meal)}
                   className="px-3 py-1.5 text-sm font-semibold text-[var(--terracotta)] hover:bg-[var(--terracotta)]/10 rounded-lg transition-colors"
                 >
-                  Edit
+                  Redigera
                 </button>
                 <button
                   onClick={() => handleDelete(meal.id)}
                   className="px-3 py-1.5 text-sm font-semibold text-[var(--warm-gray)] hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                 >
-                  Delete
+                  Ta bort
                 </button>
               </div>
             </div>

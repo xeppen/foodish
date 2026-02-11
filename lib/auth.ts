@@ -26,7 +26,7 @@ export const getCurrentUser = cache(async () => {
 export const getUserId = cache(async () => {
   const { userId } = await auth();
   if (!userId) {
-    throw new Error("Unauthorized");
+    throw new Error("Ej behörig");
   }
   return userId;
 });

@@ -25,7 +25,7 @@ export function GeneratePlanButton() {
         router.refresh();
       }
     } catch (err) {
-      setError("Failed to generate plan. Please try again.");
+      setError("Kunde inte skapa planen. Försök igen.");
       setLoading(false);
     }
   }
@@ -38,7 +38,7 @@ export function GeneratePlanButton() {
         className="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white px-6 py-3 rounded-md font-medium transition-colors flex items-center gap-2 mx-auto"
       >
         {loading && <LoadingSpinner size="sm" />}
-        {loading ? "Generating..." : "Generate This Week's Plan"}
+        {loading ? "Genererar..." : "Skapa veckans plan"}
       </button>
       {error && <ErrorMessage message={error} />}
     </div>

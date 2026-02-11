@@ -1,4 +1,5 @@
 import { SignIn } from "@clerk/nextjs";
+import { svSE } from "@clerk/localizations";
 
 export default function SignInPage() {
   return (
@@ -6,15 +7,16 @@ export default function SignInPage() {
       <div className="max-w-md w-full">
         <div className="text-center mb-8 animate-fade-in-up">
           <h1 className="text-4xl md:text-5xl font-bold mb-3 text-[var(--charcoal)]">
-            What&apos;s for <span className="text-[var(--terracotta)] italic">Dinner?</span>
+            Vad blir det till <span className="text-[var(--terracotta)] italic">middag?</span>
           </h1>
           <p className="text-lg text-[var(--warm-gray)]">
-            Weekly dinner planning in under 60 seconds
+            Veckoplanering av middagar på under en minut
           </p>
         </div>
 
         <div className="animate-scale-in delay-100">
           <SignIn
+            localization={svSE}
             appearance={{
               elements: {
                 rootBox: "mx-auto",
