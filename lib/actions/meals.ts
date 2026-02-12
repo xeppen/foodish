@@ -3,6 +3,8 @@
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
+import { STARTER_MEALS } from "@/lib/starter-meals";
+import { Prisma } from "@prisma/client";
 import { z } from "zod";
 
 const mealSchema = z.object({
@@ -10,29 +12,8 @@ const mealSchema = z.object({
     .string()
     .min(1, "Måltidsnamnet är obligatoriskt")
     .max(100, "Måltidsnamnet är för långt"),
+  complexity: z.enum(["SIMPLE", "MEDIUM", "COMPLEX"]).optional(),
 });
-
-// Starter pack meals for first-time users
-const STARTER_MEALS = [
-  "Pasta med tomatsås",
-  "Kycklingwok med ris",
-  "Tacos",
-  "Pizza (hemmagjord eller hämtmat)",
-  "Grillad kyckling med grönsaker",
-  "Pasta carbonara",
-  "Stekt ris",
-  "Hamburgare",
-  "Fisk med rostade potatisar",
-  "Kycklingcurry med ris",
-  "Quesadillas",
-  "Lasagne",
-  "Lax med grönsaker",
-  "Kycklingfajitas",
-  "Wokade nudlar",
-  "Köttbullar med pasta",
-  "Ugnsstekt kyckling med ris",
-  "Grönsakssoppa med bröd",
-];
 
 export async function initializeStarterMeals() {
   const user = await getCurrentUser();
@@ -57,6 +38,7 @@ export async function initializeStarterMeals() {
     })),
   });
 
+  revalidatePath("/");
   revalidatePath("/meals");
   return { success: true, message: "Startmåltider har lagts till" };
 }
@@ -67,12 +49,45 @@ export async function getMeals() {
     return [];
   }
 
-  const meals = await prisma.meal.findMany({
-    where: { userId: user.id },
-    orderBy: { createdAt: "desc" },
-  });
+  try {
+    let meals = await prisma.meal.findMany({
+      where: { userId: user.id },
+      orderBy: { createdAt: "desc" },
+    });
 
-  return meals;
+    // Bootstrap starter meals for authenticated users with empty libraries.
+    if (meals.length === 0) {
+      await prisma.meal.createMany({
+        data: STARTER_MEALS.map((name) => ({
+          name,
+          userId: user.id,
+        })),
+      });
+
+      meals = await prisma.meal.findMany({
+        where: { userId: user.id },
+        orderBy: { createdAt: "desc" },
+      });
+    }
+
+    return meals;
+  } catch (error) {
+    const prismaError =
+      error instanceof Prisma.PrismaClientKnownRequestError
+        ? {
+            code: error.code,
+            message: error.message,
+            meta: error.meta,
+          }
+        : null;
+
+    console.error("Failed to load meals", {
+      userId: user.id,
+      error,
+      prismaError,
+    });
+    return [];
+  }
 }
 
 export async function addMeal(formData: FormData) {
@@ -82,7 +97,11 @@ export async function addMeal(formData: FormData) {
   }
 
   const name = formData.get("name") as string;
-  const validation = mealSchema.safeParse({ name });
+  const complexity = formData.get("complexity");
+  const validation = mealSchema.safeParse({
+    name,
+    complexity: typeof complexity === "string" && complexity.length > 0 ? complexity : undefined,
+  });
 
   if (!validation.success) {
     return { error: validation.error.issues[0].message };
@@ -92,9 +111,11 @@ export async function addMeal(formData: FormData) {
     data: {
       name: validation.data.name,
       userId: user.id,
+      complexity: validation.data.complexity ?? "MEDIUM",
     },
   });
 
+  revalidatePath("/");
   revalidatePath("/meals");
   return { success: true };
 }
@@ -106,7 +127,11 @@ export async function updateMeal(id: string, formData: FormData) {
   }
 
   const name = formData.get("name") as string;
-  const validation = mealSchema.safeParse({ name });
+  const complexity = formData.get("complexity");
+  const validation = mealSchema.safeParse({
+    name,
+    complexity: typeof complexity === "string" && complexity.length > 0 ? complexity : undefined,
+  });
 
   if (!validation.success) {
     return { error: validation.error.issues[0].message };
@@ -123,9 +148,13 @@ export async function updateMeal(id: string, formData: FormData) {
 
   await prisma.meal.update({
     where: { id },
-    data: { name: validation.data.name },
+    data: {
+      name: validation.data.name,
+      ...(validation.data.complexity ? { complexity: validation.data.complexity } : {}),
+    },
   });
 
+  revalidatePath("/");
   revalidatePath("/meals");
   return { success: true };
 }
@@ -149,6 +178,7 @@ export async function deleteMeal(id: string) {
     where: { id },
   });
 
+  revalidatePath("/");
   revalidatePath("/meals");
   return { success: true };
 }

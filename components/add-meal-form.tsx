@@ -2,12 +2,14 @@
 
 import { addMeal } from "@/lib/actions/meals";
 import { useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { ErrorMessage } from "./error-message";
 
 export function AddMealForm() {
   const formRef = useRef<HTMLFormElement>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const router = useRouter();
 
   async function handleSubmit(formData: FormData) {
     setError(null);
@@ -20,6 +22,7 @@ export function AddMealForm() {
         setError(result.error);
       } else {
         formRef.current?.reset();
+        router.refresh();
       }
     } catch (err) {
       setError("Kunde inte lägga till måltiden. Försök igen.");
@@ -42,6 +45,20 @@ export function AddMealForm() {
           required
           disabled={loading}
         />
+      </div>
+
+      <div>
+        <label htmlFor="complexity" className="block text-sm font-semibold text-[var(--charcoal)] mb-2">
+          Komplexitet
+        </label>
+        <select id="complexity" name="complexity" defaultValue="MEDIUM" disabled={loading}>
+          <option value="SIMPLE">Enkel</option>
+          <option value="MEDIUM">Medium</option>
+          <option value="COMPLEX">Avancerad</option>
+        </select>
+        <p className="mt-2 text-xs text-[var(--warm-gray)]">
+          Enkel: under 30 min, Medium: 30-60 min, Avancerad: over 60 min.
+        </p>
       </div>
 
       {error && <ErrorMessage message={error} />}

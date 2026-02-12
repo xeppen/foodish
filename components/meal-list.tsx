@@ -2,43 +2,58 @@
 
 import { deleteMeal, updateMeal } from "@/lib/actions/meals";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 
 type Meal = {
   id: string;
   name: string;
-  createdAt: Date;
+  complexity: "SIMPLE" | "MEDIUM" | "COMPLEX";
+  createdAt: Date | string;
 };
 
 export function MealList({ meals }: { meals: Meal[] }) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState("");
+  const [editComplexity, setEditComplexity] = useState<Meal["complexity"]>("MEDIUM");
+  const router = useRouter();
 
   function startEditing(meal: Meal) {
     setEditingId(meal.id);
     setEditValue(meal.name);
+    setEditComplexity(meal.complexity);
   }
 
   function cancelEditing() {
     setEditingId(null);
     setEditValue("");
+    setEditComplexity("MEDIUM");
   }
 
   async function handleUpdate(id: string) {
     const formData = new FormData();
     formData.append("name", editValue);
-    await updateMeal(id, formData);
+    formData.append("complexity", editComplexity);
+    const result = await updateMeal(id, formData);
+    if (result.error) {
+      return;
+    }
     setEditingId(null);
     setEditValue("");
+    setEditComplexity("MEDIUM");
+    router.refresh();
   }
 
   async function handleDelete(id: string) {
     if (confirm("Är du säker på att du vill ta bort den här måltiden?")) {
-      await deleteMeal(id);
+      const result = await deleteMeal(id);
+      if (!result.error) {
+        router.refresh();
+      }
     }
   }
 
   return (
-    <ul className="space-y-3">
+    <ul className="divide-y divide-[var(--cream-dark)] rounded-xl border border-[var(--cream-dark)] bg-white">
       {meals.map((meal, index) => (
         <li
           key={meal.id}
@@ -46,47 +61,62 @@ export function MealList({ meals }: { meals: Meal[] }) {
           style={{ animationDelay: `${index * 0.05}s` }}
         >
           {editingId === meal.id ? (
-            <div className="flex gap-2 p-4 bg-white border-2 border-[var(--terracotta)] rounded-xl">
+            <div className="space-y-2 px-3 py-2.5">
               <input
                 type="text"
                 value={editValue}
                 onChange={(e) => setEditValue(e.target.value)}
-                className="flex-1"
+                className="w-full"
                 autoFocus
                 onKeyDown={(e) => {
                   if (e.key === "Enter") handleUpdate(meal.id);
                   if (e.key === "Escape") cancelEditing();
                 }}
               />
-              <button
-                onClick={() => handleUpdate(meal.id)}
-                className="btn-primary px-4 py-2 text-sm"
-              >
-                Spara
-              </button>
-              <button
-                onClick={cancelEditing}
-                className="btn-secondary px-4 py-2 text-sm"
-              >
-                Avbryt
-              </button>
+              <div className="flex items-center gap-2">
+                <select
+                  value={editComplexity}
+                  onChange={(e) => setEditComplexity(e.target.value as Meal["complexity"])}
+                  className="w-full text-sm"
+                >
+                  <option value="SIMPLE">Enkel</option>
+                  <option value="MEDIUM">Medium</option>
+                  <option value="COMPLEX">Avancerad</option>
+                </select>
+                <button
+                  onClick={() => handleUpdate(meal.id)}
+                  className="btn-primary px-3 py-1.5 text-sm"
+                >
+                  Spara
+                </button>
+                <button
+                  onClick={cancelEditing}
+                  className="btn-secondary px-3 py-1.5 text-sm"
+                >
+                  Avbryt
+                </button>
+              </div>
             </div>
           ) : (
-            <div className="flex items-center justify-between p-4 bg-white/60 hover:bg-white border border-[var(--cream-dark)] rounded-xl hover:border-[var(--terracotta)]/30 transition-all hover:shadow-sm">
-              <div className="flex items-center gap-3">
-                <div className="w-2 h-2 rounded-full bg-[var(--sage)]"></div>
-                <span className="font-medium text-[var(--charcoal)]">{meal.name}</span>
-              </div>
-              <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+            <div className="flex items-center justify-between px-3 py-2.5 hover:bg-[var(--cream)]/60">
+              <button
+                type="button"
+                onClick={() => startEditing(meal)}
+                className="flex flex-1 items-center gap-3 text-left"
+              >
+                <div className="h-1.5 w-1.5 rounded-full bg-[var(--sage)]" />
+                <span className="text-sm font-medium text-[var(--charcoal)]">{meal.name}</span>
+              </button>
+              <div className="flex gap-1.5">
                 <button
                   onClick={() => startEditing(meal)}
-                  className="px-3 py-1.5 text-sm font-semibold text-[var(--terracotta)] hover:bg-[var(--terracotta)]/10 rounded-lg transition-colors"
+                  className="rounded-md px-2 py-1 text-xs font-semibold text-[var(--terracotta)] hover:bg-[var(--terracotta)]/10 transition-colors"
                 >
                   Redigera
                 </button>
                 <button
                   onClick={() => handleDelete(meal.id)}
-                  className="px-3 py-1.5 text-sm font-semibold text-[var(--warm-gray)] hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                  className="rounded-md px-2 py-1 text-xs font-semibold text-[var(--warm-gray)] hover:bg-red-50 hover:text-red-600 transition-colors"
                 >
                   Ta bort
                 </button>
