@@ -143,12 +143,12 @@ Plans:
   4. Thumbs-up meals appear more frequently in generated plans (2x probability boost)
   5. Thumbs-down meals appear less frequently but are never excluded (0.5x probability)
   6. All existing meals default to neutral rating
-**Plans**: TBD
+**Plans**: 3 plans
 
 Plans:
-- [ ] 08-01: Create RatingToggle component with optimistic updates
-- [ ] 08-02: Implement rateMeal() Server Action
-- [ ] 08-03: Integrate rating influence into plan generation algorithm
+- [x] 08-01: Create RatingToggle component with optimistic updates
+- [x] 08-02: Implement rateMeal() Server Action
+- [x] 08-03: Integrate rating influence into plan generation algorithm
 
 #### Phase 9: Complexity Levels & Badges
 **Goal**: Meals indicate preparation effort, enabling time-aware meal selection
@@ -203,14 +203,14 @@ Phases execute in numeric order: 6 → 7 → 8 → 9 → 10
 | 5. Polish & Deployment | v1.0 | 6/6 | Complete | 2026-02-10 |
 | 6. Database Foundation | v1.1 | 3/3 | Complete | 2026-02-12 |
 | 7. Variety Rules & Rotation Logic | v1.1 | 3/3 | Complete | 2026-02-12 |
-| 8. Rating System & UI | v1.1 | 0/3 | Not started | - |
+| 8. Rating System & UI | v1.1 | 3/3 | Complete | 2026-02-12 |
 | 9. Complexity Levels & Badges | v1.1 | 3/3 | Complete | 2026-02-12 |
 | 10. Progressive Disclosure Swap | v1.1 | 0/4 | Not started | - |
 
 **Deployment:** https://foodish-red.vercel.app
 **Repository:** https://github.com/xeppen/foodish
-**Current Status:** v1.0 deployed, v1.1 Phases 6-7-9 complete, Phase 8/10 pending
+**Current Status:** v1.0 deployed, v1.1 Phases 6-7-8-9 complete, Phase 10 pending
 
 ---
 *Roadmap created: 2026-02-09*
-*Last updated: 2026-02-12 (Phase 9 completed)*
+*Last updated: 2026-02-12 (Phase 8 completed)*

@@ -9,12 +9,12 @@ Requirements for Smart Variety & Preferences milestone. Each maps to roadmap pha
 
 ### Ratings
 
-- [ ] **RATING-01**: User can rate meals with thumbs up/neutral/down
+- [x] **RATING-01**: User can rate meals with thumbs up/neutral/down
 - [x] **RATING-02**: Meal ratings persist across sessions
-- [ ] **RATING-03**: Rating toggle appears in meal list (not plan view)
-- [ ] **RATING-04**: Thumbs-up meals appear more frequently in generation
-- [ ] **RATING-05**: Thumbs-down meals appear less frequently (but not excluded)
-- [ ] **RATING-06**: Existing meals default to neutral rating
+- [x] **RATING-03**: Rating toggle appears in meal list (not plan view)
+- [x] **RATING-04**: Thumbs-up meals appear more frequently in generation
+- [x] **RATING-05**: Thumbs-down meals appear less frequently (but not excluded)
+- [x] **RATING-06**: Existing meals default to neutral rating
 
 ### Variety Control
 
@@ -95,12 +95,12 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| RATING-01 | Phase 8 | Pending |
+| RATING-01 | Phase 8 | Complete |
 | RATING-02 | Phase 6 | Complete |
-| RATING-03 | Phase 8 | Pending |
-| RATING-04 | Phase 8 | Pending |
-| RATING-05 | Phase 8 | Pending |
-| RATING-06 | Phase 8 | Pending |
+| RATING-03 | Phase 8 | Complete |
+| RATING-04 | Phase 8 | Complete |
+| RATING-05 | Phase 8 | Complete |
+| RATING-06 | Phase 8 | Complete |
 | VARIETY-01 | Phase 7 | Complete |
 | VARIETY-02 | Phase 7 | Complete |
 | VARIETY-03 | Phase 7 | Complete |
@@ -137,4 +137,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-02-12*
-*Last updated: 2026-02-12 (Phase 9 traceability updated)*
+*Last updated: 2026-02-12 (Phase 8 traceability updated)*

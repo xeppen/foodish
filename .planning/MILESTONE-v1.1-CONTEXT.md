@@ -2,7 +2,7 @@
 
 **Created:** 2026-02-12
 **Milestone:** v1.1 Smart Variety & Preferences
-**Status:** In progress (Phase 6-7-9 complete; Phase 8 and 10 pending)
+**Status:** In progress (Phase 6-7-8-9 complete; Phase 10 pending)
 
 ## Motivation
 
@@ -151,6 +151,7 @@ The constraint is critical: we can't sacrifice speed for features. The fast path
 - RatingToggle component (thumbs up/neutral/down)
 - Optimistic UI updates
 - Rating influence in plan generation (2x probability for thumbs-up)
+- Status: Completed on 2026-02-12
 
 ### Phase 4: Complexity Levels & Badges (Phase 9)
 - ComplexityBadge component with visual coding
