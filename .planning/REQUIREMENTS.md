@@ -1,65 +1,76 @@
-# Requirements: What's for Dinner?
+# Requirements: What's for Dinner? v1.1
 
-**Defined:** 2026-02-09
-**Core Value:** Weekly dinner planning takes less than 60 seconds and removes decision fatigue.
+**Defined:** 2026-02-12
+**Core Value:** Plans feel fresh and match household preferences while maintaining fast planning (sub-60 seconds)
 
-## v1 Requirements
+## v1.1 Requirements
 
-Requirements for initial release. Each maps to roadmap phases.
+Requirements for Smart Variety & Preferences milestone. Each maps to roadmap phases.
 
-### Authentication
+### Ratings
 
-- [ ] **AUTH-01**: User can sign in with Google
-- [ ] **AUTH-02**: User session persists across browser refresh
-- [ ] **AUTH-03**: User can sign out from any page
+- [ ] **RATING-01**: User can rate meals with thumbs up/neutral/down
+- [ ] **RATING-02**: Meal ratings persist across sessions
+- [ ] **RATING-03**: Rating toggle appears in meal list (not plan view)
+- [ ] **RATING-04**: Thumbs-up meals appear more frequently in generation
+- [ ] **RATING-05**: Thumbs-down meals appear less frequently (but not excluded)
+- [ ] **RATING-06**: Existing meals default to neutral rating
 
-### Setup
+### Variety Control
 
-- [ ] **SETUP-01**: First-time user sees starter pack of 15-20 common meals pre-filled
-- [ ] **SETUP-02**: User can remove meals from starter pack
-- [ ] **SETUP-03**: User can add their own meals during setup
-- [ ] **SETUP-04**: User can proceed to planning without completing setup
+- [ ] **VARIETY-01**: Generated plans never include duplicate meals within same week
+- [ ] **VARIETY-02**: Meals used in last 2 weeks are deprioritized
+- [ ] **VARIETY-03**: Favorite meals can appear once per week but not 3+ weeks consecutively
+- [ ] **VARIETY-04**: Usage history tracks when each meal was used
+- [ ] **VARIETY-05**: Graceful degradation when constraints conflict with small meal libraries
 
-### Meal Management
+### Complexity
 
-- [ ] **MEAL-01**: User can view their personal meal list
-- [ ] **MEAL-02**: User can add new meals (text-based, no images/recipes)
-- [ ] **MEAL-03**: User can edit existing meals
-- [ ] **MEAL-04**: User can delete meals from their list
+- [ ] **COMPLEX-01**: Meals have complexity level (simple/medium/complex)
+- [ ] **COMPLEX-02**: New meals default to medium complexity
+- [ ] **COMPLEX-03**: User can set/change complexity when creating or editing meal
+- [ ] **COMPLEX-04**: Complexity definitions are clear (time-based: <30min, 30-60min, >60min)
+- [ ] **COMPLEX-05**: Complexity badges display in meal list
 
-### Weekly Planning
+### Enhanced Swapping
 
-- [ ] **PLAN-01**: User sees auto-generated weekly plan with 5 weekday meals
-- [ ] **PLAN-02**: Each day shows one meal from the user's personal list
-- [ ] **PLAN-03**: Recently used meals are deprioritized in generation
-- [ ] **PLAN-04**: Same weekly plan is avoided if possible
-- [ ] **PLAN-05**: Current week's plan is saved automatically
-- [ ] **PLAN-06**: New plan is generated automatically for next week
+- [ ] **SWAP-01**: Fast random swap remains primary action (one click, no filters)
+- [ ] **SWAP-02**: At least 4 swap candidate meals preloaded when plan loads (no backend wait)
+- [ ] **SWAP-03**: Swap shows immediately using preloaded candidates
+- [ ] **SWAP-04**: Background refresh of swap pool after swap completes
+- [ ] **SWAP-05**: "Swap with filters" option reveals progressive disclosure UI
+- [ ] **SWAP-06**: Filter by complexity (show only simple/medium/complex meals)
+- [ ] **SWAP-07**: Filter by rating (show only thumbs-up meals)
+- [ ] **SWAP-08**: Filter by recency (show meals not used recently)
+- [ ] **SWAP-09**: Filtered results show meal count ("Simple (3 meals)")
+- [ ] **SWAP-10**: Zero-result filters show fallback options
+- [ ] **SWAP-11**: Main plan page UI unchanged from v1.0 (fast path preserved)
 
-### Plan Adjustment
+## Future Requirements
 
-- [ ] **SWAP-01**: User can swap individual days with one click
-- [ ] **SWAP-02**: Swap replaces only that single day, not entire week
+Deferred from v1.1 to future milestones.
 
-## v2 Requirements
+### Shopping Lists
 
-Deferred to future release. Tracked but not in current roadmap.
-
-### Extended Planning
-- **PLAN-07**: User can plan weekend meals (Saturday/Sunday)
-- **PLAN-08**: User can view plan history for past weeks
-
-### Meal Organization
-- **MEAL-05**: User can add tags/categories to meals
-- **MEAL-06**: User can filter meal list by tags
-
-### Shopping
 - **SHOP-01**: User can generate shopping list from weekly plan
-- **SHOP-02**: User can customize ingredient lists per meal
+- **SHOP-02**: User can add ingredients to meals
+- **SHOP-03**: Shopping list aggregates ingredients from plan
 
-### Notifications
-- **NOTF-01**: User receives email reminder to plan next week
-- **NOTF-02**: User receives notification when new week begins
+### Weekend Meals
+
+- **PLAN-07**: User can plan weekend meals (Saturday/Sunday)
+- **PLAN-08**: Weekend meals have different patterns than weekday
+
+### Visual Enhancement
+
+- **MEAL-07**: Meals can have images
+- **MEAL-08**: AI-generated or AI-searched meal images
+
+### Extended Variety
+
+- **VARIETY-06**: User can configure variety window (default 14 days)
+- **VARIETY-07**: Variety dashboard shows usage stats ("14/18 meals used this month")
+- **VARIETY-08**: Transparent selection reasons (tooltips explaining why meal chosen)
 
 ## Out of Scope
 
@@ -67,16 +78,16 @@ Explicitly excluded. Documented to prevent scope creep.
 
 | Feature | Reason |
 |---------|--------|
-| Recipe libraries | Not a food discovery tool, users already know their meals |
-| Nutrition tracking | Not a health app, trust users' existing meal knowledge |
-| AI/ML optimization | Intentionally simple logic, no complex personalization |
-| Shopping lists (v1) | Massive complexity, defer to v2 after core validation |
-| Child profiles/preferences | Household-level tool, not per-person customization |
-| Social features | Personal tool, no sharing or community aspects |
-| Inspiration feeds | No browsing, only decision removal |
-| Weekend meals (v1) | Focus on recurring weekday friction first |
-| Meal ratings/reviews | No feedback loops, keep it boring and predictable |
-| Recipe content/images | Text-only keeps focus on decision, not discovery |
+| 5-star ratings | Adds ambiguity vs binary clarity, 200% lower engagement than thumbs |
+| Hard meal exclusions ("never show") | Shrinks viable pool dangerously, creates "no meals" scenarios |
+| ML recommendation engine | Over-engineering for 18-meal sets, violates simplicity principle |
+| Complex rotation schedules | Reduces flexibility, adds configuration burden |
+| Per-person preferences | Household-level tool, not individual profiles |
+| Extensive meal metadata (tags, categories) | Adds friction on meal creation |
+| Recipe content/cooking instructions | Not a recipe app, focus on decision removal |
+| Nutrition tracking | Not a health app, trust users' meal knowledge |
+| Social features | Personal tool, no sharing or community |
+| Context-aware suggestions (time-of-day) | Defer to v1.2+, not core to variety problem |
 
 ## Traceability
 
@@ -84,31 +95,39 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| AUTH-01 | Phase 1 | Pending |
-| AUTH-02 | Phase 1 | Pending |
-| AUTH-03 | Phase 1 | Pending |
-| SETUP-01 | Phase 2 | Pending |
-| SETUP-02 | Phase 2 | Pending |
-| SETUP-03 | Phase 2 | Pending |
-| SETUP-04 | Phase 2 | Pending |
-| MEAL-01 | Phase 2 | Pending |
-| MEAL-02 | Phase 2 | Pending |
-| MEAL-03 | Phase 2 | Pending |
-| MEAL-04 | Phase 2 | Pending |
-| PLAN-01 | Phase 3 | Pending |
-| PLAN-02 | Phase 3 | Pending |
-| PLAN-03 | Phase 3 | Pending |
-| PLAN-04 | Phase 3 | Pending |
-| PLAN-05 | Phase 3 | Pending |
-| PLAN-06 | Phase 3 | Pending |
-| SWAP-01 | Phase 4 | Pending |
-| SWAP-02 | Phase 4 | Pending |
+| RATING-01 | TBD | Pending |
+| RATING-02 | TBD | Pending |
+| RATING-03 | TBD | Pending |
+| RATING-04 | TBD | Pending |
+| RATING-05 | TBD | Pending |
+| RATING-06 | TBD | Pending |
+| VARIETY-01 | TBD | Pending |
+| VARIETY-02 | TBD | Pending |
+| VARIETY-03 | TBD | Pending |
+| VARIETY-04 | TBD | Pending |
+| VARIETY-05 | TBD | Pending |
+| COMPLEX-01 | TBD | Pending |
+| COMPLEX-02 | TBD | Pending |
+| COMPLEX-03 | TBD | Pending |
+| COMPLEX-04 | TBD | Pending |
+| COMPLEX-05 | TBD | Pending |
+| SWAP-01 | TBD | Pending |
+| SWAP-02 | TBD | Pending |
+| SWAP-03 | TBD | Pending |
+| SWAP-04 | TBD | Pending |
+| SWAP-05 | TBD | Pending |
+| SWAP-06 | TBD | Pending |
+| SWAP-07 | TBD | Pending |
+| SWAP-08 | TBD | Pending |
+| SWAP-09 | TBD | Pending |
+| SWAP-10 | TBD | Pending |
+| SWAP-11 | TBD | Pending |
 
 **Coverage:**
-- v1 requirements: 19 total
-- Mapped to phases: 19/19 (100%)
-- Unmapped: 0
+- v1.1 requirements: 27 total
+- Mapped to phases: 0 (roadmap not yet created)
+- Unmapped: 27
 
 ---
-*Requirements defined: 2026-02-09*
-*Last updated: 2026-02-09 after roadmap creation*
+*Requirements defined: 2026-02-12*
+*Last updated: 2026-02-12 after v1.1 milestone definition*
