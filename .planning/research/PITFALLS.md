@@ -1,307 +1,375 @@
-# Pitfalls Research
+# Pitfalls Research: Adding Ratings, Variety & Preferences to Meal Planning
 
-**Domain:** Meal Planning & Decision Removal Tools
-**Researched:** 2026-02-09
-**Confidence:** MEDIUM
+**Domain:** Meal Planning Enhancement (v1.1 - Adding preferences to existing system)
+**Researched:** 2026-02-12
+**Confidence:** HIGH (based on existing codebase analysis + research)
+**Context:** Adding ratings, variety control, complexity levels, and filtered swapping to a working v1.0 app with real users
 
 ## Critical Pitfalls
 
-### Pitfall 1: The Complexity Death Spiral
+### Pitfall 1: Null Rating Migration Breaking Plan Generation
 
 **What goes wrong:**
-70% of users abandon meal planning apps within 2 weeks if it's too complex or time-consuming. The app intended to reduce mental load ends up creating more work than manual planning.
+Adding a nullable `rating` column to the Meal table causes the existing plan generation algorithm to fail or produce unexpected results. All existing meals have `null` ratings, and the algorithm doesn't handle this state gracefully, either filtering out all existing meals or causing runtime errors when attempting to sort/weight by rating.
 
 **Why it happens:**
-Product teams mistake "sophisticated" for "valuable" — adding customization options, detailed nutritional tracking, preference sliders, and advanced filters under the belief that more control = better experience. The result: users spend 10+ minutes configuring settings before seeing their first meal suggestion.
+Developers add the schema field first, then update the algorithm to use ratings without considering the transition period where production data has no ratings. The v1.0 algorithm's `orderBy: { lastUsed: "asc" }` gets replaced with rating-based logic that assumes non-null values.
 
 **How to avoid:**
-- Impose a 60-second time limit as a design constraint (aligns with your success criteria)
-- Every feature must pass the "does this reduce or add decisions?" test
-- Default to opinionated choices rather than asking users to configure
-- Track "time to first meal plan" metric obsessively
+- Add rating column as nullable with a documented neutral value (e.g., null = neutral/unrated)
+- Update algorithm to treat null ratings as neutral (3/5 or middle weight) in all sorting/filtering logic
+- Never filter meals by `rating != null` — always include unrated meals in pool
+- Use coalescing in queries: `orderBy: { rating: "desc" }` becomes `orderBy: [{ rating: { sort: "desc", nulls: "last" } }, { lastUsed: "asc" }]`
+- Add explicit tests for the mixed state (some meals rated, some not)
 
 **Warning signs:**
-- Feature requests asking for "more customization options"
-- User testing sessions where participants ask "what should I do first?"
-- Onboarding flows requiring more than 3 inputs
-- Finding yourself explaining "you can also..." more than once
+- New installs work but existing users see "not enough meals" errors
+- User with 15 meals suddenly can't generate plans (because only 2 have ratings)
+- Test database has all meals rated but production doesn't
 
 **Phase to address:**
-Phase 1 (Foundation) — Build with the 60-second constraint from day one. Retrofitting simplicity is nearly impossible.
+Phase 1 (Schema & Migration) — Migration must include default handling strategy documented in code comments
 
 ---
 
-### Pitfall 2: Recipe App Drift (The Core Identity Crisis)
+### Pitfall 2: Variety Rules Creating "No Meals Available" Edge Cases
 
 **What goes wrong:**
-The product slowly morphs from "dinner decision tool" into "yet another recipe app" through incremental feature additions. Each feature seems reasonable in isolation (recipe ratings, cooking videos, ingredient substitutions, nutritional info) but collectively they destroy the core value proposition.
+User has 8 meals in their library but can't generate a 5-day plan after running the app for 2 weeks because variety rules are too strict. The constraint "no meal used in last 7 days AND not in current plan" leaves zero eligible meals, causing plan generation to fail with a cryptic error.
 
 **Why it happens:**
-- Competitive pressure: "Competitor X has recipe ratings, we should too"
-- Feature requests from vocal users: "I'd love to save my favorite recipes"
-- Metrics misinterpretation: "Users are clicking through to recipes, they must want more recipe features"
-- Loss of product vision discipline over time
+Variety constraints are implemented as hard filters without graceful degradation. The existing v1.0 logic already has this issue (lines 43-45 in plans.ts: "If we don't have enough meals, cycle through what we have"), but adding MORE constraints (variety rules, complexity filters, rating thresholds) exponentially increases the risk. Developers test with 20+ meals and don't notice the problem until production users with minimal meal libraries report issues.
 
 **How to avoid:**
-- Write and publicly display your anti-feature list (what you deliberately WON'T build)
-- Every feature proposal must answer: "Does this help users decide faster or browse longer?"
-- If a feature is about browsing, rating, or comparing = RED FLAG
-- Implement a "feature obituary" ritual: before adding new features, remove something
+- Implement constraint relaxation cascade:
+  1. Try: Rating > 3 + Variety rules + Complexity match
+  2. Fallback: Rating > 2 + Relaxed variety (last 4 days instead of 7)
+  3. Fallback: Any rated meal + No variety constraints
+  4. Final fallback: ANY meal (current v1.0 behavior)
+- Show user-friendly message when falling back: "We repeated a recent meal because your library is small. Add more meals for better variety."
+- Track fallback metrics to detect when users consistently hit constraints
+- Minimum meal library warning: "For best variety, add at least 10-12 meals" (2x the plan length)
 
 **Warning signs:**
-- Users spend >5 minutes in the app per session (you want <60 seconds)
-- Session frequency increases but planning completion rates drop
-- Analytics show users returning multiple times per week (vs. once per week target)
-- Feature requests that start with "It would be cool if..."
-- Internal discussions using phrases like "discovery experience" or "recipe exploration"
+- "Not enough meals" errors despite user having meals in library
+- Plans start showing same meals repeatedly after 1-2 weeks of use
+- User can generate plan on Monday but swap fails on Friday
 
 **Phase to address:**
-Ongoing vigilance required. Most critical in Phase 2-3 when early traction creates pressure to "enhance" the product.
+Phase 2 (Variety Rules) — Constraint system must include graceful degradation from day one
 
 ---
 
-### Pitfall 3: The Variety Paradox
+### Pitfall 3: Complexity Filtering Causes Empty Swap Results
 
 **What goes wrong:**
-Users complain that meals feel repetitive too quickly, but increasing variety creates two bigger problems: (1) massive grocery lists with ingredients used only once, and (2) decision paralysis returns as users must evaluate unfamiliar recipes.
+User clicks "Quick & Easy" filter on the swap dialog, and instead of seeing alternative meals, they get "No meals available" or an empty state. The current meal is complexity="Medium", and filtering by "Easy" + applying existing variety constraints leaves zero eligible swaps.
 
 **Why it happens:**
-Misunderstanding the actual user need. Users think they want variety, but what they actually want is "predictable relief" — familiar meals that don't require thought. Research shows rotating 12-20 meals provides sufficient variety without cognitive overhead.
+The swap function (line 285 in plans.ts) already has a narrow selection pool (avoids recent + current plan meals). Adding complexity filters further narrows this pool without a fallback strategy. The UI shows a filter but doesn't warn when it will produce zero results.
 
 **How to avoid:**
-- Design for "boring, predictable, relieving" (your stated design goal)
-- Implement meal rotation (2-4 week cycles) rather than algorithmic novelty
-- Focus variety on rotation across weeks, not within a single week
-- Prioritize ingredient overlap: suggest meals that share pantry staples
-- Make "I'm bored with this meal" easy to signal (not "show me 50 alternatives")
+- ALWAYS show result count in filter UI: "Quick & Easy (3 meals)" vs. "Quick & Easy (0 meals)"
+- When filter produces 0 results, show fallback section:
+  - "No quick meals available. Here are other options:" with unfiltered results
+  - Or disable/dim filters that would produce zero results (like e-commerce sites)
+- Keep a "Random" option that ignores all filters as safety valve
+- In swap algorithm, apply filters as preferences, not hard constraints:
+  ```typescript
+  // Prefer matching complexity, but fall back to any meal
+  const preferredMeals = availableMeals.filter(m => m.complexity === filter)
+  const mealsToChooseFrom = preferredMeals.length > 0 ? preferredMeals : availableMeals
+  ```
 
 **Warning signs:**
-- Grocery lists exceeding 25-30 unique items per week
-- Users requesting "more recipe options" in feedback
-- Meals sharing fewer than 40% of core ingredients
-- User complaints about "too much shopping" or "wasted ingredients"
-- Abandonment after 4-6 weeks (the variety fatigue threshold)
+- Swap button sometimes returns errors that weren't there in v1.0
+- Users with small meal libraries can't use filters
+- Filter UI shows options that produce no results when clicked
 
 **Phase to address:**
-Phase 1 (Foundation) — Rotation logic must be core architecture, not bolted on later. Phase 2 should validate rotation cadence through usage data.
+Phase 4 (Filtered Swap) — Filter UX must show result counts and handle zero states before feature ships
 
 ---
 
-### Pitfall 4: The Grocery List Disconnect
+### Pitfall 4: Progressive Disclosure Slowing Down the "Fast Path"
 
 **What goes wrong:**
-The meal plan and grocery list exist as separate features that don't communicate properly. Users manually transfer ingredients, encounter disorganized lists requiring store backtracking, or find essential items missing. This single friction point can make the entire tool feel broken.
+The v1.0 app's core value is "sub-60 second planning." Adding ratings, complexity, and filters clutters the UI with dropdowns, stars, and badges. New users get lost in options, and existing users who loved the simplicity feel the app became "complicated." Time-to-first-plan increases from 30 seconds to 2+ minutes.
 
 **Why it happens:**
-- Treating grocery lists as a "nice-to-have" feature rather than core infrastructure
-- Underestimating the complexity of ingredient parsing, deduplication, and categorization
-- Not accounting for user shopping patterns (store layout, existing inventory)
-- Building the list generation as an afterthought to meal planning
+Developers add all new features to the main UI by default, treating them as equal-priority. The progressive disclosure pattern is poorly implemented with too many layers or confusing navigation. Research shows designs with more than 2 disclosure levels have low usability.
 
 **How to avoid:**
-- Design meal planning and grocery list as a single unified system, not separate features
-- Group ingredients by store section/category automatically (produce, dairy, pantry, etc.)
-- Aggregate quantities intelligently ("2 onions" from 3 recipes = "6 onions" on list)
-- Include a simple pantry check mechanism ("I already have this") with memory
-- Test with actual grocery store trips, not just UI mockups
+- Keep main path identical to v1.0: Plan page shows 5 meals, one swap button per day (no filters shown)
+- New features in secondary layer:
+  - Ratings: Small star icon next to meal name (optional, not blocking)
+  - Complexity: Badge only shown on Meals page, not on Plan view
+  - Filtered swap: Revealed only after clicking swap button (modal/drawer with filters)
+- "Advanced" section for variety preferences, collapsed by default
+- A/B test with existing users to ensure speed doesn't regress
+- Performance budget: First plan generation must stay under 60 seconds, swaps under 5 seconds
 
 **Warning signs:**
-- Users printing/copying lists to paper or other apps
-- Complaints about "forgetting items" or "multiple store trips"
-- Long lists with single-use exotic ingredients (signals poor ingredient overlap)
-- Users asking for manual editing capabilities (signals auto-generation is broken)
-- Grocery list feature has significantly lower usage than meal planning feature
+- Analytics show time-to-first-plan increased
+- User feedback mentions "too complicated" or "too many options"
+- Support requests asking "how do I just get a simple plan like before?"
+- Existing users have lower engagement after update
 
 **Phase to address:**
-Phase 1 (Foundation) — Must be architected together from start. Phase 2 should refine categorization and aggregation based on real usage patterns.
+Phase 5 (Progressive Disclosure) — Must validate that fast path remains fast before considering feature complete
 
 ---
 
-### Pitfall 5: The AI Sophistication Trap
+### Pitfall 5: Ratings Encouraging Meal Library Stagnation
 
 **What goes wrong:**
-Over-investing in ML/AI personalization that requires constant user input (pantry scans, preference updates, meal ratings) to function. The system becomes high-maintenance rather than low-effort. Studies show AI-driven plans offer no retention advantage over simple rule-based systems beyond 6 months.
+Users rate their favorite 5 meals with 5 stars and everything else 2-3 stars. The algorithm heavily weights high-rated meals, so plans become repetitive (same 5 meals rotating constantly). Variety rules become ineffective because the algorithm prefers breaking variety constraints to using lower-rated meals. Ironically, adding "variety" features reduces actual variety.
 
 **Why it happens:**
-- Technology-first thinking: "We have AI, let's use it"
-- Misunderstanding that personalization value ≠ personalization complexity
-- Investor/marketing pressure to be "AI-powered"
-- Copying competitor features without understanding why they fail
+Rating weight is too high in the selection algorithm. The algorithm treats ratings as hard preferences rather than soft suggestions. This is a known problem in recommendation systems: excessive personalization limits diversity. Research shows over-reliance on historical data can limit food diversity and encourage unhealthy dietary choices.
 
 **How to avoid:**
-- Start with simple rule-based logic (dietary restrictions, household size, basic preferences)
-- Only add ML if it measurably reduces user input while maintaining quality
-- Question every "the AI will learn..." assumption — learning requires data, data requires user effort
-- Design for manual override to always be faster than teaching the AI
-- Remember: PlateJoy's case study showed 31% waste reduction in month 1, but users quit by week 5 when pantry scans became burdensome
+- Limit rating influence: Ratings adjust probability but don't override variety constraints
+  - Bad: Only select from 4-5 star meals
+  - Good: 5-star meals are 2x more likely than 3-star, but 3-star still appear regularly
+- Implement "rating decay" over time: A meal rated 5 stars but used 3 times this week gets temporarily downweighted
+- Show user their variety metrics: "This week: 3 new meals, 2 repeats from last week"
+- Periodic "discovery mode": Occasionally suggest a lower-rated or new meal with explanation: "Haven't tried this in a while!"
+- Don't allow filtering out meals entirely (no "hide meals under 3 stars" option)
 
 **Warning signs:**
-- Onboarding requires >5 preference inputs
-- Feature requests for "smarter recommendations" (signals current recs are bad)
-- Engineering time on ML infrastructure exceeds time on core UX
-- Requiring ongoing user feedback (ratings, rejections) for the system to work
-- Drop-off correlates with app asking for more input data
+- User's plans show the same 5-7 meals constantly despite having 20+ in library
+- Low-rated meals never appear in plans (check database: `lastUsed` months old)
+- Users complaint of boredom despite high ratings
 
 **Phase to address:**
-Phase 1 (Foundation) — Use dumb rules that work reliably. Phase 3+ can explore ML only if Phase 1-2 data reveals clear, automatable patterns AND the ML reduces user effort.
+Phase 3 (Planning Algorithm with Ratings) — Rating weight must be tuned conservatively from the start
+
+---
+
+### Pitfall 6: Database Migration Without Backwards Compatibility
+
+**What goes wrong:**
+Schema migration adds new columns (rating, complexity) to production, but the deployment pipeline doesn't coordinate database migration with application code deployment. During the rollout window (database migrated but old app code still running), the app crashes or writes invalid data because the old code doesn't know about new columns/constraints.
+
+**Why it happens:**
+Developers test migration in local environment where database and code update atomically, but production uses a phased rollout (database → app servers over 10-15 minutes). This is a common issue with adding NOT NULL columns or columns with defaults that the application must be aware of.
+
+**How to avoid:**
+- Make all new columns nullable in initial migration (even if they'll later be NOT NULL)
+- Use multi-phase deployment:
+  - Phase 1: Add nullable columns, deploy compatible code that can read/write them
+  - Phase 2 (next release): Backfill data, add defaults
+  - Phase 3 (future release): Add NOT NULL constraint if needed
+- Test with "mixed version" environment: Run old app code against new schema
+- Use feature flags to control when new features activate, separate from deployment
+- Document migration dependencies in code: `// MIGRATION: Requires schema v1.1+`
+
+**Warning signs:**
+- Migration runs successfully but app logs show "column not found" errors
+- Some users see new features while others see errors (during rollout)
+- Rollback is impossible because database schema changed
+
+**Phase to address:**
+Phase 1 (Schema & Migration) — Migration strategy must be defined before any schema changes
+
+---
+
+### Pitfall 7: Complexity Levels Without Clear Definitions
+
+**What goes wrong:**
+User sees three complexity options (Quick, Medium, Advanced) but has no idea what they mean in context. Is "Quick" under 15 minutes or under 30? Does "Advanced" mean hard techniques or just long cooking time? Different users interpret differently, making the data inconsistent and the filtering feature useless. User tags a 45-minute roast as "Quick" because it's easy technique.
+
+**Why it happens:**
+Complexity is subjective, and the app doesn't provide clear definitions or examples. Developers assume users have a shared understanding, but users optimize for different things (time, technique difficulty, cleanup, ingredients).
+
+**How to avoid:**
+- Provide explicit definitions with examples in the UI:
+  - Quick: "30 minutes or less, minimal prep" (e.g., pasta, stir-fry)
+  - Medium: "30-60 minutes, standard cooking" (e.g., roasted chicken)
+  - Advanced: "60+ minutes or special techniques" (e.g., braised dishes, baking)
+- Show examples when user first adds complexity to a meal
+- Consider breaking into two dimensions if needed: "Time" + "Difficulty"
+- Start with optional field, observe patterns, refine definitions based on data
+- Allow users to edit complexity if they disagree with their past choice
+
+**Warning signs:**
+- Filter by "Quick" returns meals that take 60+ minutes
+- Users never use complexity filters (data is unreliable)
+- Support questions: "What does Medium mean?"
+
+**Phase to address:**
+Phase 3 (Complexity Levels) — Definitions must be user-tested before rollout
+
+---
+
+### Pitfall 8: Over-Engineering Variety Rules for v1.1
+
+**What goes wrong:**
+Developers implement sophisticated variety algorithms with multiple rules: "No same protein twice in a row," "Balance cuisines across week," "Rotate cooking methods." The algorithm becomes slow (takes 10+ seconds to generate a plan), hard to debug, and creates unexpected edge cases. The complexity violates the app's core principle of "decision removal, not optimization."
+
+**Why it happens:**
+Feature creep. The milestone says "variety control" and developers interpret that as building a comprehensive meal planning optimizer. They research advanced constraint satisfaction algorithms and implement solutions appropriate for much larger systems.
+
+**How to avoid:**
+- Start with ONE simple variety rule: "Avoid meals used in last N days"
+- Make N configurable per user (default 7 days): "Low variety" = 3 days, "High variety" = 14 days
+- Ship this first, measure effectiveness, then iterate
+- Resist adding more rules until data shows the first rule is insufficient
+- Performance requirement: Plan generation must complete in under 2 seconds (database query time)
+- Remember: v1.0 solved the problem with just `lastUsed` tracking — build on that, don't replace it
+
+**Warning signs:**
+- Plan generation becomes noticeably slower
+- Algorithm has more than 3-4 constraint checks
+- Team debates algorithm details for multiple days
+- Code comments say "this handles the edge case where..."
+
+**Phase to address:**
+Phase 2 (Variety Rules) — Scope must be ruthlessly minimized to single rule with graceful degradation
 
 ---
 
 ## Technical Debt Patterns
 
-Shortcuts that seem reasonable but create long-term problems.
-
 | Shortcut | Immediate Benefit | Long-term Cost | When Acceptable |
 |----------|-------------------|----------------|-----------------|
-| Hardcoded meal rotations instead of database-driven | Ship faster, simpler code | Can't personalize, difficult to update meals at scale | Phase 1 MVP only — must refactor before Phase 2 |
-| No pantry/inventory tracking | Simpler UX, one less feature | Users buy duplicate ingredients, can't optimize lists | Acceptable if grocery list smartly suggests common staples |
-| Static grocery categories (not store-specific) | Works for most users, avoid complexity | Users at different stores have different experiences | Acceptable — store mapping is diminishing returns |
-| Manual recipe entry (no API/scraping) | Control quality, avoid legal issues | Limited meal variety, high maintenance | Never acceptable for long-term — becomes bottleneck |
-| No dietary restriction filtering | Simpler Phase 1 | Excludes significant user segments (allergies, vegetarian, etc.) | Only acceptable for <4 week MVP test |
-
-## Integration Gotchas
-
-Common mistakes when connecting to external services.
-
-| Integration | Common Mistake | Correct Approach |
-|-------------|----------------|------------------|
-| Recipe APIs (Spoonacular, Edamam) | Treating API recipes as canonical source without curation | Build curated recipe database; use APIs for enrichment/backup only |
-| Grocery delivery (Instacart, etc.) | Auto-sending lists without user control | Provide "send to" option but never auto-execute purchases |
-| Calendar sync | Syncing every meal to user's calendar | Only sync if explicitly requested per meal (respect calendar boundaries) |
-| Smart home devices (Alexa, etc.) | Building deep integrations early | Voice should be input channel only (add meal to plan); keep core experience in app |
+| Storing complexity as string enum ("Easy", "Medium", "Hard") instead of normalized table | Faster to implement, easier to query | Hard to change labels, no i18n support, typo risks | Acceptable for v1.1 — MVP doesn't need i18n |
+| Calculating variety constraints in application code vs. database query | Easier to understand logic flow | Fetches more data than needed, slower at scale | Acceptable until 1000+ meals per user (unlikely) |
+| Rating values 1-5 stored as Int vs. flexible point system | Simple UX, familiar pattern | Can't change to 10-point or thumbs-up/down later | Never — use 0-100 internally, map to stars in UI |
+| Default null ratings to 3 in queries vs. explicit null handling | Cleaner query code | Hides difference between "neutral" and "unrated" | Never — unrated is different from neutral rating |
+| Adding complexity to existing Meal table vs. separate MealMetadata table | One migration, fewer joins | Schema grows, harder to add more metadata later | Acceptable for 2-3 fields, refactor if adding more |
+| Client-side filtering for swap vs. server-side | Faster perceived performance | Sends more data, filter logic duplicated | Never — must be server-side for accuracy |
 
 ## Performance Traps
 
-Patterns that work at small scale but fail as usage grows.
-
 | Trap | Symptoms | Prevention | When It Breaks |
 |------|----------|------------|----------------|
-| Generating grocery lists on-demand without caching | UI lag when viewing list | Cache generated lists, invalidate only when meal plan changes | >1000 active users with slow DB queries |
-| Loading all recipe data for filtering | Slow meal suggestion page | Paginate/lazy load, index by key attributes | Recipe database >500 items |
-| Real-time ingredient price lookups | API rate limits, slow list generation | Cache prices, update async in background | Multiple concurrent users (even small scale) |
-| Client-side meal rotation logic | Works fine initially | Move to server with proper date handling/timezone management | Users across timezones, plan generation edge cases |
+| Loading ALL user meals to apply filters in memory | Works fine in dev with 10 meals | Use database-level filtering with WHERE clauses | 100+ meals = slow queries, 500+ meals = timeouts |
+| N+1 queries when displaying plans with ratings (fetching meal details for each day) | Initial load feels slow | Use `include` in Prisma query or single join | 10+ plans loaded = page takes 3+ seconds |
+| Recalculating variety constraints on every swap | Swap button feels sluggish | Cache recent meal IDs for the session/request | Fine for v1.1, only issue with rapid swaps |
+| Full table scan for "unused meals" without index on lastUsed | Swap gets slower over time | Ensure `lastUsed` field has database index | 50+ meals without index = 500ms queries |
+| Storing variety preferences as JSON blob requiring parsing on every plan generation | Plan generation feels slower than v1.0 | Store as proper columns or cache parsed version | Fine for v1.1 scale, issue if rules become complex |
+
+## Integration Gotchas
+
+| Integration | Common Mistake | Correct Approach |
+|-------------|----------------|------------------|
+| Prisma Schema | Adding NOT NULL constraint in same migration as column addition | Add column as nullable first, backfill, then add constraint in later migration |
+| Next.js Caching | Forgetting to revalidatePath after rating updates | Add `revalidatePath("/meals")` after any rating mutation |
+| Clerk Auth | Assuming userId is integer when it's string | TypeScript will catch this, but watch for numeric comparisons |
+| Vercel Deployment | Long-running plan generation hitting serverless timeout | Current generation is fast (<1s), but complex algorithms might hit 10s default limit |
 
 ## UX Pitfalls
 
-Common user experience mistakes in this domain.
-
 | Pitfall | User Impact | Better Approach |
 |---------|-------------|-----------------|
-| Asking "What's for dinner?" as the entry point | Recreates the exact decision fatigue you're solving | Show the plan immediately; allow changes if needed |
-| Requiring meal approval before generating list | Forces user engagement even if they trust the plan | Auto-approve with easy "swap this meal" option |
-| Showing too many meal details upfront (cook time, difficulty, nutrition) | Information overload defeats quick planning | Show minimal info (name, image); details available on tap |
-| "Browse recipes" as primary navigation | Encourages exploration behavior instead of deciding | Hide browsing; focus on "Your Plan" and "Your List" |
-| Meal swapping that shows 20 alternatives | Decision fatigue returns in full force | Show 3 alternatives max, pre-filtered by constraints |
-| Success metrics tied to engagement time | Incentivizes keeping users in the app longer | Success = minimal time spent; track plan completion rate instead |
+| Showing all preference options on first use | Overwhelming, increases time-to-first-plan | Hide advanced options by default, show after user generates first few plans |
+| Requiring ratings before meals can be used | User can't use app until rating 15-20 meals | Ratings completely optional, plans work without any ratings |
+| Filter UI that doesn't show "no results" state | User clicks filter, sees spinning loader, then error | Show result count next to filter, disable filters that produce zero results |
+| Complexity badges on every meal in plan view | Visual clutter, distracts from meal names | Show complexity only on Meals management page, hide in Plan view |
+| Making variety settings a separate page | User doesn't discover feature | Show variety preference as inline setting on Plan page with clear label |
+| Stars UI blocking interaction while saving | User clicks star, nothing happens for 2 seconds | Optimistic UI: Show star immediately, revert if save fails |
+| Swap modal showing 20+ filtering options | User spends 30 seconds choosing instead of quick swap | Show 3 simple filters max: Complexity, Recently Used, Random |
 
 ## "Looks Done But Isn't" Checklist
 
-Things that appear complete but are missing critical pieces.
-
-- [ ] **Grocery List:** Often missing aggregation logic (3 recipes need onions = 1 "onions" entry with wrong quantity) — verify quantities combine correctly
-- [ ] **Meal Swapping:** Often missing constraint preservation (swap fish dinner, get a pork recipe despite "no red meat" preference) — verify all swaps respect original constraints
-- [ ] **Dietary Restrictions:** Often missing cross-contamination awareness (vegetarian user gets recipe calling for chicken broth) — verify ingredient-level filtering, not just recipe tags
-- [ ] **Household Size Scaling:** Often missing proper fraction handling (2.5 eggs becomes "3 eggs" always rounds up, wasting food) — verify rounding logic per ingredient type
-- [ ] **Multi-Week Plans:** Often missing proper date handling (DST changes, month boundaries, timezone issues) — test across date edge cases
-- [ ] **Meal History:** Often missing "recently served" tracking (rotation can suggest same meal two weeks in a row) — verify rotation spacing logic
-- [ ] **Partial Week Planning:** Often missing mid-week start logic (user starts Wednesday, gets Sunday-Saturday plan) — verify flexible start dates
+- [ ] **Rating Migration:** Has default value for existing meals AND algorithm handles null ratings gracefully
+- [ ] **Variety Rules:** Tested with user who has only 6-8 meals (edge case that must work)
+- [ ] **Complexity Filter:** Shows result count before applying filter, handles zero results
+- [ ] **Swap with Filters:** Works when filter matches zero meals (shows fallback)
+- [ ] **Plan Generation:** Still completes in <2 seconds with new algorithm complexity
+- [ ] **Empty States:** All new features have empty/zero states designed and implemented
+- [ ] **Backwards Compatibility:** Old app code doesn't crash when new database schema is deployed
+- [ ] **Error Messages:** User-friendly messages, not "No meals found in database query"
+- [ ] **Loading States:** All async operations show loading indicators
+- [ ] **Mobile Responsive:** Rating stars, complexity badges, filter UI work on mobile
+- [ ] **Accessibility:** Star ratings, filters, complexity indicators keyboard accessible
+- [ ] **Database Indexes:** Added indexes for new query patterns (rating, complexity, lastUsed)
 
 ## Recovery Strategies
 
-When pitfalls occur despite prevention, how to recover.
-
 | Pitfall | Recovery Cost | Recovery Steps |
 |---------|---------------|----------------|
-| Complexity Death Spiral | HIGH | Feature audit: remove anything not directly enabling <60sec planning; may require onboarding redesign |
-| Recipe App Drift | MEDIUM-HIGH | Ruthlessly cut browsing features; refocus marketing/messaging on decision removal; expect user complaints |
-| Variety Paradox | MEDIUM | Tune rotation algorithm to extend cycles; add ingredient-overlap scoring; communicate "boring is the goal" |
-| Grocery List Disconnect | HIGH | Likely requires database/architecture refactor; prioritize over new features; critical for retention |
-| AI Sophistication Trap | HIGH | Strip ML dependencies; replace with simple rules; faster to rebuild than refactor complex ML pipelines |
+| Null ratings break plan generation | LOW | Quick patch: Default null to 3 in query logic, deploy hotfix in <1 hour |
+| Variety rules too strict | MEDIUM | Feature flag to disable variety rules, relax constraints, deploy in 2-4 hours |
+| Complexity filter produces empty results | LOW | Add fallback logic to show unfiltered results with message |
+| Database migration broke production | HIGH | Rollback migration if no data written, otherwise forward fix with nullable columns |
+| Progressive disclosure confused users | MEDIUM | Move advanced features back to simple UI, simplify navigation |
+| Ratings caused repetitive plans | MEDIUM | Adjust rating weights in algorithm, redeploy (no data changes needed) |
+| Performance degradation | MEDIUM | Add database indexes, optimize queries, cache where appropriate |
 
 ## Pitfall-to-Phase Mapping
 
-How roadmap phases should address these pitfalls.
-
 | Pitfall | Prevention Phase | Verification |
 |---------|------------------|--------------|
-| Complexity Death Spiral | Phase 1 (Foundation) | Time-to-plan < 60 seconds for 95% of sessions |
-| Recipe App Drift | Ongoing discipline (all phases) | Weekly session time remains <5 min; frequency stays ~1x/week |
-| Variety Paradox | Phase 1 (Rotation Logic) | User surveys show "boring" as positive; <5% report repetition complaints |
-| Grocery List Disconnect | Phase 1 (Core Architecture) | <2% of users manually recreate lists elsewhere; completion rate >80% |
-| AI Sophistication Trap | Phase 1 (Avoid ML) / Phase 3+ (Cautious ML) | User input required per plan remains ≤3 data points |
-| Over-Customization | Phase 1 (Opinionated Defaults) | Settings page has <10 options; 90% of users never visit settings |
-| Social Feature Creep | Phase 2-3 risk | Zero social features unless directly tied to household coordination |
+| Null ratings breaking generation | Phase 1 (Schema) | Test plan generation with all-null ratings in test database |
+| Variety rules too strict | Phase 2 (Variety) | Test with small meal library (6-8 meals), verify plans generate for 2+ weeks |
+| Complexity filter empty results | Phase 4 (Filtered Swap) | Test with library where no meals match filter, verify fallback shown |
+| Progressive disclosure slows fast path | Phase 5 (UI Polish) | Time test: New user generates first plan in <60 seconds |
+| Ratings cause repetition | Phase 3 (Algorithm) | Generate 4 weeks of plans for user with 20 meals rated 1-5, measure variety |
+| Migration backwards incompatibility | Phase 1 (Schema) | Run old app code against new schema in staging, verify no crashes |
+| Complexity definitions unclear | Phase 3 (Complexity) | User test: 5 users tag same 10 meals, check consistency |
+| Over-engineered variety | Phase 2 (Variety) | Measure plan generation time, must be <2 seconds |
 
-## Domain-Specific Warnings
+## Phase-Specific Warnings
 
-### The "Just Add..." Trap
+### Phase 1: Schema & Migration
+- CRITICAL: Test migration with production database size (not empty dev database)
+- Add columns as nullable even if they'll later be required
+- Include rollback migration script
+- Document what happens to existing data
+- Test old app code against new schema
 
-The most dangerous words in meal planning products: "just add [recipe ratings / meal photos / cooking tips / nutrition facts / social sharing / meal history / favorites / collections]." Each seems small. Together they kill the product.
+### Phase 2: Variety Rules
+- CRITICAL: Test with minimal meal library (6-8 meals)
+- Implement graceful degradation from day one, not as afterthought
+- Start with single rule, resist feature creep
+- Set performance budget: <2 seconds for plan generation
 
-**Prevention:** Maintain a public "We will never..." list. Examples:
-- We will never let you browse recipes
-- We will never show you what your friends are eating
-- We will never gamify meal planning
-- We will never track nutritional data
+### Phase 3: Planning Algorithm Updates
+- CRITICAL: Test rating weight carefully — too high kills variety
+- Handle null ratings explicitly (don't just default to 3)
+- Validate that v1.0 behavior is preserved when no preferences set
+- Test with 4+ weeks of continuous plan generation
 
-### The Household Coordination Illusion
+### Phase 4: Filtered Swap
+- CRITICAL: Always show fallback when filter produces zero results
+- Show result counts in UI before user applies filter
+- Keep "Random" option that ignores all filters
+- Test with small meal libraries and aggressive filters
 
-Household meal planning sounds like a core feature (multiple users, shared calendars, preference aggregation). In reality, it's a Pandora's box of edge cases:
-- Who decides the final plan?
-- What if preferences conflict?
-- How do you handle dietary restrictions when one person is vegetarian and one isn't?
-- How do you split grocery shopping responsibilities?
-
-**Prevention:** Start with single-user mode. If you add household features, make one person the "planner" with full control. Avoid democratic/voting systems — they recreate decision fatigue.
-
-### The "Smart" Refrigerator Fantasy
-
-Smart fridge integrations, pantry scanning apps, receipt parsing, barcode scanning — all sound futuristic and useful. All add friction that kills retention.
-
-**Prevention:** Assume users have zero smart home devices. Manual "I already have this" checkboxes beat computer vision every time for actual user behavior.
+### Phase 5: Progressive Disclosure & UI
+- CRITICAL: Measure time-to-first-plan, must stay under 60 seconds
+- Default view should look almost identical to v1.0
+- A/B test with existing users before full rollout
+- Don't add more than 2 levels of disclosure
 
 ## Sources
 
-### Meal Planning App Research
-- [12 Best Meal Planning Apps for 2025: A Detailed Guide](https://ai-mealplan.com/blog/best-meal-planning-apps)
-- [Mobile Apps to Support Healthy Family Food Provision: Systematic Assessment](https://pmc.ncbi.nlm.nih.gov/articles/PMC6320405/)
-- [Barriers to and Facilitators for Using Nutrition Apps: Systematic Review](https://pmc.ncbi.nlm.nih.gov/articles/PMC8409150/)
-- [Why don't more people use meal planning apps?](https://ohapotato.app/potato-files/why-dont-more-people-use-meal-planning-apps)
+### Research Sources
+- [An AI-based nutrition recommendation system - PMC](https://pmc.ncbi.nlm.nih.gov/articles/PMC12390980/) - Variety constraints and dietary diversity
+- [Delighting Palates with AI - PMC](https://pmc.ncbi.nlm.nih.gov/articles/PMC10857145/) - Personalized meal planning with user acceptance
+- [Food Recommendation: Framework, Existing Solutions](https://arxiv.org/pdf/1905.06269) - Constraint satisfaction in food recommendation
+- [Meal Planning Apps That You Will Actually Use (2026)](https://planeatai.com/blog/meal-planning-apps-that-you-will-actually-use-2026) - UX patterns and user retention
+- [Best Meal-Planning Apps in 2026](https://ollie.ai/2025/10/21/best-meal-planning-apps-in-2025/) - Common pitfalls in meal planning UX
+- [Resolving cold start and sparse data in recommender systems](https://www.sciencedirect.com/science/article/abs/pii/S0045790621003311) - Cold start problems with ratings
+- [Addressing sparse data challenges in recommendation systems](https://www.sciencedirect.com/science/article/pii/S2667305324001480) - Sparse rating data handling
+- [PostgreSQL nullable columns and NOT NULL without downtime](https://www.sqlservercentral.com/articles/nullable-vs-non-nullable-columns-and-adding-not-null-without-downtime-in-postgresql) - Migration pitfalls
+- [Safely Adding NOT NULL Columns - Shopify](https://shopify.engineering/add-not-null-colums-to-database) - Production migration best practices
+- [Database Migrations: The Silent Killer](https://toolshelf.tech/blog/database-migrations-disasters/) - Migration failure patterns
+- [Progressive Disclosure - Nielsen Norman Group](https://www.nngroup.com/articles/progressive-disclosure/) - UX pattern best practices
+- [Progressive disclosure in UX design - LogRocket](https://blog.logrocket.com/ux-design/progressive-disclosure-ux-types-use-cases/) - Implementation challenges
+- [Getting filters right - LogRocket](https://blog.logrocket.com/ux-design/filtering-ux-ui-design-patterns-best-practices/) - Filter UX and zero-result states
+- [Filter UI Design Best Practices](https://www.aufaitux.com/blog/filter-ui-design/) - Preventing empty result states
 
-### Retention & User Behavior
-- [Mobile App Retention Benchmarks by Industry 2025](https://growth-onomics.com/mobile-app-retention-benchmarks-by-industry-2025/)
-- [Diet and Nutrition Apps Statistics and Facts (2025)](https://media.market.us/diet-and-nutrition-apps-statistics/)
-
-### User Complaints & Problems
-- [Plan to Eat Reviews (2025)](https://justuseapp.com/en/app/1215348056/plan-to-eat-meal-planner/reviews)
-- [A Totally Honest Review of the Most Popular Meal Planning Services](https://www.madefrank.com/totally-honest-review-popular-meal-planning-services/)
-- [The Flaws of Meal Planning](https://www.plantoeat.com/blog/2022/04/the-flaws-of-meal-planning/)
-- [How to Solve These 4 Common Meal Planning Problems](https://www.plantoeat.com/blog/2024/07/how-to-solve-these-4-common-meal-planning-problems/)
-- [10 Common Mistakes in Weekly Meal Planning](https://www.menumagic.ai/blog/10-common-mistakes-in-weekly-meal-planning)
-
-### Recipe Apps vs Meal Planners
-- [AI Meal Planner Subscription Vs Old-school Recipe App](https://www.alibaba.com/product-insights/ai-meal-planner-subscription-vs-old-school-recipe-app-does-hyper-personalization-actually-reduce-food-waste.html)
-
-### Feature Creep & Product Design
-- [Feature Creep Is Killing Your Software: Here's How to Stop It](https://www.designrush.com/agency/software-development/trends/feature-creep)
-- [Feature creep - Wikipedia](https://en.wikipedia.org/wiki/Feature_creep)
-- [How to stop feature creep before it stops your project](https://nulab.com/learn/design-and-ux/feature-creep/)
-- [The Cost of Feature Bloat](https://www.codelink.io/blog/post/the-cost-of-feature-bloat-how-to-say-no-to-unnecessary-features-and-focus-on-core-value)
-
-### Decision Fatigue Research
-- [The Neuroscience of Decision Fatigue](https://gc-bs.org/articles/the-neuroscience-of-decision-fatigue/)
-- [Decision Fatigue - The Decision Lab](https://thedecisionlab.com/biases/decision-fatigue)
-- [How High Performers Overcome Decision Fatigue](https://www.psychologytoday.com/us/blog/urban-survival/202503/maximizing-decisions-how-high-performers-overcome-decision-fatigue)
-
-### Meal Variety & Rotation
-- [Simplify Your Life with a Rotating Meal Plan](https://organizingmoms.com/rotating-meal-plan/)
-- [Meal Planning 101: Make a Two-Week Rotation](https://goodcheapeats.com/meal-planning-101-make-a-two-week-rotation/)
-
-### MVP & Minimal Design
-- [5 Ways to Avoid Feature Bloats](https://blog.producter.co/5-ways-to-avoid-feature-bloat/)
-- [How to build an MVP efficiently by prioritizing the right features](https://roboticsandautomationnews.com/2026/01/20/how-to-build-an-mvp-efficiently-by-prioritizing-the-right-features/98214/)
-- [What Is Feature Bloat And How To Avoid It](https://userpilot.com/blog/feature-bloat/)
+### Codebase Analysis
+- `/Users/seblju/Development/repos/foodish/lib/actions/plans.ts` - Current planning algorithm
+- `/Users/seblju/Development/repos/foodish/lib/actions/meals.ts` - Meal management actions
+- `/Users/seblju/Development/repos/foodish/prisma/schema.prisma` - Current schema structure
+- `/Users/seblju/Development/repos/foodish/.planning/v1.0-MILESTONE-AUDIT.md` - v1.0 success criteria and performance baselines
 
 ---
-*Pitfalls research for: What's for Dinner? — Decision Removal Meal Planning Tool*
-*Researched: 2026-02-09*
+*Pitfalls research for: Adding Ratings, Variety & Preferences to Meal Planning App*
+*Researched: 2026-02-12*
+*Confidence: HIGH (existing codebase + domain research)*

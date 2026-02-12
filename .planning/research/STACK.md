@@ -1,187 +1,854 @@
-# Stack Research
+# Technology Stack — v1.1 Additions
 
-**Domain:** Minimal Meal Planning Web Application
-**Researched:** 2026-02-09
-**Confidence:** HIGH
+**Project:** What's for Dinner? v1.1 (Ratings, Variety, Complexity)
+**Researched:** 2026-02-12
+**Context:** SUBSEQUENT MILESTONE - Adding features to existing validated stack
 
-## Recommended Stack
+---
 
-### Core Technologies
+## Executive Summary
 
-| Technology | Version | Purpose | Why Recommended |
-|------------|---------|---------|-----------------|
-| Next.js | 15.5+ | Full-stack React framework | Industry standard for React SSR/SSG. Built-in App Router with React Server Components (RSC) enables server-first architecture perfect for minimal apps. Excellent DX with zero config. TypeScript and Tailwind built-in. Latest 15.5 (Aug 2025) brings stable Turbopack, typed routes, and Node.js middleware support. **CONFIDENCE: HIGH** |
-| React | 19.2+ | UI library | React 19 (stable Dec 2024) is required for Next.js 15. Brings 40% improvement in Core Web Vitals. Server Components reduce JS bundle size dramatically—perfect for minimal apps. **CONFIDENCE: HIGH** |
-| TypeScript | 5.8+ | Type safety | TypeScript 5.8 (Feb 2025) latest stable. Next.js 15.5 has excellent TS DX with auto-generated route types (`PageProps`, `LayoutProps`), `next typegen` command, and typed routes. Zero config needed. **CONFIDENCE: HIGH** |
+**ZERO new npm packages required** for v1.1 features (ratings, variety rules, complexity levels, filtered swapping).
 
-### Authentication & Authorization
+All capabilities implement via:
+1. **Prisma schema extensions** (new fields + indexes)
+2. **Enhanced Server Actions** (filtered queries, extended lookback)
+3. **UI component updates** (progressive disclosure with Tailwind)
+4. **Existing libraries** (lucide-react icons, Zod validation)
 
-| Technology | Version | Purpose | Why Recommended |
-|------------|---------|---------|-----------------|
-| Auth.js (NextAuth v5) | 5.0.0-beta | Authentication library | Auth.js v5 (rebranded NextAuth) is the standard for Next.js auth. Built-in Google OAuth provider requires only `clientId` and `clientSecret`. While still in beta, it's stable enough for production (widely used in 2025). **Critical 2025 update:** Middleware is NO LONGER safe for auth after CVE-2025-29927. Must use Data Access Layer (DAL) pattern with auth checks in Server Components/Actions. **CONFIDENCE: MEDIUM** (beta status, but production-ready) |
+This maintains the app's minimal footprint while delivering substantial new functionality.
 
-### Database & ORM
+---
 
-| Technology | Version | Purpose | Why Recommended |
-|------------|---------|---------|-----------------|
-| PostgreSQL (via Neon) | Latest | Relational database | Neon is serverless Postgres with pay-per-use pricing. **Key: Vercel Postgres now uses Neon as backend** (Q4 2024 transition). Free tier: 512MB storage, ~192 compute hours/month, branching, scale-to-zero. Perfect for minimal apps. Better cold start performance than Supabase (500ms-100ms vs longer). **CONFIDENCE: HIGH** |
-| Prisma ORM | 7.x | Type-safe database client | Prisma 7 (late 2025) removed Rust engine—now pure TypeScript. Schema-first approach with excellent DX: `prisma generate` creates fully-typed client. Best for rapid development and beginners. Auto-generated types integrate perfectly with TypeScript/Next.js. **Alternative: Drizzle ORM (7.4kb, fastest)—but Prisma wins on DX for minimal projects.** **CONFIDENCE: HIGH** |
+## Validated Existing Stack (DO NOT CHANGE)
 
-### Styling & UI
+### Core Dependencies (Already Proven in v1.0)
 
-| Technology | Version | Purpose | Why Recommended |
-|------------|---------|---------|-----------------|
-| Tailwind CSS | 4.x | Utility-first CSS framework | Tailwind v4 (2025) simplifies setup with minimal dependencies. Next.js has first-class Tailwind support (auto-configured with `create-next-app`). Perfect for minimal, intentionally boring UI—utility classes keep components simple without CSS files. **CONFIDENCE: HIGH** |
-| shadcn/ui | Latest | Component collection (optional) | NOT a library—copy/paste components built on Radix UI + Tailwind. Fully owned code, WCAG-compliant, zero bloat. Great for minimal apps that need a few polished components (forms, buttons, dialogs) without heavy frameworks. **Use sparingly—only add components you need.** **CONFIDENCE: HIGH** |
+| Technology | Current Version | Purpose | v1.1 Usage |
+|------------|-----------------|---------|------------|
+| **Next.js** | 15.5.12 | App framework, routing | Server Actions handle all new data mutations |
+| **TypeScript** | ^5 | Type safety | Prisma Client regenerates types for new fields |
+| **Tailwind CSS** | ^3.4.1 | Styling | Progressive disclosure, complexity badges, rating buttons |
+| **Clerk** | ^6.37.3 | Authentication | User context for new rating/complexity data |
+| **Prisma ORM** | 5.22.0 | Database schema & queries | Schema extensions, filtered queries, indexes |
+| **Neon PostgreSQL** | - | Database | Native enum support, integer indexes |
+| **Zod** | ^4.3.6 | Schema validation | Validates new rating/complexity fields |
+| **lucide-react** | ^0.563.0 | Icons | ThumbsUp, ThumbsDown, ChevronDown, ChevronUp |
+| **Vercel** | - | Hosting | No deployment changes |
 
-### Validation & Forms
+**Why no changes:** Next.js 15 + React Server Components + Prisma already provide all patterns needed for v1.1 features.
 
-| Technology | Version | Purpose | Why Recommended |
-|------------|---------|---------|-----------------|
-| Zod | 3.x | Schema validation | Industry standard for TypeScript validation. Share schemas between client/server to avoid duplication. Use with Server Actions: `schema.safeParse(formData)` for input validation. Integrates with forms via `useActionState` hook. Prevents over-engineering—no need for heavy form libraries. **CONFIDENCE: HIGH** |
+---
 
-### Development Tools
+## New Capabilities (Via Schema Extensions Only)
 
-| Tool | Purpose | Notes |
-|------|---------|-------|
-| pnpm | Package manager | **Recommended over npm/yarn for 2025.** 70% less disk space, fastest installs, strict dependency resolution prevents phantom dependency bugs. Monorepo-ready. Next.js plays well with pnpm. **CONFIDENCE: HIGH** |
-| Biome | Linter + Formatter | **Alternative to ESLint + Prettier.** 10-25x faster, single binary (Rust-based), one config file vs four. Next.js 15.5 deprecated `next lint`—can now choose Biome during setup. Perfect for minimal projects avoiding tooling bloat. **Use if starting fresh; ESLint+Prettier fine for existing projects.** **CONFIDENCE: MEDIUM** (newer, but battle-tested) |
-| Turbopack | Bundler | Built into Next.js 15.5 for production builds (`next build --turbopack`). 2-5x faster builds. Zero config. **Beta but stable on large codebases (1.2B+ requests on Vercel).** **CONFIDENCE: MEDIUM** (beta, but production-ready) |
+### 1. Ratings System (Thumbs Up/Down)
 
-## Installation
+**Schema Change:**
+```prisma
+model Meal {
+  id         String    @id @default(cuid())
+  name       String
+  userId     String
+  lastUsed   DateTime?
+  rating     Int?      @default(0)  // NEW: -1 (down), 0 (neutral), 1 (up)
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
 
-```bash
-# Initialize Next.js project with TypeScript + Tailwind
-npx create-next-app@latest my-meal-planner --typescript --tailwind --app --use-pnpm
-
-# Core dependencies
-pnpm add next-auth@beta zod @prisma/client
-pnpm add -D prisma
-
-# Optional: shadcn/ui (install selectively)
-npx shadcn@latest init
-npx shadcn@latest add button form input
-
-# Initialize Prisma with Neon
-npx prisma init --datasource-provider postgresql
+  @@index([userId])
+  @@index([userId, rating]) // NEW: Fast filtered queries
+}
 ```
 
-## Alternatives Considered
+**Why Integer over Enum:**
+- Simpler queries: `rating >= 1` vs enum matching
+- PostgreSQL indexing more efficient for integers
+- No migration complexity (nullable with default)
+- Math operations possible (e.g., average ratings later)
 
-| Recommended | Alternative | When to Use Alternative |
-|-------------|-------------|-------------------------|
-| **Auth.js (NextAuth v5)** | Clerk, Lucia Auth | Clerk if you need drop-in auth UI (but paid beyond free tier). Lucia for full control over auth flow (more manual). NextAuth is sweet spot for Google-only OAuth. |
-| **Prisma ORM** | Drizzle ORM | Drizzle if performance is critical (10x faster, 7.4kb bundle) or serverless/edge deployment. Prisma better for DX and rapid development. |
-| **Neon Postgres** | Supabase, PlanetScale | Supabase if you need realtime subscriptions or built-in auth/storage. PlanetScale if MySQL preferred. Neon best for pure Postgres with Vercel integration. |
-| **Vercel** | Netlify, Railway, Fly.io | Vercel perfect for Next.js (made by same team), but expensive at scale ($500-2000/month for moderate traffic). Railway/Fly.io for predictable costs. Netlify for multi-framework. **For minimal personal app, Vercel free tier sufficient.** |
-| **Biome** | ESLint + Prettier | ESLint+Prettier if you need extensive plugin ecosystem (security, a11y). Biome for speed and simplicity. |
-| **pnpm** | npm, yarn | npm if you want "default" experience (most compatible). Yarn for mature workspaces. pnpm for modern projects. |
+**UI Implementation:**
+```typescript
+// Already available in lucide-react 0.563.0
+import { ThumbsUp, ThumbsDown } from 'lucide-react';
 
-## What NOT to Use
+// Component pattern (existing useState + Server Action)
+const [rating, setRating] = useState(meal.rating || 0);
 
-| Avoid | Why | Use Instead |
-|-------|-----|-------------|
-| **NextAuth v4** | v4 uses deprecated patterns. CVE-2025-29927 security issue affects middleware-based auth. v5 enforces safer Data Access Layer pattern. | Auth.js v5 (next-auth@beta) |
-| **Pages Router** | Next.js App Router is the future. Pages Router only supports React 18 (missing RSC benefits). All new projects should use App Router. | App Router (`/app` directory) |
-| **Client-side data fetching** | React Server Components eliminate need for `useEffect` + fetch. Server Components fetch data directly with async/await—less JS, better performance. | Server Components with async functions |
-| **Heavy component libraries** | Material-UI, Ant Design add 300kb+ to bundle. Overkill for minimal app. | Tailwind CSS + shadcn/ui (copy only what you need) |
-| **Redux, Zustand for all state** | Most state should be server state (via RSC). Only use client state management for truly interactive UI. Over-engineering for minimal apps. | React Server Components + minimal `useState` for interactivity |
-| **MongoDB with Prisma** | Prisma's MongoDB support is incomplete. Better Postgres support. | PostgreSQL (Neon) with Prisma |
-| **Middleware for authentication** | **CRITICAL: CVE-2025-29927.** Middleware doesn't protect static routes, runs on Edge (no DB access). | Data Access Layer (DAL) with auth checks in Server Components/Actions |
+async function handleRating(newRating: number) {
+  setRating(newRating); // Optimistic local update
+  await updateMealRating(meal.id, newRating);
+}
+```
 
-## Stack Rationale for "What's for Dinner?"
+**No New Dependencies:**
+- Icons: lucide-react already installed
+- State: React `useState` (built-in)
+- Server mutation: Extend existing `updateMeal` Server Action
+- Validation: Zod schema extends to `rating: z.number().int().min(-1).max(1).optional()`
 
-### Why This Stack Fits Your Constraints:
+**Sources:**
+- [lucide-react thumbs-up icon](https://lucide.dev/icons/thumbs-up)
+- [lucide-react thumbs-down icon](https://lucide.dev/icons/thumbs-down)
+- [React rating component best practices](https://www.freecodecamp.org/news/how-to-build-a-rating-component-with-the-react-compound-component-pattern/)
 
-1. **Next.js + TypeScript (locked in)** ✅
-   - Blueprint repo already has Next.js/TypeScript—stack complements existing choice
+---
 
-2. **Google sign-in only** ✅
-   - Auth.js GoogleProvider is literally 3 lines of config
-   - No complex auth UI needed—minimal setup
+### 2. Complexity Levels
 
-3. **Simple text-based meal list (no images, recipes)** ✅
-   - Postgres with Prisma perfect for simple relational data (users, meals, plans)
-   - No need for S3/image hosting—keeps stack minimal
+**Schema Change:**
+```prisma
+enum Complexity {
+  SIMPLE
+  MEDIUM
+  COMPLEX
+}
 
-4. **Minimal UI, intentionally boring** ✅
-   - Tailwind + shadcn/ui = boring, predictable components
-   - No flashy animations or heavy UI frameworks
+model Meal {
+  id         String      @id @default(cuid())
+  name       String
+  userId     String
+  lastUsed   DateTime?
+  rating     Int?        @default(0)
+  complexity Complexity? @default(SIMPLE) // NEW: Meal difficulty
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
 
-5. **Weekly plan generation with basic variation logic** ✅
-   - Server Actions ideal for plan generation logic
-   - Prisma makes database queries simple
-   - React Server Components reduce client JS (fast load)
+  @@index([userId])
+  @@index([userId, rating])
+  @@index([userId, complexity]) // NEW: Fast filtered queries
+}
+```
 
-6. **Must work fast (<60 second planning sessions)** ✅
-   - Neon scales to zero (no cold start delays for active users)
-   - Turbopack (2-5x faster builds)
-   - RSC reduces hydration time
+**Why Prisma Enum:**
+- Type-safe on client + server (auto-generated TypeScript types)
+- PostgreSQL native enum (efficient storage)
+- Zod auto-generates validators after `prisma generate`
+- Default value prevents null handling complexity
 
-### Avoid Over-Engineering:
+**Prisma Client Integration:**
+```typescript
+import { Complexity } from '@prisma/client';
 
-- ❌ No recipe APIs (Spoonacular, Edamam)—not needed
-- ❌ No image storage (Cloudinary, S3)—not needed
-- ❌ No real-time features (WebSockets, Pusher)—not needed
-- ❌ No complex state management (Redux)—RSC handles it
-- ❌ No microservices/GraphQL—monolithic Next.js app sufficient
+// Type-safe enum values
+const validComplexity: Complexity = 'SIMPLE'; // ✓
+const invalid: Complexity = 'EASY'; // ✗ Type error
 
-### Stack Stays Minimal:
+// Prisma query filters
+const simpleMeals = await prisma.meal.findMany({
+  where: { complexity: Complexity.SIMPLE }
+});
+```
 
-This stack has **7 production dependencies** (excluding Next.js built-ins):
-1. `next-auth` (auth)
-2. `@prisma/client` (database)
-3. `zod` (validation)
-4. `tailwindcss` (styling - auto-installed)
-5. Optional: 2-3 shadcn/ui components (copied, not installed)
+**No New Dependencies:**
+- Enum types: Generated by `prisma generate` (built-in)
+- Validation: Zod infers enum from `@prisma/client` types
+- UI: Tailwind badge components (no library needed)
 
-Compare to typical React app: 20-40 dependencies. **This is intentionally lean.**
+**Sources:**
+- [Prisma enum types with TypeScript](https://www.squash.io/tutorial-on-prisma-enum-with-typescript/)
+- [Type-safe Prisma enum integration](https://openillumi.com/en/en-prisma-enum-client-side-best-practice/)
+- [Prisma schema reference - enums](https://www.prisma.io/docs/orm/reference/prisma-schema-reference)
 
-## Deployment & Infrastructure
+---
 
-| Technology | Purpose | Why Recommended |
-|------------|---------|-----------------|
-| **Vercel** | Hosting | Free tier perfect for personal/minimal apps (100GB bandwidth, unlimited requests). Made by Next.js creators—zero config deployment. Git push = live site. Integrated with Neon Postgres. **Costs scale with traffic—for minimal app, likely stays free.** **CONFIDENCE: HIGH** |
-| **Neon Postgres** | Database hosting | Free tier: 512MB storage, ~192 compute hours/month. Auto-scales to zero. Vercel integration built-in. **CONFIDENCE: HIGH** |
-| **GitHub** | Version control + CI/CD | Vercel auto-deploys from GitHub. Built-in CI via GitHub Actions. **CONFIDENCE: HIGH** |
+### 3. Variety Rules (No Duplicates, Long-Term Rotation)
 
-## Version Compatibility
+**Schema Change:**
+```prisma
+// NO TABLE CHANGES NEEDED
+// WeeklyPlan already stores history; extend query logic only
 
-| Package A | Compatible With | Notes |
-|-----------|-----------------|-------|
-| Next.js 15.5+ | React 19.2+, Node.js 20.9+ | React 19 required for Next.js 15 App Router. Node.js 20.9 minimum. |
-| Auth.js v5 (beta) | Next.js 14+, React 19+ | Requires App Router. v5 beta stable enough for production. |
-| Prisma 7.x | PostgreSQL 12+, Node.js 18+ | Works with Neon's Postgres 15+. Prisma 7 dropped Rust engine (pure TS now). |
-| Tailwind CSS 4.x | Next.js 13.4+, PostCSS 8+ | Auto-configured with `create-next-app`. |
-| TypeScript 5.8+ | Next.js 15+, React 19+ | Next.js 15.5 has best TS support (typed routes, auto-generated props). |
+model WeeklyPlan {
+  id            String   @id @default(cuid())
+  userId        String
+  weekStartDate DateTime
+  monday        String?
+  tuesday       String?
+  wednesday     String?
+  thursday      String?
+  friday        String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([userId, weekStartDate])
+  @@index([userId])
+  @@index([userId, weekStartDate]) // Supports historical lookback
+}
+```
+
+**Algorithm Enhancement (Server Actions Only):**
+
+**Current v1.0 Logic (plans.ts):**
+```typescript
+// Looks back 1 week
+const lastWeekStart = new Date(weekStart);
+lastWeekStart.setDate(lastWeekStart.getDate() - 7);
+
+const lastWeekPlan = await prisma.weeklyPlan.findUnique({
+  where: {
+    userId_weekStartDate: {
+      userId: user.id,
+      weekStartDate: lastWeekStart
+    }
+  }
+});
+```
+
+**Enhanced v1.1 Logic:**
+```typescript
+// Extend lookback to 3-4 weeks
+const lookbackWeeks = 3;
+const lookbackStart = new Date(weekStart);
+lookbackStart.setDate(lookbackStart.getDate() - (7 * lookbackWeeks));
+
+const recentPlans = await prisma.weeklyPlan.findMany({
+  where: {
+    userId: user.id,
+    weekStartDate: {
+      gte: lookbackStart,
+      lt: weekStart
+    }
+  },
+  select: {
+    monday: true,
+    tuesday: true,
+    wednesday: true,
+    thursday: true,
+    friday: true
+  }
+});
+
+// Build exclusion set from all recent plans
+const recentMealNames = new Set<string>();
+recentPlans.forEach(plan => {
+  [plan.monday, plan.tuesday, plan.wednesday, plan.thursday, plan.friday]
+    .filter(Boolean)
+    .forEach(meal => recentMealNames.add(meal));
+});
+
+// Existing selectRandomMeals() already accepts exclusion set
+const selectedMeals = await selectRandomMeals(
+  user.id,
+  5,
+  recentMealNames // Expanded from 1 week to 3 weeks
+);
+```
+
+**Why No Schema Changes:**
+- WeeklyPlan table already stores full history
+- Query last N weeks dynamically (no new fields)
+- Existing `lastUsed` field on Meal model provides secondary sorting
+- Index on `(userId, weekStartDate)` already supports range queries
+
+**No New Dependencies:**
+- Date manipulation: Native JavaScript `Date` (already used in v1.0)
+- Set operations: Native JavaScript `Set` (already used in v1.0)
+- Database queries: Prisma Client (already used in v1.0)
+
+**Sources:**
+- [Meal rotation algorithm patterns](https://kalynbrooke.com/personal-growth/habits-routines/monthly-meal-planner-template/)
+- [Seasonal meal planning rotation](https://flusterbuster.com/seasonal-meal-plan.html)
+- [Flexible meal planning 2026](https://planeatai.com/blog/flexible-meal-planning-without-a-strict-plan-2026)
+
+---
+
+### 4. Enhanced Meal Swapping with Filters
+
+**Implementation: New Server Actions (No Schema Changes)**
+
+**New Action 1: Get Swap Options**
+```typescript
+// lib/actions/plans.ts
+
+interface SwapFilters {
+  complexity?: Complexity;
+  minRating?: number;
+  excludeRecent?: boolean;
+}
+
+interface MealOption {
+  id: string;
+  name: string;
+  rating: number | null;
+  complexity: Complexity | null;
+}
+
+export async function getSwapOptions(
+  day: Day,
+  filters: SwapFilters = {}
+): Promise<{ options: MealOption[]; error?: string }> {
+  const user = await getCurrentUser();
+  if (!user) return { options: [], error: "Ej behörig" };
+
+  const weekStart = getWeekStart();
+
+  // Get current plan to exclude
+  const currentPlan = await prisma.weeklyPlan.findUnique({
+    where: {
+      userId_weekStartDate: {
+        userId: user.id,
+        weekStartDate: weekStart
+      }
+    }
+  });
+
+  const currentMeals = new Set([
+    currentPlan?.monday,
+    currentPlan?.tuesday,
+    currentPlan?.wednesday,
+    currentPlan?.thursday,
+    currentPlan?.friday
+  ].filter(Boolean));
+
+  // Get recent meals to exclude (if filter enabled)
+  let recentMealNames = new Set<string>();
+  if (filters.excludeRecent !== false) {
+    const lookbackWeeks = 3;
+    const lookbackStart = new Date(weekStart);
+    lookbackStart.setDate(lookbackStart.getDate() - (7 * lookbackWeeks));
+
+    const recentPlans = await prisma.weeklyPlan.findMany({
+      where: {
+        userId: user.id,
+        weekStartDate: { gte: lookbackStart, lt: weekStart }
+      },
+      select: {
+        monday: true,
+        tuesday: true,
+        wednesday: true,
+        thursday: true,
+        friday: true
+      }
+    });
+
+    recentPlans.forEach(plan => {
+      [plan.monday, plan.tuesday, plan.wednesday, plan.thursday, plan.friday]
+        .filter(Boolean)
+        .forEach(meal => recentMealNames.add(meal));
+    });
+  }
+
+  // Combined exclusion list
+  const excludedMeals = [...currentMeals, ...recentMealNames];
+
+  // Query with filters (LEVERAGES NEW INDEXES)
+  const meals = await prisma.meal.findMany({
+    where: {
+      userId: user.id,
+      name: { notIn: excludedMeals },
+      ...(filters.complexity && { complexity: filters.complexity }),
+      ...(filters.minRating !== undefined && {
+        rating: { gte: filters.minRating }
+      })
+    },
+    orderBy: { lastUsed: 'asc' }, // Prefer least recently used
+    select: {
+      id: true,
+      name: true,
+      rating: true,
+      complexity: true
+    }
+  });
+
+  return { options: meals };
+}
+
+export async function swapDayMealWithChoice(
+  day: Day,
+  mealId: string
+) {
+  const user = await getCurrentUser();
+  if (!user) return { error: "Ej behörig" };
+
+  const weekStart = getWeekStart();
+
+  // Get meal details
+  const meal = await prisma.meal.findUnique({
+    where: { id: mealId },
+    select: { name: true, userId: true }
+  });
+
+  if (!meal || meal.userId !== user.id) {
+    return { error: "Måltiden hittades inte" };
+  }
+
+  // Update plan
+  await prisma.weeklyPlan.update({
+    where: {
+      userId_weekStartDate: {
+        userId: user.id,
+        weekStartDate: weekStart
+      }
+    },
+    data: { [day]: meal.name }
+  });
+
+  // Update lastUsed
+  await prisma.meal.update({
+    where: { id: mealId },
+    data: { lastUsed: new Date() }
+  });
+
+  revalidatePath('/');
+  revalidatePath('/plan');
+  return { success: true, newMeal: meal.name };
+}
+```
+
+**UI Pattern: Progressive Disclosure (Tailwind + useState)**
+
+```typescript
+'use client';
+
+import { useState } from 'react';
+import { ThumbsUp, ChevronDown, ChevronUp, RefreshCw } from 'lucide-react';
+import { Complexity } from '@prisma/client';
+
+interface SwapMealAdvancedProps {
+  day: Day;
+}
+
+export function SwapMealAdvanced({ day }: SwapMealAdvancedProps) {
+  const [expanded, setExpanded] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [options, setOptions] = useState<MealOption[]>([]);
+
+  // Filter state
+  const [complexity, setComplexity] = useState<Complexity | undefined>();
+  const [favoritesOnly, setFavoritesOnly] = useState(false);
+  const [excludeRecent, setExcludeRecent] = useState(true);
+
+  async function handleRandomSwap() {
+    setLoading(true);
+    const result = await swapDayMeal(day); // Existing v1.0 action
+    setLoading(false);
+  }
+
+  async function loadOptions() {
+    setLoading(true);
+    const result = await getSwapOptions(day, {
+      complexity,
+      minRating: favoritesOnly ? 1 : undefined,
+      excludeRecent
+    });
+    setOptions(result.options || []);
+    setLoading(false);
+  }
+
+  async function selectMeal(mealId: string) {
+    setLoading(true);
+    await swapDayMealWithChoice(day, mealId);
+    setExpanded(false);
+    setLoading(false);
+  }
+
+  return (
+    <div className="space-y-2">
+      {/* Quick swap button (existing behavior) */}
+      <button
+        onClick={handleRandomSwap}
+        disabled={loading}
+        className="flex items-center gap-2 text-blue-600 hover:text-blue-800 disabled:opacity-50"
+      >
+        <RefreshCw className="w-4 h-4" />
+        {loading ? 'Byter...' : 'Byt'}
+      </button>
+
+      {/* Progressive disclosure: expand filters */}
+      <button
+        onClick={() => {
+          setExpanded(!expanded);
+          if (!expanded && options.length === 0) loadOptions();
+        }}
+        className="flex items-center gap-1 text-sm text-gray-600 hover:text-gray-800"
+      >
+        {expanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+        Välj specifik rätt
+      </button>
+
+      {/* Filter panel (hidden by default) */}
+      {expanded && (
+        <div className="border rounded-lg p-3 space-y-3 bg-gray-50">
+          {/* Complexity filter */}
+          <div>
+            <label className="block text-sm font-medium mb-1">Komplexitet</label>
+            <div className="flex gap-2">
+              {['SIMPLE', 'MEDIUM', 'COMPLEX'].map(c => (
+                <button
+                  key={c}
+                  onClick={() => setComplexity(complexity === c ? undefined : c as Complexity)}
+                  className={`px-3 py-1 rounded text-sm ${
+                    complexity === c
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-white border hover:border-blue-600'
+                  }`}
+                >
+                  {c === 'SIMPLE' ? 'Enkelt' : c === 'MEDIUM' ? 'Medel' : 'Komplext'}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Favorites filter */}
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={favoritesOnly}
+              onChange={(e) => setFavoritesOnly(e.target.checked)}
+            />
+            <ThumbsUp className="w-4 h-4" />
+            Endast favoriter
+          </label>
+
+          {/* Recent exclusion toggle */}
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={excludeRecent}
+              onChange={(e) => setExcludeRecent(e.target.checked)}
+            />
+            Uteslut senaste 3 veckorna
+          </label>
+
+          {/* Apply filters */}
+          <button
+            onClick={loadOptions}
+            disabled={loading}
+            className="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 disabled:opacity-50"
+          >
+            {loading ? 'Laddar...' : 'Visa alternativ'}
+          </button>
+
+          {/* Options list */}
+          {options.length > 0 && (
+            <div className="space-y-2 max-h-64 overflow-y-auto">
+              {options.map(option => (
+                <button
+                  key={option.id}
+                  onClick={() => selectMeal(option.id)}
+                  className="w-full text-left p-2 rounded bg-white border hover:border-blue-600 flex items-center justify-between"
+                >
+                  <span>{option.name}</span>
+                  <div className="flex items-center gap-2">
+                    {option.rating === 1 && <ThumbsUp className="w-4 h-4 text-green-600" />}
+                    <span className="text-xs px-2 py-0.5 rounded bg-gray-100">
+                      {option.complexity || 'SIMPLE'}
+                    </span>
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+
+          {options.length === 0 && !loading && (
+            <p className="text-sm text-gray-600 text-center py-4">
+              Inga rätter matchar filtren
+            </p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+```
+
+**Why No UI Library:**
+- **Tailwind CSS**: Handles all styling (borders, backgrounds, hover states)
+- **React useState**: Manages expand/collapse, loading, filter state
+- **lucide-react**: Already has ChevronDown, ChevronUp, ThumbsUp, RefreshCw icons
+- **No accordion library needed**: Simple `hidden` class + click handler = 0KB vs 12KB+ for Radix/Headless UI
+
+**No Optimistic Updates Needed:**
+- Filter selection happens BEFORE swap (not during)
+- User explicitly clicks meal to swap (no uncertainty)
+- Simple local `useState` for current meal display sufficient
+- React 19's `useOptimistic` adds complexity without value here
+
+**Sources:**
+- [Progressive disclosure - GitHub Primer](https://primer.style/product/ui-patterns/progressive-disclosure/)
+- [Progressive disclosure examples](https://userpilot.com/blog/progressive-disclosure-examples/)
+- [Next.js Server Actions](https://nextjs.org/docs/app/getting-started/updating-data)
+- [useOptimistic limitations](https://www.columkelly.com/blog/use-optimistic) (when NOT to use)
+
+---
+
+## What NOT to Add
+
+| Library | Why Avoid | What to Use Instead |
+|---------|-----------|---------------------|
+| **react-hook-form** | Overkill for single-click rating actions | Direct Server Action calls |
+| **@radix-ui/react-accordion** | 12KB+ for show/hide functionality | Tailwind + `useState` (<1KB) |
+| **@headlessui/react** | Disclosure component redundant | lucide-react icons + Tailwind |
+| **next-safe-action** | Type-safe wrapper adds boilerplate | Zod validation + TypeScript |
+| **TanStack Query** | Server Components handle data fetching | Server Actions + revalidatePath |
+| **zustand / jotai** | No global client state needed | Server state (DB) + local `useState` |
+| **date-fns / dayjs** | Existing date logic sufficient | Native `Date` (already in plans.ts) |
+
+**Philosophy:** Only add dependencies that solve problems the existing stack cannot. Next.js 15 + React Server Components + Prisma already handle data flow, state management, and validation.
+
+---
+
+## Migration Path
+
+### Step 1: Update Database Schema
+
+```bash
+# Edit prisma/schema.prisma (add rating, complexity, indexes)
+
+npx prisma migrate dev --name add_ratings_complexity_variety
+npx prisma generate  # Regenerates TypeScript types
+```
+
+**Migration Output:**
+```sql
+-- CreateEnum
+CREATE TYPE "Complexity" AS ENUM ('SIMPLE', 'MEDIUM', 'COMPLEX');
+
+-- AlterTable
+ALTER TABLE "Meal" ADD COLUMN "rating" INTEGER DEFAULT 0;
+ALTER TABLE "Meal" ADD COLUMN "complexity" "Complexity" DEFAULT 'SIMPLE';
+
+-- CreateIndex
+CREATE INDEX "Meal_userId_rating_idx" ON "Meal"("userId", "rating");
+CREATE INDEX "Meal_userId_complexity_idx" ON "Meal"("userId", "complexity");
+```
+
+**Backward Compatibility:**
+- Existing meals get `rating: 0`, `complexity: SIMPLE`
+- Nullable fields prevent constraint violations
+- Indexes created after data migration (no lock issues)
+
+### Step 2: Extend Zod Schemas
+
+```typescript
+// lib/actions/meals.ts
+import { Complexity } from '@prisma/client';
+import { z } from 'zod';
+
+const mealUpdateSchema = z.object({
+  name: z.string().min(1).max(100).optional(),
+  rating: z.number().int().min(-1).max(1).optional(),
+  complexity: z.nativeEnum(Complexity).optional()
+});
+
+export async function updateMeal(
+  id: string,
+  data: z.infer<typeof mealUpdateSchema>
+) {
+  const user = await getCurrentUser();
+  if (!user) return { error: "Ej behörig" };
+
+  const validation = mealUpdateSchema.safeParse(data);
+  if (!validation.success) {
+    return { error: validation.error.issues[0].message };
+  }
+
+  const meal = await prisma.meal.findUnique({
+    where: { id },
+    select: { userId: true }
+  });
+
+  if (!meal || meal.userId !== user.id) {
+    return { error: "Måltiden hittades inte" };
+  }
+
+  await prisma.meal.update({
+    where: { id },
+    data: validation.data
+  });
+
+  revalidatePath('/');
+  revalidatePath('/meals');
+  return { success: true };
+}
+```
+
+### Step 3: Extend Server Actions
+
+**Files to modify:**
+- `lib/actions/meals.ts`: Add `updateMealRating()`, `updateMealComplexity()`
+- `lib/actions/plans.ts`:
+  - Extend `selectRandomMeals()` lookback from 1 week to 3 weeks
+  - Add `getSwapOptions()`
+  - Add `swapDayMealWithChoice()`
+
+**Pattern Consistency:**
+- Use existing `getCurrentUser()` auth pattern
+- Return `{ success?, error?, data? }` shape
+- Call `revalidatePath('/')` after mutations
+
+### Step 4: Update Components
+
+**Files to modify:**
+- `components/meal-card.tsx`: Add rating buttons, complexity badge
+- `components/swap-meal-button.tsx` → `components/swap-meal-advanced.tsx`: Add progressive disclosure
+- `components/meal-list.tsx`: Add inline rating controls
+
+**UI Pattern:**
+- Thumbs up/down inline with meal name (lucide-react icons)
+- Complexity badge: colored pill (green=simple, yellow=medium, orange=complex)
+- Filter accordion: Tailwind `hidden` class + `useState` toggle
+
+### Step 5: Deploy
+
+```bash
+# Push schema changes to production database
+npx prisma migrate deploy
+
+# Deploy to Vercel (auto-deploys on git push)
+git add .
+git commit -m "feat: add ratings, complexity, variety rules, filtered swap"
+git push origin main
+```
+
+**Zero downtime:** Schema changes backward compatible, new fields optional.
+
+---
+
+## Performance Considerations
+
+| Concern | Mitigation | Measurement |
+|---------|-----------|-------------|
+| **Filtered queries slow** | Indexes on `(userId, rating)`, `(userId, complexity)` | Query time <50ms for 100 meals |
+| **Historical lookback expensive** | Limit to 3 weeks max, WeeklyPlan table small (1 row/week/user) | Query time <100ms for 3 weeks |
+| **Swap options query returns 100+ meals** | Users typically have 15-30 meals; paginate if >50 | No pagination needed for MVP |
+| **Progressive disclosure re-fetches options** | Cache options in component state after first load | 1 query per expand, not per filter change |
+
+**Scalability:**
+- **At 10 users:** Negligible performance impact
+- **At 1000 users:** Indexes ensure fast queries (<100ms)
+- **At 100K users:** May need query optimization (e.g., Redis caching), but schema supports it
+
+---
+
+## Version Updates (Optional)
+
+| Package | Current | Latest (Feb 2026) | Upgrade? |
+|---------|---------|-------------------|----------|
+| Prisma | 5.22.0 | 7.2.0 | NO - 5.x sufficient, 7.x breaking changes |
+| lucide-react | 0.563.0 | 0.563.0 | N/A - already latest |
+| Zod | 4.3.6 | 4.3.6 | N/A - already latest |
+| Next.js | 15.5.12 | 15.5.12 | N/A - already latest |
+
+**Recommendation:** Stay on Prisma 5.22.0 for v1.1. Version 7.x introduced Rust-free client (architectural change) without features needed for this milestone. Upgrading adds risk without value.
+
+**Sources:**
+- [Prisma 7.2.0 release notes](https://www.prisma.io/blog/announcing-prisma-orm-7-2-0)
+- [Prisma 7.0.0 announcement](https://www.prisma.io/blog/announcing-prisma-orm-7-0-0)
+
+---
+
+## Technical Decisions Summary
+
+| Decision | Rationale | Alternative Rejected |
+|----------|-----------|---------------------|
+| **Integer for ratings** | Simpler queries, indexable, efficient | Enum (less flexible, harder to query) |
+| **Prisma enum for complexity** | Type-safe, PostgreSQL native, auto-validates | String field (no type safety) |
+| **No new UsageHistory table** | WeeklyPlan history sufficient | New table (over-engineered) |
+| **Progressive disclosure with Tailwind** | 0KB vs 12KB+ for UI library | Radix/Headless UI (bloat) |
+| **Server Actions for filters** | Filters applied server-side (secure) | Client-side filtering (less secure) |
+| **No useOptimistic** | Filter selection happens before swap | useOptimistic (adds complexity) |
+| **Stay on Prisma 5.x** | Stable, sufficient features | Upgrade to 7.x (breaking changes) |
+
+---
+
+## Integration Points with Existing Stack
+
+### Prisma Migrations
+- **Pattern:** Existing `prisma/migrations/` directory
+- **New migration:** `add_ratings_complexity_variety`
+- **Commands:** `npx prisma migrate dev`, `npx prisma generate`
+
+### Server Actions Pattern
+- **Pattern:** `"use server"` directive, `getCurrentUser()` auth, return shape `{ success?, error?, data? }`
+- **New actions:** `updateMealRating`, `getSwapOptions`, `swapDayMealWithChoice`
+- **Revalidation:** `revalidatePath('/')` after mutations
+
+### Zod Validation
+- **Pattern:** Schema definitions in action files, `schema.safeParse(data)`
+- **Prisma integration:** `z.nativeEnum(Complexity)` auto-infers enum values after `prisma generate`
+
+### Component Patterns
+- **Pattern:** Client components use `useState`, call Server Actions, handle loading/error
+- **New components:** Follow same pattern (no new state management)
+- **Icons:** lucide-react already imported; add `ThumbsUp`, `ThumbsDown`, `ChevronDown`, `ChevronUp`
+
+### Styling
+- **Pattern:** Tailwind utility classes, CSS variables for theme colors
+- **New styles:** Complexity badges (colored pills), filter panel (border, padding, bg-gray-50)
+
+---
+
+## Confidence Assessment
+
+| Area | Confidence | Rationale |
+|------|------------|-----------|
+| **Ratings storage** | HIGH | Integer field standard, Prisma/PostgreSQL proven |
+| **Complexity enum** | HIGH | Prisma enum official feature, PostgreSQL native |
+| **Variety algorithm** | HIGH | Extension of existing logic, WeeklyPlan history stored |
+| **Filtered swap Server Action** | HIGH | Prisma filters well-documented, indexed fields fast |
+| **Progressive disclosure UI** | MEDIUM | Pattern synthesis, but Tailwind implementation simple |
+| **No new dependencies** | HIGH | All features implementable with existing stack |
+
+---
+
+## Open Questions for Implementation
+
+1. **Lookback window duration:** 2 weeks? 3 weeks? 4 weeks? (Recommend 3, configurable)
+2. **Complexity default:** SIMPLE or null for existing meals? (Recommend SIMPLE for lower friction)
+3. **Rating button placement:** Inline with meal name or separate row? (UX decision)
+4. **Filter defaults:** "Exclude recent" on or off by default? (Recommend on for variety)
+5. **Swap behavior:** Keep "Byt" button as random, or always show filters? (Recommend progressive disclosure - random default, filters optional)
+
+---
 
 ## Sources
 
-### High Confidence Sources (Context7, Official Docs):
-- [Next.js 15.5 Release](https://nextjs.org/blog/next-15-5) — Official release notes, features, and recommendations
-- [Next.js 15 Release](https://nextjs.org/blog/next-15) — React 19 support, App Router updates
-- [Next.js Authentication Docs](https://nextjs.org/docs/app/guides/authentication) — Official auth patterns
-- [Auth.js Google Provider](https://next-auth.js.org/providers/google) — Official Google OAuth setup
-- [Prisma Next.js Docs](https://www.prisma.io/nextjs) — Official integration guide
-- [Tailwind CSS Next.js Guide](https://tailwindcss.com/docs/guides/nextjs) — Official setup
-- [TypeScript 5.8 Announcement](https://devblogs.microsoft.com/typescript/announcing-typescript-5-8/) — Official Microsoft release
-- [Neon Vercel Postgres Transition](https://neon.com/docs/guides/vercel-postgres-transition-guide) — Official migration guide
+### Official Documentation (HIGH confidence)
+- [Prisma Schema Reference](https://www.prisma.io/docs/orm/reference/prisma-schema-reference)
+- [Prisma Data Model](https://www.prisma.io/docs/orm/prisma-schema/data-model/models)
+- [Next.js Server Actions](https://nextjs.org/docs/app/getting-started/updating-data)
+- [React useOptimistic Hook](https://react.dev/reference/react/useOptimistic)
+- [Lucide Icons - thumbs-up](https://lucide.dev/icons/thumbs-up)
+- [Lucide Icons - thumbs-down](https://lucide.dev/icons/thumbs-down)
 
-### Medium Confidence Sources (Verified Web Search):
-- [Complete Next.js Security Guide 2025](https://www.turbostarter.dev/blog/complete-nextjs-security-guide-2025-authentication-api-protection-and-best-practices) — CVE-2025-29927, auth best practices
-- [Next.js Authentication Best Practices 2025](https://www.franciscomoretti.com/blog/modern-nextjs-authentication-best-practices) — Data Access Layer pattern
-- [Prisma vs Drizzle 2026 Comparison](https://makerkit.dev/blog/tutorials/drizzle-vs-prisma) — ORM comparison
-- [Best Databases for Next.js 2026](https://nextjstemplates.com/blog/best-database-for-nextjs) — Database options
-- [Biome vs ESLint 2025 Showdown](https://medium.com/better-dev-nextjs-react/biome-vs-eslint-prettier-the-2025-linting-revolution-you-need-to-know-about-ec01c5d5b6c8) — Tooling comparison
-- [pnpm vs npm vs yarn 2025](https://dev.to/hamzakhan/npm-vs-yarn-vs-pnpm-which-package-manager-should-you-use-in-2025-2f1g) — Package manager comparison
-- [shadcn/ui Modern React Components](https://thecodebeast.com/shadcn-ui-the-component-library-that-finally-puts-developers-in-control/) — Component library overview
-- [Next.js App Router Best Practices 2025](https://www.anshgupta.in/blog/nextjs-app-router-best-practices-2025) — Server Actions patterns
+### Technical Guides (MEDIUM-HIGH confidence)
+- [PostgreSQL Tutorial 2026](https://thelinuxcode.com/postgresql-tutorial-2026-from-first-query-to-production-grade-patterns/)
+- [Prisma Enum with TypeScript](https://www.squash.io/tutorial-on-prisma-enum-with-typescript/)
+- [Type-Safe Prisma Enum Integration](https://openillumi.com/en/en-prisma-enum-client-side-best-practice/)
+- [Next.js 15 Advanced Patterns 2026](https://johal.in/next-js-15-advanced-patterns-app-router-server-actions-and-caching-strategies-for-2026/)
+- [Prisma 7.2.0 Release](https://www.prisma.io/blog/announcing-prisma-orm-7-2-0)
+- [Prisma 7.0.0 Announcement](https://www.prisma.io/blog/announcing-prisma-orm-7-0-0)
 
-### Low Confidence / Additional Context:
-- [Vercel Alternatives 2025](https://snappify.com/blog/vercel-alternatives) — Deployment options
-- [React 19 + Next.js 15 Guide](https://medium.com/@genildocs/next-js-15-react-19-full-stack-implementation-guide-4ba0978fa0e5) — Compatibility notes
+### UI/UX Patterns (MEDIUM confidence)
+- [Progressive Disclosure - GitHub Primer](https://primer.style/product/ui-patterns/progressive-disclosure/)
+- [Progressive Disclosure Examples](https://userpilot.com/blog/progressive-disclosure-examples/)
+- [Progressive Disclosure - IxDF](https://www.interaction-design.org/literature/topics/progressive-disclosure)
+- [React Rating Best Practices](https://www.freecodecamp.org/news/how-to-build-a-rating-component-with-the-react-compound-component-pattern/)
+- [useOptimistic Limitations](https://www.columkelly.com/blog/use-optimistic)
+
+### Meal Planning Domain (MEDIUM confidence)
+- [Meal Rotation Hack](https://kalynbrooke.com/personal-growth/habits-routines/monthly-meal-planner-template/)
+- [Seasonal Meal Planning](https://flusterbuster.com/seasonal-meal-plan.html)
+- [Flexible Meal Planning 2026](https://planeatai.com/blog/flexible-meal-planning-without-a-strict-plan-2026)
+
+### Package Versions (HIGH confidence)
+- [lucide-react npm](https://www.npmjs.com/package/lucide-react)
+- [Zod npm](https://www.npmjs.com/package/zod)
 
 ---
-*Stack research for: What's for Dinner? (Minimal Meal Planning Web App)*
-*Researched: 2026-02-09*
-*Researcher: GSD Project Researcher Agent*
+
+## Final Recommendation
+
+**Install: Nothing. Extend: Everything.**
+
+All v1.1 features implement via:
+1. Prisma schema extensions (2 new fields, 2 new indexes, 1 new enum)
+2. Server Actions enhancements (3 new actions, 1 modified action)
+3. Component updates (3 files modified, leveraging existing patterns)
+
+**Zero new npm packages.** Minimal footprint maintained. TypeScript type safety preserved. Performance optimized via indexes. Backward compatible migrations.
+
+**Risk: LOW.** All changes additive. Existing v1.0 functionality untouched. Schema defaults prevent null issues.
+
+**Developer Experience: EXCELLENT.** No new libraries to learn. Existing patterns extend naturally. Prisma + Zod + TypeScript maintain type safety end-to-end.
