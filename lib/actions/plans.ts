@@ -5,6 +5,22 @@ import { getCurrentUser } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 import { selectMeals, selectMealsWithConstraints, type SelectionWarning } from "@/lib/planning/selection";
 
+type Day = "monday" | "tuesday" | "wednesday" | "thursday" | "friday";
+type SwapFilterInput = {
+  complexity?: "SIMPLE" | "MEDIUM" | "COMPLEX";
+  rating?: "THUMBS_UP";
+  recency?: "FRESH_ONLY";
+  limit?: number;
+};
+
+type SwapCandidate = {
+  id: string;
+  name: string;
+  complexity: "SIMPLE" | "MEDIUM" | "COMPLEX";
+  rating: "THUMBS_DOWN" | "NEUTRAL" | "THUMBS_UP";
+  isRecent: boolean;
+};
+
 // Get the Monday of the current week (ISO week starts on Monday)
 function getMonday(date: Date): Date {
   const d = new Date(date);
@@ -220,7 +236,198 @@ export async function getWeekInfo() {
   };
 }
 
-export async function swapDayMeal(day: "monday" | "tuesday" | "wednesday" | "thursday" | "friday") {
+function applySwapFilters(candidates: SwapCandidate[], filters?: SwapFilterInput): SwapCandidate[] {
+  let filtered = [...candidates];
+
+  if (filters?.complexity) {
+    filtered = filtered.filter((candidate) => candidate.complexity === filters.complexity);
+  }
+  if (filters?.rating === "THUMBS_UP") {
+    filtered = filtered.filter((candidate) => candidate.rating === "THUMBS_UP");
+  }
+  if (filters?.recency === "FRESH_ONLY") {
+    filtered = filtered.filter((candidate) => !candidate.isRecent);
+  }
+
+  return filtered;
+}
+
+function buildCounts(candidates: SwapCandidate[]) {
+  return {
+    simple: candidates.filter((candidate) => candidate.complexity === "SIMPLE").length,
+    medium: candidates.filter((candidate) => candidate.complexity === "MEDIUM").length,
+    complex: candidates.filter((candidate) => candidate.complexity === "COMPLEX").length,
+    thumbsUp: candidates.filter((candidate) => candidate.rating === "THUMBS_UP").length,
+    fresh: candidates.filter((candidate) => !candidate.isRecent).length,
+    total: candidates.length,
+  };
+}
+
+async function getSwapCandidatesForDay(userId: string, day: Day, weekStart: Date): Promise<SwapCandidate[]> {
+  const plan = await prisma.weeklyPlan.findUnique({
+    where: {
+      userId_weekStartDate: {
+        userId,
+        weekStartDate: weekStart,
+      },
+    },
+  });
+
+  if (!plan) {
+    return [];
+  }
+
+  const recentMealIds = await getRecentMealIds(userId, weekStart);
+  const currentPlanMeals = new Set<string>(
+    [plan.monday, plan.tuesday, plan.wednesday, plan.thursday, plan.friday].filter(
+      (meal): meal is string => meal !== null
+    )
+  );
+
+  const currentMealForDay = plan[day];
+  if (currentMealForDay) {
+    currentPlanMeals.delete(currentMealForDay);
+  }
+
+  const allMeals = await prisma.meal.findMany({
+    where: { userId },
+    select: { id: true, name: true, complexity: true, rating: true },
+  });
+
+  return allMeals
+    .filter((meal) => !currentPlanMeals.has(meal.name))
+    .filter((meal) => meal.name !== currentMealForDay)
+    .map((meal) => ({
+      id: meal.id,
+      name: meal.name,
+      complexity: meal.complexity,
+      rating: meal.rating,
+      isRecent: recentMealIds.has(meal.id),
+    }));
+}
+
+export async function getSwapOptions(day: Day, filters?: SwapFilterInput) {
+  const user = await getCurrentUser();
+  if (!user) {
+    return { error: "Ej behörig" };
+  }
+
+  const weekStart = getWeekStart();
+  const limit = Math.max(1, Math.min(filters?.limit ?? 8, 20));
+  const candidates = await getSwapCandidatesForDay(user.id, day, weekStart);
+  if (candidates.length === 0) {
+    return {
+      options: [],
+      counts: buildCounts([]),
+      fallbackUsed: false,
+      fallbackOptions: [],
+    };
+  }
+
+  const filteredCandidates = applySwapFilters(candidates, filters);
+  const usingFilters = Boolean(filters?.complexity || filters?.rating || filters?.recency);
+  const orderedFiltered = selectMeals(
+    filteredCandidates,
+    Math.min(limit, filteredCandidates.length),
+    new Set<string>()
+  );
+  const options = orderedFiltered.map((meal) => ({
+    id: meal.id,
+    name: meal.name,
+    complexity: candidates.find((candidate) => candidate.id === meal.id)?.complexity ?? "MEDIUM",
+    rating: candidates.find((candidate) => candidate.id === meal.id)?.rating ?? "NEUTRAL",
+  }));
+
+  if (options.length > 0 || !usingFilters) {
+    return {
+      options,
+      counts: buildCounts(filteredCandidates),
+      fallbackUsed: false,
+      fallbackOptions: [],
+    };
+  }
+
+  const fallbackRaw = selectMeals(candidates, Math.min(limit, candidates.length), new Set<string>());
+  const fallbackOptions = fallbackRaw.map((meal) => ({
+    id: meal.id,
+    name: meal.name,
+    complexity: candidates.find((candidate) => candidate.id === meal.id)?.complexity ?? "MEDIUM",
+    rating: candidates.find((candidate) => candidate.id === meal.id)?.rating ?? "NEUTRAL",
+  }));
+
+  return {
+    options: [],
+    counts: buildCounts(filteredCandidates),
+    fallbackUsed: true,
+    fallbackOptions,
+  };
+}
+
+export async function swapDayMealWithChoice(day: Day, mealId: string) {
+  const user = await getCurrentUser();
+  if (!user) {
+    return { error: "Ej behörig" };
+  }
+
+  const weekStart = getWeekStart();
+  const plan = await prisma.weeklyPlan.findUnique({
+    where: {
+      userId_weekStartDate: {
+        userId: user.id,
+        weekStartDate: weekStart,
+      },
+    },
+  });
+
+  if (!plan) {
+    return { error: "Ingen plan hittades för den här veckan" };
+  }
+
+  const meal = await prisma.meal.findUnique({
+    where: { id: mealId },
+    select: { id: true, name: true, userId: true },
+  });
+
+  if (!meal || meal.userId !== user.id) {
+    return { error: "Måltiden hittades inte" };
+  }
+
+  const occupiedMeals = new Set<string>(
+    [plan.monday, plan.tuesday, plan.wednesday, plan.thursday, plan.friday].filter(
+      (mealName): mealName is string => mealName !== null
+    )
+  );
+  occupiedMeals.delete(plan[day] ?? "");
+
+  if (occupiedMeals.has(meal.name)) {
+    return { error: "Måltiden finns redan i veckoplanen" };
+  }
+
+  await prisma.weeklyPlan.update({
+    where: {
+      userId_weekStartDate: {
+        userId: user.id,
+        weekStartDate: weekStart,
+      },
+    },
+    data: { [day]: meal.name },
+  });
+
+  await prisma.usageHistory.create({
+    data: {
+      mealId: meal.id,
+      userId: user.id,
+      usedDate: new Date(),
+      weekStartDate: weekStart,
+    },
+  });
+
+  revalidatePath("/");
+  revalidatePath("/plan");
+  return { success: true, newMeal: meal.name, mealId: meal.id };
+}
+
+export async function swapDayMeal(day: Day) {
   const user = await getCurrentUser();
   if (!user) {
     return { error: "Ej behörig" };
