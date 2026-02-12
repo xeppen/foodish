@@ -3,6 +3,7 @@
 import { deleteMeal, updateMeal } from "@/lib/actions/meals";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { ComplexityBadge } from "@/components/complexity-badge";
 
 type Meal = {
   id: string;
@@ -98,14 +99,15 @@ export function MealList({ meals }: { meals: Meal[] }) {
               </div>
             </div>
           ) : (
-            <div className="flex items-center justify-between px-3 py-2.5 hover:bg-[var(--cream)]/60">
+            <div className="flex items-center justify-between px-3 py-2 hover:bg-[var(--cream)]/60">
               <button
                 type="button"
                 onClick={() => startEditing(meal)}
-                className="flex flex-1 items-center gap-3 text-left"
+                className="flex flex-1 items-center gap-2 text-left"
               >
                 <div className="h-1.5 w-1.5 rounded-full bg-[var(--sage)]" />
                 <span className="text-sm font-medium text-[var(--charcoal)]">{meal.name}</span>
+                <ComplexityBadge complexity={meal.complexity} />
               </button>
               <div className="flex gap-1.5">
                 <button

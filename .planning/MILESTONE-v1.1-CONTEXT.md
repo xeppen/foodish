@@ -2,7 +2,7 @@
 
 **Created:** 2026-02-12
 **Milestone:** v1.1 Smart Variety & Preferences
-**Status:** In progress (Phase 6-7 complete; Phase 8-10 pending)
+**Status:** In progress (Phase 6-7-9 complete; Phase 8 and 10 pending)
 
 ## Motivation
 
@@ -156,6 +156,7 @@ The constraint is critical: we can't sacrifice speed for features. The fast path
 - ComplexityBadge component with visual coding
 - Complexity selector with clear definitions
 - Display in meal list only (not plan view)
+- Status: Completed on 2026-02-12
 
 ### Phase 5: Progressive Disclosure Swap (Phase 10)
 - SwapModal with filter options

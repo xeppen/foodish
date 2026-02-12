@@ -28,9 +28,9 @@ Requirements for Smart Variety & Preferences milestone. Each maps to roadmap pha
 
 - [x] **COMPLEX-01**: Meals have complexity level (simple/medium/complex)
 - [x] **COMPLEX-02**: New meals default to medium complexity in persisted data
-- [ ] **COMPLEX-03**: User can set/change complexity when creating or editing meal
-- [ ] **COMPLEX-04**: Complexity definitions are clear (time-based: <30min, 30-60min, >60min)
-- [ ] **COMPLEX-05**: Complexity badges display in meal list
+- [x] **COMPLEX-03**: User can set/change complexity when creating or editing meal
+- [x] **COMPLEX-04**: Complexity definitions are clear (time-based: <30min, 30-60min, >60min)
+- [x] **COMPLEX-05**: Complexity badges display in meal list
 
 ### Enhanced Swapping
 
@@ -108,9 +108,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | VARIETY-05 | Phase 7 | Complete |
 | COMPLEX-01 | Phase 6 | Complete |
 | COMPLEX-02 | Phase 6 | Complete |
-| COMPLEX-03 | Phase 9 | Pending |
-| COMPLEX-04 | Phase 9 | Pending |
-| COMPLEX-05 | Phase 9 | Pending |
+| COMPLEX-03 | Phase 9 | Complete |
+| COMPLEX-04 | Phase 9 | Complete |
+| COMPLEX-05 | Phase 9 | Complete |
 | SWAP-01 | Phase 10 | Pending |
 | SWAP-02 | Phase 10 | Pending |
 | SWAP-03 | Phase 10 | Pending |
@@ -137,4 +137,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-02-12*
-*Last updated: 2026-02-12 (Phase 7 traceability updated)*
+*Last updated: 2026-02-12 (Phase 9 traceability updated)*

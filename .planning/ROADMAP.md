@@ -159,12 +159,12 @@ Plans:
   2. Complexity selector shows clear definitions (Simple: <30min, Medium: 30-60min, Complex: >60min)
   3. Complexity badges display in meal list with visual coding (green=Simple, yellow=Medium, orange=Complex)
   4. Complexity information helps users understand preparation time at a glance
-**Plans**: TBD
+**Plans**: 3 plans
 
 Plans:
-- [ ] 09-01: Create ComplexityBadge component with clear visual design
-- [ ] 09-02: Add complexity selector to meal forms with examples
-- [ ] 09-03: Display complexity badges in meal list
+- [x] 09-01: Add complexity selector support in create/edit flows
+- [x] 09-02: Add time-based complexity definitions in meal management UI
+- [x] 09-03: Display complexity badges in meal list + add test coverage
 
 #### Phase 10: Progressive Disclosure Swap
 **Goal**: Users can swap meals with optional filters while keeping fast random swap as default
@@ -204,13 +204,13 @@ Phases execute in numeric order: 6 → 7 → 8 → 9 → 10
 | 6. Database Foundation | v1.1 | 3/3 | Complete | 2026-02-12 |
 | 7. Variety Rules & Rotation Logic | v1.1 | 3/3 | Complete | 2026-02-12 |
 | 8. Rating System & UI | v1.1 | 0/3 | Not started | - |
-| 9. Complexity Levels & Badges | v1.1 | 0/3 | Not started | - |
+| 9. Complexity Levels & Badges | v1.1 | 3/3 | Complete | 2026-02-12 |
 | 10. Progressive Disclosure Swap | v1.1 | 0/4 | Not started | - |
 
 **Deployment:** https://foodish-red.vercel.app
 **Repository:** https://github.com/xeppen/foodish
-**Current Status:** v1.0 deployed, v1.1 Phases 6-7 complete, Phase 9 planning started
+**Current Status:** v1.0 deployed, v1.1 Phases 6-7-9 complete, Phase 8/10 pending
 
 ---
 *Roadmap created: 2026-02-09*
-*Last updated: 2026-02-12 (Phase 7 completed, Phase 9 planning started)*
+*Last updated: 2026-02-12 (Phase 9 completed)*

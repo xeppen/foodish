@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-02-12)
 
 **Core value:** Weekly dinner planning takes less than 60 seconds and removes decision fatigue
-**Current focus:** Phase 9 - Complexity Levels & Badges (v1.1 milestone, planning)
+**Current focus:** Phase 8 - Rating System & UI (v1.1 milestone)
 
 ## Current Position
 
-Phase: 9 of 10 (Complexity Levels & Badges)
+Phase: 8 of 10 (Rating System & UI)
 Plan: Ready to plan
 Status: Ready to execute
-Last activity: 2026-02-12 - Phase 7 completed (variety rules + fallback messaging + tests)
+Last activity: 2026-02-12 - Phase 9 completed (complexity controls + badges + tests)
 
-Progress: [████████████████░░░░] 70% (v1.0 complete, v1.1 Phases 6-7 complete)
+Progress: [██████████████████░░] 80% (v1.0 complete, v1.1 Phases 6-7-9 complete)
 
 ## Performance Metrics
 
@@ -34,14 +34,16 @@ Progress: [████████████████░░░░] 70% (v1
 | 5. Polish & Deployment | 6/6 | Complete |
 | 6. Database Foundation | 3/3 | Complete |
 | 7. Variety Rules & Rotation Logic | 3/3 | Complete |
+| 9. Complexity Levels & Badges | 3/3 | Complete |
 
 **Recent Trend:**
 - v1.0 shipped successfully on 2026-02-10
 - Completed v1.1 Phase 6 (database foundation)
 - Completed v1.1 Phase 7 (variety rules + graceful fallback)
-- Starting Phase 9 planning (complexity UI + badges)
+- Completed v1.1 Phase 9 (complexity UI + badges)
+- Next: execute Phase 8 (ratings) and Phase 10 (progressive swap)
 
-*Updated after Phase 7 completion*
+*Updated after Phase 9 completion*
 
 ## Accumulated Context
 
@@ -59,20 +61,20 @@ Recent decisions from PROJECT.md affecting current work:
 
 ### Pending Todos
 
-Phase 9 planning/execution:
-- Add complexity selector controls to create/edit meal flows
-- Define and display complexity helper text (<30, 30-60, >60 min)
-- Render compact complexity badges in meal list rows
-- Add unit/integration tests for complexity updates
+Phase 8 planning/execution:
+- Add rating controls to meal list rows
+- Add rateMeal server action and optimistic UI
+- Add rating-aware selection weighting in generation logic
+- Add test coverage for rating writes and weighted selection
 
 ### Blockers/Concerns
 
-No blockers. Phase 9 depends on Phase 6 schema defaults, which are in place.
+No blockers. Phase 8 depends on Phase 6 schema defaults, which are in place.
 
 ## Session Continuity
 
 Last session: 2026-02-12
-Stopped at: Completed Phase 7 implementation and verification
+Stopped at: Completed Phase 9 implementation and verification
 Resume file: None
 
-**Next action:** Create Phase 9 plan files (09-01, 09-02, 09-03)
+**Next action:** Create and execute Phase 8 Plan 01
