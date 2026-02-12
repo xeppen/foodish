@@ -10,7 +10,7 @@ Requirements for Smart Variety & Preferences milestone. Each maps to roadmap pha
 ### Ratings
 
 - [ ] **RATING-01**: User can rate meals with thumbs up/neutral/down
-- [ ] **RATING-02**: Meal ratings persist across sessions
+- [x] **RATING-02**: Meal ratings persist across sessions
 - [ ] **RATING-03**: Rating toggle appears in meal list (not plan view)
 - [ ] **RATING-04**: Thumbs-up meals appear more frequently in generation
 - [ ] **RATING-05**: Thumbs-down meals appear less frequently (but not excluded)
@@ -18,16 +18,16 @@ Requirements for Smart Variety & Preferences milestone. Each maps to roadmap pha
 
 ### Variety Control
 
-- [ ] **VARIETY-01**: Generated plans never include duplicate meals within same week
-- [ ] **VARIETY-02**: Meals used in last 2 weeks are deprioritized
-- [ ] **VARIETY-03**: Favorite meals can appear once per week but not 3+ weeks consecutively
-- [ ] **VARIETY-04**: Usage history tracks when each meal was used
-- [ ] **VARIETY-05**: Graceful degradation when constraints conflict with small meal libraries
+- [x] **VARIETY-01**: Generated plans never include duplicate meals within same week
+- [x] **VARIETY-02**: Meals used in last 2 weeks are deprioritized
+- [x] **VARIETY-03**: Favorite meals can appear once per week but not 3+ weeks consecutively
+- [x] **VARIETY-04**: Usage history tracks when each meal was used
+- [x] **VARIETY-05**: Graceful degradation when constraints conflict with small meal libraries
 
 ### Complexity
 
-- [ ] **COMPLEX-01**: Meals have complexity level (simple/medium/complex)
-- [ ] **COMPLEX-02**: New meals default to medium complexity
+- [x] **COMPLEX-01**: Meals have complexity level (simple/medium/complex)
+- [x] **COMPLEX-02**: New meals default to medium complexity in persisted data
 - [ ] **COMPLEX-03**: User can set/change complexity when creating or editing meal
 - [ ] **COMPLEX-04**: Complexity definitions are clear (time-based: <30min, 30-60min, >60min)
 - [ ] **COMPLEX-05**: Complexity badges display in meal list
@@ -96,18 +96,18 @@ Which phases cover which requirements. Updated during roadmap creation.
 | Requirement | Phase | Status |
 |-------------|-------|--------|
 | RATING-01 | Phase 8 | Pending |
-| RATING-02 | Phase 6 | Pending |
+| RATING-02 | Phase 6 | Complete |
 | RATING-03 | Phase 8 | Pending |
 | RATING-04 | Phase 8 | Pending |
 | RATING-05 | Phase 8 | Pending |
 | RATING-06 | Phase 8 | Pending |
-| VARIETY-01 | Phase 7 | Pending |
-| VARIETY-02 | Phase 7 | Pending |
-| VARIETY-03 | Phase 7 | Pending |
-| VARIETY-04 | Phase 6 | Pending |
-| VARIETY-05 | Phase 7 | Pending |
-| COMPLEX-01 | Phase 6 | Pending |
-| COMPLEX-02 | Phase 6 | Pending |
+| VARIETY-01 | Phase 7 | Complete |
+| VARIETY-02 | Phase 7 | Complete |
+| VARIETY-03 | Phase 7 | Complete |
+| VARIETY-04 | Phase 6 | Complete |
+| VARIETY-05 | Phase 7 | Complete |
+| COMPLEX-01 | Phase 6 | Complete |
+| COMPLEX-02 | Phase 6 | Complete |
 | COMPLEX-03 | Phase 9 | Pending |
 | COMPLEX-04 | Phase 9 | Pending |
 | COMPLEX-05 | Phase 9 | Pending |
@@ -137,4 +137,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-02-12*
-*Last updated: 2026-02-12 (traceability complete)*
+*Last updated: 2026-02-12 (Phase 7 traceability updated)*

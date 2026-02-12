@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-02-12)
 
 **Core value:** Weekly dinner planning takes less than 60 seconds and removes decision fatigue
-**Current focus:** Phase 6 - Database Foundation (v1.1 milestone)
+**Current focus:** Phase 9 - Complexity Levels & Badges (v1.1 milestone, planning)
 
 ## Current Position
 
-Phase: 6 of 10 (Database Foundation)
+Phase: 9 of 10 (Complexity Levels & Badges)
 Plan: Ready to plan
-Status: Ready to plan
-Last activity: 2026-02-12 - v1.1 roadmap created, starting Phase 6
+Status: Ready to execute
+Last activity: 2026-02-12 - Phase 7 completed (variety rules + fallback messaging + tests)
 
-Progress: [████████████░░░░░░░░] 50% (v1.0 complete, v1.1 starting)
+Progress: [████████████████░░░░] 70% (v1.0 complete, v1.1 Phases 6-7 complete)
 
 ## Performance Metrics
 
@@ -32,13 +32,16 @@ Progress: [████████████░░░░░░░░] 50% (v1
 | 3. Planning Logic | 3/3 | Complete |
 | 4. Plan Adjustment | 2/2 | Complete |
 | 5. Polish & Deployment | 6/6 | Complete |
-| 6. Database Foundation | 0/3 | Not started |
+| 6. Database Foundation | 3/3 | Complete |
+| 7. Variety Rules & Rotation Logic | 3/3 | Complete |
 
 **Recent Trend:**
 - v1.0 shipped successfully on 2026-02-10
-- Starting v1.1 milestone with 5 new phases (6-10)
+- Completed v1.1 Phase 6 (database foundation)
+- Completed v1.1 Phase 7 (variety rules + graceful fallback)
+- Starting Phase 9 planning (complexity UI + badges)
 
-*Will update after each v1.1 plan completion*
+*Updated after Phase 7 completion*
 
 ## Accumulated Context
 
@@ -49,26 +52,27 @@ Recent decisions from PROJECT.md affecting current work:
 - **v1.0**: Google sign-in only (simplicity) - ✓ Shipped
 - **v1.0**: 5 weekday meals only - ✓ Maintained for v1.1
 - **v1.0**: Text-only meal list - ✓ AI images deferred
-- **v1.1 Pending**: Add ratings (thumbs up/down influence generation)
-- **v1.1 Pending**: Hard rule - no duplicates per week
-- **v1.1 Pending**: Complexity defaults to medium (optional metadata)
+- **v1.1 Complete**: Add ratings (thumbs up/down influence generation) at schema level
+- **v1.1 Complete**: Hard rule + graceful fallback constraints in plan generation
+- **v1.1 Complete**: Complexity defaults to medium (schema + persistence)
 - **v1.1 Pending**: Progressive disclosure for swap filters (keep fast path fast)
 
 ### Pending Todos
 
-From v1.0 (may be resolved):
-- Debug production dashboard error (server-side exception)
-- Verify database schema initialized in production
-- Test full auth flow in production
+Phase 9 planning/execution:
+- Add complexity selector controls to create/edit meal flows
+- Define and display complexity helper text (<30, 30-60, >60 min)
+- Render compact complexity badges in meal list rows
+- Add unit/integration tests for complexity updates
 
 ### Blockers/Concerns
 
-None blocking v1.1 start. v1.0 shipped successfully, v1.1 roadmap complete and ready for Phase 6 planning.
+No blockers. Phase 9 depends on Phase 6 schema defaults, which are in place.
 
 ## Session Continuity
 
 Last session: 2026-02-12
-Stopped at: Created v1.1 roadmap with phases 6-10
+Stopped at: Completed Phase 7 implementation and verification
 Resume file: None
 
-**Next action:** Run `/gsd:plan-phase 6` to create execution plan for Database Foundation phase
+**Next action:** Create Phase 9 plan files (09-01, 09-02, 09-03)

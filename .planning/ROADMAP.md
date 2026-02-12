@@ -106,13 +106,14 @@ Plans:
   2. Meal model includes complexity field (SIMPLE/MEDIUM/COMPLEX enum with default MEDIUM)
   3. UsageHistory model tracks when each meal was used with timestamp and week context
   4. Database indexes exist for filtered queries (userId + rating, userId + complexity)
-  5. Existing meals migrate successfully with defaults (rating=NEUTRAL, complexity=MEDIUM)
+  5. New and existing meals resolve to explicit defaults (rating=NEUTRAL, complexity=MEDIUM)
+  6. Plan generation no longer relies on Meal.lastUsed and uses UsageHistory as primary recency source
 **Plans**: 3 plans in 2 waves
 
 Plans:
-- [ ] 06-01-PLAN.md — Add Rating/Complexity enums to Meal model with nullable fields
-- [ ] 06-02-PLAN.md — Add UsageHistory model with cascade delete and composite indexes
-- [ ] 06-03-PLAN.md — Apply migration and verify backward compatibility
+- [x] 06-01-PLAN.md — Add Rating/Complexity enums to Meal model with explicit defaults
+- [x] 06-02-PLAN.md — Add UsageHistory model with cascade delete and composite indexes
+- [x] 06-03-PLAN.md — Apply migration and verify backward compatibility
 
 #### Phase 7: Variety Rules & Rotation Logic
 **Goal**: Generated plans avoid repetition and respect long-term rotation without user configuration
@@ -124,12 +125,12 @@ Plans:
   3. Favorite meals can appear weekly but not 3+ weeks consecutively
   4. When variety constraints conflict with small meal libraries, system gracefully degrades (shows message: "We repeated a recent meal because your library is small")
   5. UsageHistory entries are created on plan generation and swap actions
-**Plans**: TBD
+**Plans**: 3 plans
 
 Plans:
-- [ ] 07-01: Enhance selectRandomMeals() with variety constraints
-- [ ] 07-02: Implement constraint relaxation cascade for edge cases
-- [ ] 07-03: Create UsageHistory tracking in plan generation
+- [x] 07-01: Enhance selection algorithm with 14-day recency + no-duplicate constraints
+- [x] 07-02: Implement constraint relaxation cascade for edge cases
+- [x] 07-03: Add graceful degradation warnings and test coverage
 
 #### Phase 8: Rating System & UI
 **Goal**: Users can express meal preferences that influence future plan generation
@@ -138,7 +139,7 @@ Plans:
 **Success Criteria** (what must be TRUE):
   1. User can toggle meal rating between thumbs-up/neutral/thumbs-down
   2. Rating changes appear immediately (optimistic UI)
-  3. Rating toggle appears in meal list view (Meals page and meal drawer)
+  3. Rating toggle appears in meal management list view (single-view drawer)
   4. Thumbs-up meals appear more frequently in generated plans (2x probability boost)
   5. Thumbs-down meals appear less frequently but are never excluded (0.5x probability)
   6. All existing meals default to neutral rating
@@ -200,16 +201,16 @@ Phases execute in numeric order: 6 → 7 → 8 → 9 → 10
 | 3. Planning Logic | v1.0 | 3/3 | Complete | 2026-02-09 |
 | 4. Plan Adjustment | v1.0 | 2/2 | Complete | 2026-02-09 |
 | 5. Polish & Deployment | v1.0 | 6/6 | Complete | 2026-02-10 |
-| 6. Database Foundation | v1.1 | 0/3 | Not started | - |
-| 7. Variety Rules & Rotation Logic | v1.1 | 0/3 | Not started | - |
+| 6. Database Foundation | v1.1 | 3/3 | Complete | 2026-02-12 |
+| 7. Variety Rules & Rotation Logic | v1.1 | 3/3 | Complete | 2026-02-12 |
 | 8. Rating System & UI | v1.1 | 0/3 | Not started | - |
 | 9. Complexity Levels & Badges | v1.1 | 0/3 | Not started | - |
 | 10. Progressive Disclosure Swap | v1.1 | 0/4 | Not started | - |
 
 **Deployment:** https://foodish-red.vercel.app
 **Repository:** https://github.com/xeppen/foodish
-**Current Status:** v1.0 deployed, v1.1 roadmap ready for planning
+**Current Status:** v1.0 deployed, v1.1 Phases 6-7 complete, Phase 9 planning started
 
 ---
 *Roadmap created: 2026-02-09*
-*Last updated: 2026-02-12 (v1.1 roadmap added)*
+*Last updated: 2026-02-12 (Phase 7 completed, Phase 9 planning started)*

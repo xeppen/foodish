@@ -2,7 +2,7 @@
 
 **Created:** 2026-02-12
 **Milestone:** v1.1 Smart Variety & Preferences
-**Status:** Planning complete, ready for execution
+**Status:** In progress (Phase 6-7 complete; Phase 8-10 pending)
 
 ## Motivation
 
@@ -81,12 +81,12 @@ The constraint is critical: we can't sacrifice speed for features. The fast path
 - Filters: Only revealed when user clicks "Swap with filters"
 - Ratings: Small icon, optional interaction
 
-### 2. Backward Compatibility Required
-**Problem:** App is in production with real users
-**Solution:** All schema changes nullable, migrations staged carefully
-- Existing meals: rating=null, complexity=null (app treats as neutral/medium)
-- No forced data backfill
-- Old code continues working during deployment window
+### 2. Clean Schema Evolution (Pre-Launch)
+**Context:** App is not live yet
+**Solution:** Use explicit defaults and adopt the new usage-tracking model now
+- Existing and new meals persist with explicit defaults (rating=NEUTRAL, complexity=MEDIUM)
+- No nullable transitional state required for Phase 6
+- Replace `lastUsed`-driven recency with `UsageHistory` as primary source
 
 ### 3. Decision Removal, Not Optimization
 **Problem:** Feature creep toward complex ML/recommendation systems
@@ -145,6 +145,7 @@ The constraint is critical: we can't sacrifice speed for features. The fast path
 - Hard rule: no duplicate meals in same week
 - Soft rule: deprioritize meals from last 2 weeks
 - Graceful degradation cascade when constraints conflict
+- Status: Completed on 2026-02-12
 
 ### Phase 3: Rating System & UI (Phase 8)
 - RatingToggle component (thumbs up/neutral/down)
