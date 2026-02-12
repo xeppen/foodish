@@ -5,16 +5,14 @@
 See: .planning/PROJECT.md (updated 2026-02-09)
 
 **Core value:** Weekly dinner planning takes less than 60 seconds and removes decision fatigue.
-**Current focus:** Production debugging and stabilization
+**Current focus:** Milestone v1.1 - Smart Variety & Preferences
 
 ## Current Position
 
-Phase: 5 of 5 (All phases complete)
-Plan: All phases completed
-Status: Deployed to production, debugging runtime error
-Last activity: 2026-02-10 — All phases built, Clerk auth migrated, deployed to Vercel, debugging dashboard error
-
-Progress: [██████████] 100%
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements for v1.1
+Last activity: 2026-02-12 — Milestone v1.1 started (Smart Variety & Preferences)
 
 ## Performance Metrics
 
