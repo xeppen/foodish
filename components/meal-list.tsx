@@ -1,7 +1,7 @@
 "use client";
 
-import { deleteMeal, updateMeal } from "@/lib/actions/meals";
-import { useState } from "react";
+import { deleteMeal, rateMeal, updateMeal } from "@/lib/actions/meals";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ComplexityBadge } from "@/components/complexity-badge";
 import { MealRating, RatingToggle } from "@/components/rating-toggle";
@@ -21,7 +21,12 @@ export function MealList({ meals }: { meals: Meal[] }) {
   const [ratings, setRatings] = useState<Record<string, MealRating>>(
     Object.fromEntries(meals.map((meal) => [meal.id, meal.rating]))
   );
+  const [ratingPendingId, setRatingPendingId] = useState<string | null>(null);
   const router = useRouter();
+
+  useEffect(() => {
+    setRatings(Object.fromEntries(meals.map((meal) => [meal.id, meal.rating])));
+  }, [meals]);
 
   function startEditing(meal: Meal) {
     setEditingId(meal.id);
@@ -58,8 +63,21 @@ export function MealList({ meals }: { meals: Meal[] }) {
     }
   }
 
-  function handleRatingChange(id: string, rating: MealRating) {
+  async function handleRatingChange(id: string, rating: MealRating) {
+    const previous = ratings[id];
+    if (previous === rating) {
+      return;
+    }
+
     setRatings((current) => ({ ...current, [id]: rating }));
+    setRatingPendingId(id);
+
+    const result = await rateMeal(id, rating);
+    if (result.error) {
+      setRatings((current) => ({ ...current, [id]: previous }));
+    }
+
+    setRatingPendingId(null);
   }
 
   return (
@@ -121,6 +139,7 @@ export function MealList({ meals }: { meals: Meal[] }) {
               <div className="flex gap-1.5">
                 <RatingToggle
                   rating={ratings[meal.id] ?? meal.rating}
+                  disabled={ratingPendingId === meal.id}
                   onChange={(rating) => handleRatingChange(meal.id, rating)}
                 />
                 <button

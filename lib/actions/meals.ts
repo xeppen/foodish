@@ -14,6 +14,9 @@ const mealSchema = z.object({
     .max(100, "Måltidsnamnet är för långt"),
   complexity: z.enum(["SIMPLE", "MEDIUM", "COMPLEX"]).optional(),
 });
+const ratingSchema = z.object({
+  rating: z.enum(["THUMBS_DOWN", "NEUTRAL", "THUMBS_UP"]),
+});
 
 export async function initializeStarterMeals() {
   const user = await getCurrentUser();
@@ -176,6 +179,35 @@ export async function deleteMeal(id: string) {
 
   await prisma.meal.delete({
     where: { id },
+  });
+
+  revalidatePath("/");
+  revalidatePath("/meals");
+  return { success: true };
+}
+
+export async function rateMeal(id: string, rating: "THUMBS_DOWN" | "NEUTRAL" | "THUMBS_UP") {
+  const user = await getCurrentUser();
+  if (!user) {
+    return { error: "Ej behörig" };
+  }
+
+  const validation = ratingSchema.safeParse({ rating });
+  if (!validation.success) {
+    return { error: "Ogiltigt betyg" };
+  }
+
+  const meal = await prisma.meal.findUnique({
+    where: { id },
+  });
+
+  if (!meal || meal.userId !== user.id) {
+    return { error: "Måltiden hittades inte" };
+  }
+
+  await prisma.meal.update({
+    where: { id },
+    data: { rating: validation.data.rating },
   });
 
   revalidatePath("/");

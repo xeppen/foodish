@@ -28,7 +28,7 @@ vi.mock("next/cache", () => ({
   revalidatePath: mockRevalidatePath,
 }));
 
-import { addMeal, updateMeal } from "@/lib/actions/meals";
+import { addMeal, rateMeal, updateMeal } from "@/lib/actions/meals";
 
 describe("meals actions (phase 9)", () => {
   beforeEach(() => {
@@ -92,6 +92,22 @@ describe("meals actions (phase 9)", () => {
         name: "Kycklinggryta",
         complexity: "SIMPLE",
       },
+    });
+  });
+
+  it("rateMeal updates meal rating for owner", async () => {
+    prismaMock.meal.findUnique.mockResolvedValue({
+      id: "m1",
+      userId: "user_1",
+    });
+    prismaMock.meal.update.mockResolvedValue({ id: "m1" });
+
+    const result = await rateMeal("m1", "THUMBS_UP");
+
+    expect(result).toEqual({ success: true });
+    expect(prismaMock.meal.update).toHaveBeenCalledWith({
+      where: { id: "m1" },
+      data: { rating: "THUMBS_UP" },
     });
   });
 });
