@@ -1,7 +1,8 @@
 export type CandidateMeal = {
   id: string;
   name: string;
-  rating?: "THUMBS_DOWN" | "NEUTRAL" | "THUMBS_UP";
+  thumbsUpCount?: number;
+  thumbsDownCount?: number;
 };
 
 export type SelectionWarning =
@@ -18,11 +19,15 @@ function shuffle<T>(items: T[], randomFn: () => number): T[] {
   return copy;
 }
 
-function ratingWeight(rating: CandidateMeal["rating"]): number {
-  if (rating === "THUMBS_UP") {
+function voteWeight(meal: CandidateMeal): number {
+  const up = meal.thumbsUpCount ?? 0;
+  const down = meal.thumbsDownCount ?? 0;
+  const delta = up - down;
+
+  if (delta > 0) {
     return 2;
   }
-  if (rating === "THUMBS_DOWN") {
+  if (delta < 0) {
     return 0.5;
   }
   return 1;
@@ -33,7 +38,7 @@ function weightedOrder(items: CandidateMeal[], randomFn: () => number): Candidat
   const ordered: CandidateMeal[] = [];
 
   while (pool.length > 0) {
-    const totalWeight = pool.reduce((sum, meal) => sum + ratingWeight(meal.rating), 0);
+    const totalWeight = pool.reduce((sum, meal) => sum + voteWeight(meal), 0);
     if (totalWeight <= 0) {
       ordered.push(...shuffle(pool, randomFn));
       break;
@@ -44,7 +49,7 @@ function weightedOrder(items: CandidateMeal[], randomFn: () => number): Candidat
     let pickedIndex = 0;
 
     for (let i = 0; i < pool.length; i++) {
-      cumulative += ratingWeight(pool[i].rating);
+      cumulative += voteWeight(pool[i]);
       if (target <= cumulative) {
         pickedIndex = i;
         break;

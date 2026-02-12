@@ -17,7 +17,8 @@ type SwapCandidate = {
   id: string;
   name: string;
   complexity: "SIMPLE" | "MEDIUM" | "COMPLEX";
-  rating: "THUMBS_DOWN" | "NEUTRAL" | "THUMBS_UP";
+  thumbsUpCount: number;
+  thumbsDownCount: number;
   isRecent: boolean;
 };
 
@@ -76,7 +77,7 @@ async function getBlockedFavoriteIds(userId: string, weekStart: Date): Promise<S
         lt: weekStart,
       },
       meal: {
-        rating: "THUMBS_UP",
+        thumbsUpCount: { gt: 0 },
       },
     },
     select: {
@@ -174,7 +175,7 @@ export async function generateWeeklyPlan() {
   const blockedFavoriteIds = await getBlockedFavoriteIds(user.id, weekStart);
   const allMeals = await prisma.meal.findMany({
     where: { userId: user.id },
-    select: { id: true, name: true, rating: true },
+    select: { id: true, name: true, thumbsUpCount: true, thumbsDownCount: true },
   });
   const { selectedMeals, warnings } = selectMealsWithConstraints(
     allMeals,
@@ -243,7 +244,7 @@ function applySwapFilters(candidates: SwapCandidate[], filters?: SwapFilterInput
     filtered = filtered.filter((candidate) => candidate.complexity === filters.complexity);
   }
   if (filters?.rating === "THUMBS_UP") {
-    filtered = filtered.filter((candidate) => candidate.rating === "THUMBS_UP");
+    filtered = filtered.filter((candidate) => candidate.thumbsUpCount > candidate.thumbsDownCount);
   }
   if (filters?.recency === "FRESH_ONLY") {
     filtered = filtered.filter((candidate) => !candidate.isRecent);
@@ -257,7 +258,7 @@ function buildCounts(candidates: SwapCandidate[]) {
     simple: candidates.filter((candidate) => candidate.complexity === "SIMPLE").length,
     medium: candidates.filter((candidate) => candidate.complexity === "MEDIUM").length,
     complex: candidates.filter((candidate) => candidate.complexity === "COMPLEX").length,
-    thumbsUp: candidates.filter((candidate) => candidate.rating === "THUMBS_UP").length,
+    thumbsUp: candidates.filter((candidate) => candidate.thumbsUpCount > candidate.thumbsDownCount).length,
     fresh: candidates.filter((candidate) => !candidate.isRecent).length,
     total: candidates.length,
   };
@@ -291,7 +292,7 @@ async function getSwapCandidatesForDay(userId: string, day: Day, weekStart: Date
 
   const allMeals = await prisma.meal.findMany({
     where: { userId },
-    select: { id: true, name: true, complexity: true, rating: true },
+    select: { id: true, name: true, complexity: true, thumbsUpCount: true, thumbsDownCount: true },
   });
 
   return allMeals
@@ -301,7 +302,8 @@ async function getSwapCandidatesForDay(userId: string, day: Day, weekStart: Date
       id: meal.id,
       name: meal.name,
       complexity: meal.complexity,
-      rating: meal.rating,
+      thumbsUpCount: meal.thumbsUpCount,
+      thumbsDownCount: meal.thumbsDownCount,
       isRecent: recentMealIds.has(meal.id),
     }));
 }
@@ -335,7 +337,8 @@ export async function getSwapOptions(day: Day, filters?: SwapFilterInput) {
     id: meal.id,
     name: meal.name,
     complexity: candidates.find((candidate) => candidate.id === meal.id)?.complexity ?? "MEDIUM",
-    rating: candidates.find((candidate) => candidate.id === meal.id)?.rating ?? "NEUTRAL",
+    thumbsUpCount: candidates.find((candidate) => candidate.id === meal.id)?.thumbsUpCount ?? 0,
+    thumbsDownCount: candidates.find((candidate) => candidate.id === meal.id)?.thumbsDownCount ?? 0,
   }));
 
   if (options.length > 0 || !usingFilters) {
@@ -352,7 +355,8 @@ export async function getSwapOptions(day: Day, filters?: SwapFilterInput) {
     id: meal.id,
     name: meal.name,
     complexity: candidates.find((candidate) => candidate.id === meal.id)?.complexity ?? "MEDIUM",
-    rating: candidates.find((candidate) => candidate.id === meal.id)?.rating ?? "NEUTRAL",
+    thumbsUpCount: candidates.find((candidate) => candidate.id === meal.id)?.thumbsUpCount ?? 0,
+    thumbsDownCount: candidates.find((candidate) => candidate.id === meal.id)?.thumbsDownCount ?? 0,
   }));
 
   return {

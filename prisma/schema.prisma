@@ -11,22 +11,36 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
+enum Complexity {
+  SIMPLE
+  MEDIUM
+  COMPLEX
+}
+
 // Application models
 // Note: userId is the Clerk user ID (string)
 model Meal {
-  id        String    @id @default(cuid())
-  name      String
-  userId    String    // Clerk user ID
-  lastUsed  DateTime?
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  id              String         @id @default(cuid())
+  name            String
+  userId          String // Clerk user ID
+  complexity      Complexity     @default(MEDIUM)
+  thumbsUpCount   Int            @default(0)
+  thumbsDownCount Int            @default(0)
+  imageUrl        String?
+  imagePrompt     String?
+  tags            Json?
+  ingredients     Json?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  usageHistory    UsageHistory[]
 
   @@index([userId])
+  @@index([userId, complexity])
 }
 
 model WeeklyPlan {
   id            String   @id @default(cuid())
-  userId        String   // Clerk user ID
+  userId        String // Clerk user ID
   weekStartDate DateTime
   monday        String?
   tuesday       String?
@@ -38,4 +52,17 @@ model WeeklyPlan {
 
   @@unique([userId, weekStartDate])
   @@index([userId])
+}
+
+model UsageHistory {
+  id            String   @id @default(cuid())
+  meal          Meal     @relation(fields: [mealId], references: [id], onDelete: Cascade)
+  mealId        String
+  userId        String
+  usedDate      DateTime @default(now())
+  weekStartDate DateTime
+  createdAt     DateTime @default(now())
+
+  @@index([userId, usedDate])
+  @@index([mealId])
 }

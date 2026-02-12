@@ -1,164 +1,224 @@
 "use client";
 
-import { deleteMeal, rateMeal, updateMeal } from "@/lib/actions/meals";
-import { useEffect, useState } from "react";
+import { deleteMeal, updateMeal, voteMeal } from "@/lib/actions/meals";
+import { MoreHorizontal } from "lucide-react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { ComplexityBadge } from "@/components/complexity-badge";
-import { MealRating, RatingToggle } from "@/components/rating-toggle";
+import Image from "next/image";
 
 type Meal = {
   id: string;
   name: string;
   complexity: "SIMPLE" | "MEDIUM" | "COMPLEX";
-  rating: MealRating;
+  thumbsUpCount: number;
+  thumbsDownCount: number;
+  imageUrl: string | null;
   createdAt: Date | string;
+};
+
+const DOT_COLOR: Record<Meal["complexity"], string> = {
+  SIMPLE: "bg-emerald-500",
+  MEDIUM: "bg-amber-500",
+  COMPLEX: "bg-red-500",
 };
 
 export function MealList({ meals }: { meals: Meal[] }) {
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [editValue, setEditValue] = useState("");
+  const [editName, setEditName] = useState("");
   const [editComplexity, setEditComplexity] = useState<Meal["complexity"]>("MEDIUM");
-  const [ratings, setRatings] = useState<Record<string, MealRating>>(
-    Object.fromEntries(meals.map((meal) => [meal.id, meal.rating]))
+  const [editImageFile, setEditImageFile] = useState<File | null>(null);
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const [votes, setVotes] = useState<Record<string, { up: number; down: number }>>(
+    Object.fromEntries(meals.map((meal) => [meal.id, { up: meal.thumbsUpCount, down: meal.thumbsDownCount }]))
   );
-  const [ratingPendingId, setRatingPendingId] = useState<string | null>(null);
+  const [pendingVoteId, setPendingVoteId] = useState<string | null>(null);
   const router = useRouter();
 
-  useEffect(() => {
-    setRatings(Object.fromEntries(meals.map((meal) => [meal.id, meal.rating])));
-  }, [meals]);
-
-  function startEditing(meal: Meal) {
+  function startEdit(meal: Meal) {
     setEditingId(meal.id);
-    setEditValue(meal.name);
+    setEditName(meal.name);
     setEditComplexity(meal.complexity);
+    setEditImageFile(null);
+    setOpenMenuId(null);
   }
 
-  function cancelEditing() {
+  function cancelEdit() {
     setEditingId(null);
-    setEditValue("");
+    setEditName("");
     setEditComplexity("MEDIUM");
+    setEditImageFile(null);
   }
 
-  async function handleUpdate(id: string) {
-    const formData = new FormData();
-    formData.append("name", editValue);
-    formData.append("complexity", editComplexity);
-    const result = await updateMeal(id, formData);
+  async function handleVote(id: string, direction: "up" | "down") {
+    const current = votes[id] ?? { up: 0, down: 0 };
+    const optimistic = direction === "up" ? { up: current.up + 1, down: current.down } : { up: current.up, down: current.down + 1 };
+
+    setVotes((state) => ({ ...state, [id]: optimistic }));
+    setPendingVoteId(id);
+
+    const result = await voteMeal(id, direction);
     if (result.error) {
-      return;
+      setVotes((state) => ({ ...state, [id]: current }));
+    } else {
+      setVotes((state) => ({
+        ...state,
+        [id]: {
+          up: result.meal?.thumbsUpCount ?? optimistic.up,
+          down: result.meal?.thumbsDownCount ?? optimistic.down,
+        },
+      }));
     }
-    setEditingId(null);
-    setEditValue("");
-    setEditComplexity("MEDIUM");
-    router.refresh();
+
+    setPendingVoteId(null);
   }
 
   async function handleDelete(id: string) {
-    if (confirm("Är du säker på att du vill ta bort den här måltiden?")) {
-      const result = await deleteMeal(id);
-      if (!result.error) {
-        router.refresh();
-      }
-    }
-  }
-
-  async function handleRatingChange(id: string, rating: MealRating) {
-    const previous = ratings[id];
-    if (previous === rating) {
+    if (!confirm("Är du säker på att du vill ta bort den här måltiden?")) {
       return;
     }
 
-    setRatings((current) => ({ ...current, [id]: rating }));
-    setRatingPendingId(id);
-
-    const result = await rateMeal(id, rating);
-    if (result.error) {
-      setRatings((current) => ({ ...current, [id]: previous }));
+    const result = await deleteMeal(id);
+    if (!result.error) {
+      router.refresh();
     }
+  }
 
-    setRatingPendingId(null);
+  async function handleEditSave(id: string) {
+    const formData = new FormData();
+    formData.append("name", editName.trim());
+    formData.append("complexity", editComplexity);
+    if (editImageFile) {
+      formData.append("image", editImageFile);
+    }
+    const result = await updateMeal(id, formData);
+    if (!result.error) {
+      cancelEdit();
+      router.refresh();
+    }
   }
 
   return (
     <ul className="divide-y divide-[var(--cream-dark)] rounded-xl border border-[var(--cream-dark)] bg-white">
-      {meals.map((meal, index) => (
-        <li
-          key={meal.id}
-          className="group animate-slide-in-right"
-          style={{ animationDelay: `${index * 0.05}s` }}
-        >
-          {editingId === meal.id ? (
-            <div className="space-y-2 px-3 py-2.5">
-              <input
-                type="text"
-                value={editValue}
-                onChange={(e) => setEditValue(e.target.value)}
-                className="w-full"
-                autoFocus
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") handleUpdate(meal.id);
-                  if (e.key === "Escape") cancelEditing();
-                }}
-              />
-              <div className="flex items-center gap-2">
-                <select
-                  value={editComplexity}
-                  onChange={(e) => setEditComplexity(e.target.value as Meal["complexity"])}
-                  className="w-full text-sm"
-                >
-                  <option value="SIMPLE">Enkel</option>
-                  <option value="MEDIUM">Medium</option>
-                  <option value="COMPLEX">Avancerad</option>
-                </select>
-                <button
-                  onClick={() => handleUpdate(meal.id)}
-                  className="btn-primary px-3 py-1.5 text-sm"
-                >
-                  Spara
-                </button>
-                <button
-                  onClick={cancelEditing}
-                  className="btn-secondary px-3 py-1.5 text-sm"
-                >
-                  Avbryt
-                </button>
-              </div>
-            </div>
-          ) : (
-            <div className="flex items-center justify-between px-3 py-2 hover:bg-[var(--cream)]/60">
-              <button
-                type="button"
-                onClick={() => startEditing(meal)}
-                className="flex flex-1 items-center gap-2 text-left"
-              >
-                <div className="h-1.5 w-1.5 rounded-full bg-[var(--sage)]" />
-                <span className="text-sm font-medium text-[var(--charcoal)]">{meal.name}</span>
-                <ComplexityBadge complexity={meal.complexity} />
-              </button>
-              <div className="flex gap-1.5">
-                <RatingToggle
-                  rating={ratings[meal.id] ?? meal.rating}
-                  disabled={ratingPendingId === meal.id}
-                  onChange={(rating) => handleRatingChange(meal.id, rating)}
+      {meals.map((meal) => {
+        const mealVotes = votes[meal.id] ?? { up: meal.thumbsUpCount, down: meal.thumbsDownCount };
+        const imageSrc = meal.imageUrl || `/api/meal-image?meal=${encodeURIComponent(meal.name)}&style=warm-home-cooked-top-down`;
+
+        return (
+          <li key={meal.id} className="relative px-2 py-2">
+            {editingId === meal.id ? (
+              <div className="space-y-2 rounded-md border border-[var(--cream-dark)] bg-[var(--cream)]/50 p-2">
+                <input
+                  type="text"
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  className="w-full"
+                  autoFocus
                 />
+                <div className="flex items-center gap-2">
+                  <select
+                    value={editComplexity}
+                    onChange={(e) => setEditComplexity(e.target.value as Meal["complexity"])}
+                    className="w-full text-sm"
+                  >
+                    <option value="SIMPLE">Enkel</option>
+                    <option value="MEDIUM">Medium</option>
+                    <option value="COMPLEX">Avancerad</option>
+                  </select>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => setEditImageFile(e.target.files?.[0] ?? null)}
+                    className="w-full text-xs"
+                  />
+                </div>
+                <div className="flex justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={cancelEdit}
+                    className="rounded-md border border-[var(--cream-dark)] px-2 py-1 text-xs font-semibold text-[var(--warm-gray)]"
+                  >
+                    Avbryt
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void handleEditSave(meal.id)}
+                    className="rounded-md bg-[var(--terracotta)] px-2 py-1 text-xs font-semibold text-white"
+                  >
+                    Spara
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="grid grid-cols-[auto_1fr_auto_auto] items-center gap-2">
+              <div className="relative h-10 w-10 overflow-hidden rounded-md">
+                <Image src={imageSrc} alt={meal.name} fill className="object-cover" sizes="40px" />
+              </div>
+
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className={`h-2 w-2 rounded-full ${DOT_COLOR[meal.complexity]}`} />
+                  <p className="truncate text-sm font-medium text-[var(--charcoal)]">{meal.name}</p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-1">
                 <button
-                  onClick={() => startEditing(meal)}
-                  className="rounded-md px-2 py-1 text-xs font-semibold text-[var(--terracotta)] hover:bg-[var(--terracotta)]/10 transition-colors"
+                  type="button"
+                  onClick={() => handleVote(meal.id, "up")}
+                  disabled={pendingVoteId === meal.id}
+                  className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-700"
                 >
-                  Redigera
+                  👍 {mealVotes.up}
                 </button>
                 <button
-                  onClick={() => handleDelete(meal.id)}
-                  className="rounded-md px-2 py-1 text-xs font-semibold text-[var(--warm-gray)] hover:bg-red-50 hover:text-red-600 transition-colors"
+                  type="button"
+                  onClick={() => handleVote(meal.id, "down")}
+                  disabled={pendingVoteId === meal.id}
+                  className="rounded-full border border-rose-200 bg-rose-50 px-2 py-1 text-xs font-semibold text-rose-700"
                 >
-                  Ta bort
+                  👎 {mealVotes.down}
                 </button>
               </div>
-            </div>
-          )}
-        </li>
-      ))}
+
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setOpenMenuId((current) => (current === meal.id ? null : meal.id))}
+                  className="rounded-md p-1 text-[var(--warm-gray)] hover:bg-[var(--cream)]"
+                  aria-label="Meny"
+                >
+                  <MoreHorizontal className="h-4 w-4" />
+                </button>
+
+                {openMenuId === meal.id && (
+                  <div className="absolute right-0 top-7 z-20 w-28 rounded-md border border-[var(--cream-dark)] bg-white shadow-md">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        startEdit(meal);
+                      }}
+                      className="block w-full px-3 py-2 text-left text-xs font-semibold text-[var(--charcoal)] hover:bg-[var(--cream)]"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setOpenMenuId(null);
+                        void handleDelete(meal.id);
+                      }}
+                      className="block w-full px-3 py-2 text-left text-xs font-semibold text-rose-600 hover:bg-rose-50"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                )}
+              </div>
+              </div>
+            )}
+          </li>
+        );
+      })}
     </ul>
   );
 }

@@ -31,7 +31,9 @@ type Meal = {
   id: string;
   name: string;
   complexity: "SIMPLE" | "MEDIUM" | "COMPLEX";
-  rating: "THUMBS_DOWN" | "NEUTRAL" | "THUMBS_UP";
+  thumbsUpCount: number;
+  thumbsDownCount: number;
+  imageUrl: string | null;
   createdAt: Date | string;
 };
 
@@ -62,10 +64,6 @@ export function SingleViewShell({
   }, [openSignIn]);
 
   function openManager() {
-    if (!isAuthenticated) {
-      promptLogin();
-      return;
-    }
     setAuthPrompt(null);
     setIsDrawerOpen(true);
   }
@@ -86,28 +84,15 @@ export function SingleViewShell({
       </div>
 
       <header className="relative z-20 px-4 pt-6 sm:px-6 lg:px-8">
-        <div className="mx-auto flex w-full max-w-7xl items-center justify-between">
-          <h1 className="text-2xl font-bold text-white drop-shadow-lg sm:text-3xl">
-            Vad blir det till <span className="italic text-[var(--terracotta)]">middag?</span>
-          </h1>
-
-          <div className="flex items-center gap-3">
-            {isAuthenticated && (
-              <button
-                type="button"
-                onClick={openManager}
-                className="inline-flex items-center gap-2 rounded-xl border border-white/25 bg-black/40 px-3 py-2 text-sm font-semibold text-white backdrop-blur-md hover:bg-black/55"
-              >
-                <List className="h-4 w-4" />
-                <span className="hidden sm:inline">Måltider</span>
-              </button>
-            )}
-            {!isAuthenticated && (
-              <LoginButton className="rounded-xl border border-white/25 bg-black/40 px-3 py-2 text-sm font-semibold text-white backdrop-blur-md hover:bg-black/55">
-                Logga in
-              </LoginButton>
-            )}
-          </div>
+        <div className="mx-auto flex w-full max-w-7xl items-center justify-end">
+          <button
+            type="button"
+            onClick={openManager}
+            className="inline-flex items-center gap-2 rounded-xl border border-white/25 bg-black/40 px-3 py-2 text-sm font-semibold text-white backdrop-blur-md hover:bg-black/55"
+          >
+            <List className="h-4 w-4" />
+            <span>Måltider</span>
+          </button>
         </div>
       </header>
 
@@ -117,14 +102,13 @@ export function SingleViewShell({
             <h2 className="text-4xl font-bold text-white drop-shadow-md sm:text-5xl">
               Veckans middagsplan
             </h2>
-            <p className="mt-2 text-base font-medium text-white/80">
-              Vecka {weekInfo.weekStart} till {weekInfo.weekEnd}
-            </p>
           </div>
 
-          {authPrompt && (
+          {!isAuthenticated && (
             <div className="mx-auto mb-6 flex max-w-xl flex-col items-center gap-3 rounded-2xl border border-[var(--terracotta)]/40 bg-black/45 px-4 py-3 text-center backdrop-blur-md sm:flex-row sm:justify-center sm:text-left">
-              <p className="text-sm font-semibold text-white">{authPrompt}</p>
+              <p className="text-sm font-semibold text-white">
+                {authPrompt ?? "Login to Save your weekly plan and votes"}
+              </p>
               <LoginButton className="rounded-lg bg-[var(--terracotta)] px-3 py-1.5 text-xs font-bold uppercase tracking-wide text-white hover:bg-[var(--terracotta-dark)]">
                 Logga in
               </LoginButton>

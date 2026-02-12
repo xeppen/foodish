@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import { X } from "lucide-react";
-import { AddMealForm } from "@/components/add-meal-form";
+import { MagicMealInput } from "@/components/magic-meal-input";
 import { MealList } from "@/components/meal-list";
 import { EmptyState } from "@/components/empty-state";
 import { LoginButton } from "@/components/login-button";
@@ -12,7 +12,9 @@ type Meal = {
   id: string;
   name: string;
   complexity: "SIMPLE" | "MEDIUM" | "COMPLEX";
-  rating: "THUMBS_DOWN" | "NEUTRAL" | "THUMBS_UP";
+  thumbsUpCount: number;
+  thumbsDownCount: number;
+  imageUrl: string | null;
   createdAt: Date | string;
 };
 
@@ -90,7 +92,7 @@ export function MealDrawer({
             {isAuthenticated ? (
               <div className="space-y-6">
                 <section className="rounded-2xl bg-[var(--cream)]/70 p-4">
-                  <AddMealForm />
+                  <MagicMealInput />
                   <p className="mt-3 text-xs text-[var(--warm-gray)]">
                     Enkel: under 30 min, Medium: 30-60 min, Avancerad: over 60 min.
                   </p>

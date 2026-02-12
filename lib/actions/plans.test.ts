@@ -139,9 +139,9 @@ describe("plans actions (phase 6)", () => {
     });
     prismaMock.usageHistory.findMany.mockResolvedValueOnce([]);
     prismaMock.meal.findMany.mockResolvedValueOnce([
-      { id: "mA", name: "Meal A", complexity: "SIMPLE", rating: "THUMBS_UP" },
-      { id: "mF", name: "Meal F", complexity: "SIMPLE", rating: "THUMBS_UP" },
-      { id: "mG", name: "Meal G", complexity: "COMPLEX", rating: "NEUTRAL" },
+      { id: "mA", name: "Meal A", complexity: "SIMPLE", thumbsUpCount: 3, thumbsDownCount: 0 },
+      { id: "mF", name: "Meal F", complexity: "SIMPLE", thumbsUpCount: 3, thumbsDownCount: 0 },
+      { id: "mG", name: "Meal G", complexity: "COMPLEX", thumbsUpCount: 1, thumbsDownCount: 1 },
     ]);
 
     const result = await getSwapOptions("monday", {
@@ -151,7 +151,7 @@ describe("plans actions (phase 6)", () => {
     });
 
     expect(result.options).toHaveLength(1);
-    expect(result.options[0]).toMatchObject({ id: "mF", complexity: "SIMPLE", rating: "THUMBS_UP" });
+    expect(result.options[0]).toMatchObject({ id: "mF", complexity: "SIMPLE", thumbsUpCount: 3, thumbsDownCount: 0 });
     expect(result.fallbackUsed).toBe(false);
     expect(result.counts.simple).toBeGreaterThanOrEqual(1);
   });
@@ -191,9 +191,9 @@ describe("plans actions (phase 6)", () => {
     });
     prismaMock.usageHistory.findMany.mockResolvedValueOnce([]);
     prismaMock.meal.findMany.mockResolvedValueOnce([
-      { id: "mA", name: "Meal A", complexity: "SIMPLE", rating: "THUMBS_UP" },
-      { id: "mF", name: "Meal F", complexity: "MEDIUM", rating: "NEUTRAL" },
-      { id: "mG", name: "Meal G", complexity: "COMPLEX", rating: "THUMBS_DOWN" },
+      { id: "mA", name: "Meal A", complexity: "SIMPLE", thumbsUpCount: 3, thumbsDownCount: 0 },
+      { id: "mF", name: "Meal F", complexity: "MEDIUM", thumbsUpCount: 1, thumbsDownCount: 1 },
+      { id: "mG", name: "Meal G", complexity: "COMPLEX", thumbsUpCount: 0, thumbsDownCount: 2 },
     ]);
 
     const result = await getSwapOptions("monday", {

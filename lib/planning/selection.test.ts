@@ -65,9 +65,9 @@ describe("selectMealsWithConstraints", () => {
 
   it("biases thumbs-up meals above thumbs-down meals over many runs", () => {
     const ratedMeals: CandidateMeal[] = [
-      { id: "up", name: "Up", rating: "THUMBS_UP" },
-      { id: "neutral", name: "Neutral", rating: "NEUTRAL" },
-      { id: "down", name: "Down", rating: "THUMBS_DOWN" },
+      { id: "up", name: "Up", thumbsUpCount: 4, thumbsDownCount: 0 },
+      { id: "neutral", name: "Neutral", thumbsUpCount: 0, thumbsDownCount: 0 },
+      { id: "down", name: "Down", thumbsUpCount: 0, thumbsDownCount: 3 },
     ];
 
     let i = 0;

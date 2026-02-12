@@ -6,13 +6,13 @@ import { getSwapOptions, swapDayMealWithChoice } from "@/lib/actions/plans";
 
 type Day = "monday" | "tuesday" | "wednesday" | "thursday" | "friday";
 type Complexity = "SIMPLE" | "MEDIUM" | "COMPLEX";
-type Rating = "THUMBS_DOWN" | "NEUTRAL" | "THUMBS_UP";
 
 type SwapOption = {
   id: string;
   name: string;
   complexity: Complexity;
-  rating: Rating;
+  thumbsUpCount: number;
+  thumbsDownCount: number;
 };
 
 type FilterState = {
@@ -29,13 +29,6 @@ interface MealCardProps {
   onAuthRequired: () => void;
   imageSrc?: string; // Optional override
 }
-
-// Deterministic generic image based on day/meal name length
-const GENERIC_IMAGES = [
-  "/food-plate-1.png",
-  "/food-plate-2.png",
-  "/food-plate-3.png",
-];
 
 export function MealCard({
   day,
@@ -134,9 +127,9 @@ export function MealCard({
     void refreshFilteredOptions();
   }, [isFilterOpen, isAuthenticated, refreshFilteredOptions]);
 
-  // Simple deterministic image selection
-  const imageIndex = (mealName?.length || 0) % GENERIC_IMAGES.length;
-  const displayImage = imageSrc || GENERIC_IMAGES[imageIndex];
+  const displayImage =
+    imageSrc ||
+    `/api/meal-image?meal=${encodeURIComponent(currentMeal || dayLabel)}&style=warm-home-cooked-top-down`;
 
   async function applySwap(option: SwapOption) {
     if (!isAuthenticated) {
@@ -330,7 +323,9 @@ export function MealCard({
                       className="flex w-full items-center justify-between rounded-md bg-white px-2 py-1.5 text-left text-xs hover:bg-[var(--cream)]"
                     >
                       <span className="truncate pr-2 text-[var(--charcoal)]">{option.name}</span>
-                      <span className="text-[10px] text-[var(--warm-gray)]">{option.complexity}</span>
+                      <span className="text-[10px] text-[var(--warm-gray)]">
+                        👍 {option.thumbsUpCount} / 👎 {option.thumbsDownCount}
+                      </span>
                     </button>
                   ))}
                 </div>
@@ -349,7 +344,9 @@ export function MealCard({
                           className="flex w-full items-center justify-between rounded-md bg-white px-2 py-1.5 text-left text-xs hover:bg-[var(--cream)]"
                         >
                           <span className="truncate pr-2 text-[var(--charcoal)]">{option.name}</span>
-                          <span className="text-[10px] text-[var(--warm-gray)]">{option.complexity}</span>
+                          <span className="text-[10px] text-[var(--warm-gray)]">
+                            👍 {option.thumbsUpCount} / 👎 {option.thumbsDownCount}
+                          </span>
                         </button>
                       ))}
                     </div>
