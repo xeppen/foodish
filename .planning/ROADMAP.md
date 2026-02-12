@@ -184,10 +184,10 @@ Plans:
 **Plans**: 4 plans
 
 Plans:
-- [ ] 10-01: Add `getSwapOptions()` and `swapDayMealWithChoice()` server actions
-- [ ] 10-02: Preload fast-swap candidates and refresh pool after swap
-- [ ] 10-03: Add progressive \"Byt med filter\" disclosure UI
-- [ ] 10-04: Add filter counts, zero-result fallback, and final tests
+- [x] 10-01: Add `getSwapOptions()` and `swapDayMealWithChoice()` server actions
+- [x] 10-02: Preload fast-swap candidates and refresh pool after swap
+- [x] 10-03: Add progressive \"Byt med filter\" disclosure UI
+- [x] 10-04: Add filter counts, zero-result fallback, and final tests
 
 ## Progress
 
@@ -205,12 +205,12 @@ Phases execute in numeric order: 6 → 7 → 8 → 9 → 10
 | 7. Variety Rules & Rotation Logic | v1.1 | 3/3 | Complete | 2026-02-12 |
 | 8. Rating System & UI | v1.1 | 3/3 | Complete | 2026-02-12 |
 | 9. Complexity Levels & Badges | v1.1 | 3/3 | Complete | 2026-02-12 |
-| 10. Progressive Disclosure Swap | v1.1 | 0/4 | Not started | - |
+| 10. Progressive Disclosure Swap | v1.1 | 4/4 | Complete | 2026-02-12 |
 
 **Deployment:** https://foodish-red.vercel.app
 **Repository:** https://github.com/xeppen/foodish
-**Current Status:** v1.0 deployed, v1.1 Phases 6-7-8-9 complete, Phase 10 pending
+**Current Status:** v1.0 deployed, v1.1 milestone phases 6-10 complete
 
 ---
 *Roadmap created: 2026-02-09*
-*Last updated: 2026-02-12 (Phase 10 plans created)*
+*Last updated: 2026-02-12 (Phase 10 completed)*

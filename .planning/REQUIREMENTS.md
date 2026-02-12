@@ -34,17 +34,17 @@ Requirements for Smart Variety & Preferences milestone. Each maps to roadmap pha
 
 ### Enhanced Swapping
 
-- [ ] **SWAP-01**: Fast random swap remains primary action (one click, no filters)
-- [ ] **SWAP-02**: At least 4 swap candidate meals preloaded when plan loads (no backend wait)
-- [ ] **SWAP-03**: Swap shows immediately using preloaded candidates
-- [ ] **SWAP-04**: Background refresh of swap pool after swap completes
-- [ ] **SWAP-05**: "Swap with filters" option reveals progressive disclosure UI
-- [ ] **SWAP-06**: Filter by complexity (show only simple/medium/complex meals)
-- [ ] **SWAP-07**: Filter by rating (show only thumbs-up meals)
-- [ ] **SWAP-08**: Filter by recency (show meals not used recently)
-- [ ] **SWAP-09**: Filtered results show meal count ("Simple (3 meals)")
-- [ ] **SWAP-10**: Zero-result filters show fallback options
-- [ ] **SWAP-11**: Main plan page UI unchanged from v1.0 (fast path preserved)
+- [x] **SWAP-01**: Fast random swap remains primary action (one click, no filters)
+- [x] **SWAP-02**: At least 4 swap candidate meals preloaded when plan loads (no backend wait)
+- [x] **SWAP-03**: Swap shows immediately using preloaded candidates
+- [x] **SWAP-04**: Background refresh of swap pool after swap completes
+- [x] **SWAP-05**: "Swap with filters" option reveals progressive disclosure UI
+- [x] **SWAP-06**: Filter by complexity (show only simple/medium/complex meals)
+- [x] **SWAP-07**: Filter by rating (show only thumbs-up meals)
+- [x] **SWAP-08**: Filter by recency (show meals not used recently)
+- [x] **SWAP-09**: Filtered results show meal count ("Simple (3 meals)")
+- [x] **SWAP-10**: Zero-result filters show fallback options
+- [x] **SWAP-11**: Main plan page UI unchanged from v1.0 (fast path preserved)
 
 ## Future Requirements
 
@@ -111,17 +111,17 @@ Which phases cover which requirements. Updated during roadmap creation.
 | COMPLEX-03 | Phase 9 | Complete |
 | COMPLEX-04 | Phase 9 | Complete |
 | COMPLEX-05 | Phase 9 | Complete |
-| SWAP-01 | Phase 10 | Pending |
-| SWAP-02 | Phase 10 | Pending |
-| SWAP-03 | Phase 10 | Pending |
-| SWAP-04 | Phase 10 | Pending |
-| SWAP-05 | Phase 10 | Pending |
-| SWAP-06 | Phase 10 | Pending |
-| SWAP-07 | Phase 10 | Pending |
-| SWAP-08 | Phase 10 | Pending |
-| SWAP-09 | Phase 10 | Pending |
-| SWAP-10 | Phase 10 | Pending |
-| SWAP-11 | Phase 10 | Pending |
+| SWAP-01 | Phase 10 | Complete |
+| SWAP-02 | Phase 10 | Complete |
+| SWAP-03 | Phase 10 | Complete |
+| SWAP-04 | Phase 10 | Complete |
+| SWAP-05 | Phase 10 | Complete |
+| SWAP-06 | Phase 10 | Complete |
+| SWAP-07 | Phase 10 | Complete |
+| SWAP-08 | Phase 10 | Complete |
+| SWAP-09 | Phase 10 | Complete |
+| SWAP-10 | Phase 10 | Complete |
+| SWAP-11 | Phase 10 | Complete |
 
 **Coverage:**
 - v1.1 requirements: 27 total
@@ -137,4 +137,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-02-12*
-*Last updated: 2026-02-12 (Phase 8 traceability updated)*
+*Last updated: 2026-02-12 (Phase 10 traceability updated)*
