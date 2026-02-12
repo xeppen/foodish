@@ -107,12 +107,12 @@ Plans:
   3. UsageHistory model tracks when each meal was used with timestamp and week context
   4. Database indexes exist for filtered queries (userId + rating, userId + complexity)
   5. Existing meals migrate successfully with defaults (rating=NEUTRAL, complexity=MEDIUM)
-**Plans**: TBD
+**Plans**: 3 plans in 2 waves
 
 Plans:
-- [ ] 06-01: Extend Prisma schema with Rating and Complexity enums
-- [ ] 06-02: Create UsageHistory model for usage tracking
-- [ ] 06-03: Run migration and verify backward compatibility
+- [ ] 06-01-PLAN.md — Add Rating/Complexity enums to Meal model with nullable fields
+- [ ] 06-02-PLAN.md — Add UsageHistory model with cascade delete and composite indexes
+- [ ] 06-03-PLAN.md — Apply migration and verify backward compatibility
 
 #### Phase 7: Variety Rules & Rotation Logic
 **Goal**: Generated plans avoid repetition and respect long-term rotation without user configuration
