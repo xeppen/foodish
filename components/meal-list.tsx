@@ -4,11 +4,13 @@ import { deleteMeal, updateMeal } from "@/lib/actions/meals";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { ComplexityBadge } from "@/components/complexity-badge";
+import { MealRating, RatingToggle } from "@/components/rating-toggle";
 
 type Meal = {
   id: string;
   name: string;
   complexity: "SIMPLE" | "MEDIUM" | "COMPLEX";
+  rating: MealRating;
   createdAt: Date | string;
 };
 
@@ -16,6 +18,9 @@ export function MealList({ meals }: { meals: Meal[] }) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState("");
   const [editComplexity, setEditComplexity] = useState<Meal["complexity"]>("MEDIUM");
+  const [ratings, setRatings] = useState<Record<string, MealRating>>(
+    Object.fromEntries(meals.map((meal) => [meal.id, meal.rating]))
+  );
   const router = useRouter();
 
   function startEditing(meal: Meal) {
@@ -51,6 +56,10 @@ export function MealList({ meals }: { meals: Meal[] }) {
         router.refresh();
       }
     }
+  }
+
+  function handleRatingChange(id: string, rating: MealRating) {
+    setRatings((current) => ({ ...current, [id]: rating }));
   }
 
   return (
@@ -110,6 +119,10 @@ export function MealList({ meals }: { meals: Meal[] }) {
                 <ComplexityBadge complexity={meal.complexity} />
               </button>
               <div className="flex gap-1.5">
+                <RatingToggle
+                  rating={ratings[meal.id] ?? meal.rating}
+                  onChange={(rating) => handleRatingChange(meal.id, rating)}
+                />
                 <button
                   onClick={() => startEditing(meal)}
                   className="rounded-md px-2 py-1 text-xs font-semibold text-[var(--terracotta)] hover:bg-[var(--terracotta)]/10 transition-colors"

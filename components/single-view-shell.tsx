@@ -31,6 +31,7 @@ type Meal = {
   id: string;
   name: string;
   complexity: "SIMPLE" | "MEDIUM" | "COMPLEX";
+  rating: "THUMBS_DOWN" | "NEUTRAL" | "THUMBS_UP";
   createdAt: Date | string;
 };
 
