@@ -181,13 +181,13 @@ Plans:
   8. Zero-result filters show fallback options with message
   9. Background refresh updates swap pool after swap completes
   10. Main plan page UI unchanged from v1.0 (fast path preserved)
-**Plans**: TBD
+**Plans**: 4 plans
 
 Plans:
-- [ ] 10-01: Create SwapModal component with progressive disclosure pattern
-- [ ] 10-02: Implement getSwapOptions() Server Action with filtering
-- [ ] 10-03: Add swap candidate preloading and background refresh
-- [ ] 10-04: Display result counts and zero-state fallbacks
+- [ ] 10-01: Add `getSwapOptions()` and `swapDayMealWithChoice()` server actions
+- [ ] 10-02: Preload fast-swap candidates and refresh pool after swap
+- [ ] 10-03: Add progressive \"Byt med filter\" disclosure UI
+- [ ] 10-04: Add filter counts, zero-result fallback, and final tests
 
 ## Progress
 
@@ -213,4 +213,4 @@ Phases execute in numeric order: 6 → 7 → 8 → 9 → 10
 
 ---
 *Roadmap created: 2026-02-09*
-*Last updated: 2026-02-12 (Phase 8 completed)*
+*Last updated: 2026-02-12 (Phase 10 plans created)*
