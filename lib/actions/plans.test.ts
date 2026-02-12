@@ -179,4 +179,31 @@ describe("plans actions (phase 6)", () => {
     expect(prismaMock.weeklyPlan.update).toHaveBeenCalledTimes(1);
     expect(prismaMock.usageHistory.create).toHaveBeenCalledTimes(1);
   });
+
+  it("getSwapOptions returns fallback options when filters have zero matches", async () => {
+    mockGetCurrentUser.mockResolvedValue({ id: "user_1", name: "Test User" });
+    prismaMock.weeklyPlan.findUnique.mockResolvedValueOnce({
+      monday: "Meal A",
+      tuesday: "Meal B",
+      wednesday: "Meal C",
+      thursday: "Meal D",
+      friday: "Meal E",
+    });
+    prismaMock.usageHistory.findMany.mockResolvedValueOnce([]);
+    prismaMock.meal.findMany.mockResolvedValueOnce([
+      { id: "mA", name: "Meal A", complexity: "SIMPLE", rating: "THUMBS_UP" },
+      { id: "mF", name: "Meal F", complexity: "MEDIUM", rating: "NEUTRAL" },
+      { id: "mG", name: "Meal G", complexity: "COMPLEX", rating: "THUMBS_DOWN" },
+    ]);
+
+    const result = await getSwapOptions("monday", {
+      complexity: "SIMPLE",
+      recency: "FRESH_ONLY",
+      limit: 4,
+    });
+
+    expect(result.options).toHaveLength(0);
+    expect(result.fallbackUsed).toBe(true);
+    expect(result.fallbackOptions.length).toBeGreaterThan(0);
+  });
 });
