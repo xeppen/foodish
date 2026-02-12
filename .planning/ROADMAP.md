@@ -1,28 +1,17 @@
 # Roadmap: What's for Dinner?
 
-## Overview
+## Milestones
 
-This roadmap delivers a minimal meal planning tool that removes dinner decisions in under 60 seconds. Five phases build from authentication foundation through meal management, auto-generated planning, adjustment capabilities, and production deployment. Every phase delivers a complete, verifiable capability that moves closer to the core value proposition: weekly dinner planning without decision fatigue.
+- ✅ **v1.0 MVP** - Phases 1-5 (shipped 2026-02-10)
+- 🚧 **v1.1 Smart Variety & Preferences** - Phases 6-10 (in progress)
 
 ## Phases
 
-**Phase Numbering:**
-- Integer phases (1, 2, 3): Planned milestone work
-- Decimal phases (2.1, 2.2): Urgent insertions (marked with INSERTED)
-
-Decimal phases appear between their surrounding integers in numeric order.
-
-- [x] **Phase 1: Foundation** - Authentication and database infrastructure
-- [x] **Phase 2: Core Data** - Meal management with starter pack
-- [x] **Phase 3: Planning Logic** - Auto-generated weekly plans
-- [x] **Phase 4: Plan Adjustment** - Single-day meal swapping
-- [x] **Phase 5: Polish & Deployment** - Production readiness
-
-## Phase Details
+<details>
+<summary>✅ v1.0 MVP (Phases 1-5) - SHIPPED 2026-02-10</summary>
 
 ### Phase 1: Foundation
 **Goal**: Users can authenticate and data persists securely
-**Depends on**: Nothing (first phase)
 **Requirements**: AUTH-01, AUTH-02, AUTH-03
 **Success Criteria** (what must be TRUE):
   1. ✅ User can sign in with Google OAuth (Clerk)
@@ -38,7 +27,6 @@ Plans:
 
 ### Phase 2: Core Data
 **Goal**: Users can manage their personal meal list with minimal setup friction
-**Depends on**: Phase 1
 **Requirements**: SETUP-01, SETUP-02, SETUP-03, SETUP-04, MEAL-01, MEAL-02, MEAL-03, MEAL-04
 **Success Criteria** (what must be TRUE):
   1. ✅ First-time user sees starter pack of 18 pre-filled meals
@@ -56,7 +44,6 @@ Plans:
 
 ### Phase 3: Planning Logic
 **Goal**: Users receive auto-generated weekly plans without manual assignment
-**Depends on**: Phase 2
 **Requirements**: PLAN-01, PLAN-02, PLAN-03, PLAN-04, PLAN-05, PLAN-06
 **Success Criteria** (what must be TRUE):
   1. ✅ User sees auto-generated plan with 5 weekday meals (Mon-Fri)
@@ -74,7 +61,6 @@ Plans:
 
 ### Phase 4: Plan Adjustment
 **Goal**: Users can quickly adjust plans without regenerating entire week
-**Depends on**: Phase 3
 **Requirements**: SWAP-01, SWAP-02
 **Success Criteria** (what must be TRUE):
   1. ✅ User can swap any single day's meal with one click
@@ -88,7 +74,6 @@ Plans:
 
 ### Phase 5: Polish & Deployment
 **Goal**: Application is production-ready with error handling and deployed live
-**Depends on**: Phase 4
 **Requirements**: None (production readiness work)
 **Success Criteria** (what must be TRUE):
   1. ✅ Loading states display during plan generation
@@ -106,23 +91,125 @@ Plans:
 - [x] Clerk auth configuration for production
 - [x] Fixed compatibility issues (Prisma v5, React 18, Zod v4)
 
+</details>
+
+### 🚧 v1.1 Smart Variety & Preferences (In Progress)
+
+**Milestone Goal:** Plans feel fresh and match household preferences while maintaining fast planning (sub-60 seconds)
+
+#### Phase 6: Database Foundation
+**Goal**: Schema supports ratings, complexity levels, and usage tracking for smart variety
+**Depends on**: Phase 5
+**Requirements**: RATING-02, VARIETY-04, COMPLEX-01, COMPLEX-02
+**Success Criteria** (what must be TRUE):
+  1. Meal model includes rating field (THUMBS_DOWN/NEUTRAL/THUMBS_UP enum with default NEUTRAL)
+  2. Meal model includes complexity field (SIMPLE/MEDIUM/COMPLEX enum with default MEDIUM)
+  3. UsageHistory model tracks when each meal was used with timestamp and week context
+  4. Database indexes exist for filtered queries (userId + rating, userId + complexity)
+  5. Existing meals migrate successfully with defaults (rating=NEUTRAL, complexity=MEDIUM)
+**Plans**: TBD
+
+Plans:
+- [ ] 06-01: Extend Prisma schema with Rating and Complexity enums
+- [ ] 06-02: Create UsageHistory model for usage tracking
+- [ ] 06-03: Run migration and verify backward compatibility
+
+#### Phase 7: Variety Rules & Rotation Logic
+**Goal**: Generated plans avoid repetition and respect long-term rotation without user configuration
+**Depends on**: Phase 6
+**Requirements**: VARIETY-01, VARIETY-02, VARIETY-03, VARIETY-05
+**Success Criteria** (what must be TRUE):
+  1. Generated plans never include duplicate meals within same week (hard constraint)
+  2. Meals used in last 2 weeks are deprioritized in selection algorithm
+  3. Favorite meals can appear weekly but not 3+ weeks consecutively
+  4. When variety constraints conflict with small meal libraries, system gracefully degrades (shows message: "We repeated a recent meal because your library is small")
+  5. UsageHistory entries are created on plan generation and swap actions
+**Plans**: TBD
+
+Plans:
+- [ ] 07-01: Enhance selectRandomMeals() with variety constraints
+- [ ] 07-02: Implement constraint relaxation cascade for edge cases
+- [ ] 07-03: Create UsageHistory tracking in plan generation
+
+#### Phase 8: Rating System & UI
+**Goal**: Users can express meal preferences that influence future plan generation
+**Depends on**: Phase 6
+**Requirements**: RATING-01, RATING-03, RATING-04, RATING-05, RATING-06
+**Success Criteria** (what must be TRUE):
+  1. User can toggle meal rating between thumbs-up/neutral/thumbs-down
+  2. Rating changes appear immediately (optimistic UI)
+  3. Rating toggle appears in meal list view (Meals page and meal drawer)
+  4. Thumbs-up meals appear more frequently in generated plans (2x probability boost)
+  5. Thumbs-down meals appear less frequently but are never excluded (0.5x probability)
+  6. All existing meals default to neutral rating
+**Plans**: TBD
+
+Plans:
+- [ ] 08-01: Create RatingToggle component with optimistic updates
+- [ ] 08-02: Implement rateMeal() Server Action
+- [ ] 08-03: Integrate rating influence into plan generation algorithm
+
+#### Phase 9: Complexity Levels & Badges
+**Goal**: Meals indicate preparation effort, enabling time-aware meal selection
+**Depends on**: Phase 6
+**Requirements**: COMPLEX-03, COMPLEX-04, COMPLEX-05
+**Success Criteria** (what must be TRUE):
+  1. User can set complexity level when creating or editing meal
+  2. Complexity selector shows clear definitions (Simple: <30min, Medium: 30-60min, Complex: >60min)
+  3. Complexity badges display in meal list with visual coding (green=Simple, yellow=Medium, orange=Complex)
+  4. Complexity information helps users understand preparation time at a glance
+**Plans**: TBD
+
+Plans:
+- [ ] 09-01: Create ComplexityBadge component with clear visual design
+- [ ] 09-02: Add complexity selector to meal forms with examples
+- [ ] 09-03: Display complexity badges in meal list
+
+#### Phase 10: Progressive Disclosure Swap
+**Goal**: Users can swap meals with optional filters while keeping fast random swap as default
+**Depends on**: Phases 7, 8, 9
+**Requirements**: SWAP-01, SWAP-02, SWAP-03, SWAP-04, SWAP-05, SWAP-06, SWAP-07, SWAP-08, SWAP-09, SWAP-10, SWAP-11
+**Success Criteria** (what must be TRUE):
+  1. Fast random swap remains primary action (one click, no modal, existing v1.0 behavior preserved)
+  2. Swap shows immediately using preloaded candidates (at least 4 meals)
+  3. "Swap with filters" option reveals progressive disclosure UI (modal with filter options)
+  4. User can filter swap options by complexity (show only simple/medium/complex)
+  5. User can filter by rating (show only thumbs-up meals)
+  6. User can filter by recency (show meals not recently used)
+  7. Filtered results show meal count ("Simple (3 meals)" vs "Simple (0 meals)")
+  8. Zero-result filters show fallback options with message
+  9. Background refresh updates swap pool after swap completes
+  10. Main plan page UI unchanged from v1.0 (fast path preserved)
+**Plans**: TBD
+
+Plans:
+- [ ] 10-01: Create SwapModal component with progressive disclosure pattern
+- [ ] 10-02: Implement getSwapOptions() Server Action with filtering
+- [ ] 10-03: Add swap candidate preloading and background refresh
+- [ ] 10-04: Display result counts and zero-state fallbacks
+
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
+Phases execute in numeric order: 6 → 7 → 8 → 9 → 10
 
-| Phase | Plans Complete | Status | Completed |
-|-------|----------------|--------|-----------|
-| 1. Foundation | Complete | ✅ Done | 2026-02-09 (Clerk migration 2026-02-10) |
-| 2. Core Data | Complete | ✅ Done | 2026-02-09 |
-| 3. Planning Logic | Complete | ✅ Done | 2026-02-09 |
-| 4. Plan Adjustment | Complete | ✅ Done | 2026-02-09 |
-| 5. Polish & Deployment | Complete | ✅ Done | 2026-02-10 |
+| Phase | Milestone | Plans Complete | Status | Completed |
+|-------|-----------|----------------|--------|-----------|
+| 1. Foundation | v1.0 | 3/3 | Complete | 2026-02-09 |
+| 2. Core Data | v1.0 | 3/3 | Complete | 2026-02-09 |
+| 3. Planning Logic | v1.0 | 3/3 | Complete | 2026-02-09 |
+| 4. Plan Adjustment | v1.0 | 2/2 | Complete | 2026-02-09 |
+| 5. Polish & Deployment | v1.0 | 6/6 | Complete | 2026-02-10 |
+| 6. Database Foundation | v1.1 | 0/3 | Not started | - |
+| 7. Variety Rules & Rotation Logic | v1.1 | 0/3 | Not started | - |
+| 8. Rating System & UI | v1.1 | 0/3 | Not started | - |
+| 9. Complexity Levels & Badges | v1.1 | 0/3 | Not started | - |
+| 10. Progressive Disclosure Swap | v1.1 | 0/4 | Not started | - |
 
 **Deployment:** https://foodish-red.vercel.app
 **Repository:** https://github.com/xeppen/foodish
-**Current Status:** Deployed, debugging production dashboard error
+**Current Status:** v1.0 deployed, v1.1 roadmap ready for planning
 
 ---
 *Roadmap created: 2026-02-09*
-*Last updated: 2026-02-10*
+*Last updated: 2026-02-12 (v1.1 roadmap added)*

@@ -2,72 +2,73 @@
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-02-09)
+See: .planning/PROJECT.md (updated 2026-02-12)
 
-**Core value:** Weekly dinner planning takes less than 60 seconds and removes decision fatigue.
-**Current focus:** Milestone v1.1 - Smart Variety & Preferences
+**Core value:** Weekly dinner planning takes less than 60 seconds and removes decision fatigue
+**Current focus:** Phase 6 - Database Foundation (v1.1 milestone)
 
 ## Current Position
 
-Phase: Not started (defining requirements)
-Plan: —
-Status: Defining requirements for v1.1
-Last activity: 2026-02-12 — Milestone v1.1 started (Smart Variety & Preferences)
+Phase: 6 of 10 (Database Foundation)
+Plan: Ready to plan
+Status: Ready to plan
+Last activity: 2026-02-12 - v1.1 roadmap created, starting Phase 6
+
+Progress: [████████████░░░░░░░░] 50% (v1.0 complete, v1.1 starting)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 5 phases
-- Build time: ~8 hours (autonomous overnight build)
-- Deployment fixes: ~2 hours
-- Total execution time: ~10 hours
+- Total plans completed: 18 (v1.0 complete)
+- Average duration: Not tracked for v1.0
+- Total execution time: ~10 hours (v1.0)
 
 **By Phase:**
 
-| Phase | Status | Completed |
-|-------|--------|-----------|
-| 1. Foundation | Complete | 2026-02-09 |
-| 2. Core Data | Complete | 2026-02-09 |
-| 3. Planning Logic | Complete | 2026-02-09 |
-| 4. Plan Adjustment | Complete | 2026-02-09 |
-| 5. Polish & Deployment | Complete | 2026-02-10 |
+| Phase | Plans | Status |
+|-------|-------|--------|
+| 1. Foundation | 3/3 | Complete |
+| 2. Core Data | 3/3 | Complete |
+| 3. Planning Logic | 3/3 | Complete |
+| 4. Plan Adjustment | 2/2 | Complete |
+| 5. Polish & Deployment | 6/6 | Complete |
+| 6. Database Foundation | 0/3 | Not started |
 
-*Updated after deployment completion*
+**Recent Trend:**
+- v1.0 shipped successfully on 2026-02-10
+- Starting v1.1 milestone with 5 new phases (6-10)
+
+*Will update after each v1.1 plan completion*
 
 ## Accumulated Context
 
 ### Decisions
 
-Decisions are logged in PROJECT.md Key Decisions table.
-Recent decisions affecting current work:
+Recent decisions from PROJECT.md affecting current work:
 
-- **Auth migration**: Switched from Auth.js to Clerk per user request (2026-02-10)
-- **Clerk catch-all routes**: Using `[[...sign-in]]` pattern for OAuth callback handling
-- **Dependency downgrades**: Prisma v7→v5.22.0 (Vercel compatibility), React 19→18 (Clerk compatibility)
-- **Client wrapper pattern**: ClerkProviderWrapper with @ts-expect-error to handle async component types
-- **Zod v4 migration**: Updated from `.errors` to `.issues` API
-- Google sign-in only (simplicity over flexibility for v1)
-- 5 weekday meals only (focus on recurring weekday friction)
-- Text-only meal list (no images/recipes keeps focus on decision removal)
-- Starter pack included (removes setup friction)
-- Deprioritize recent meals (basic variation without complex logic)
+- **v1.0**: Google sign-in only (simplicity) - ✓ Shipped
+- **v1.0**: 5 weekday meals only - ✓ Maintained for v1.1
+- **v1.0**: Text-only meal list - ✓ AI images deferred
+- **v1.1 Pending**: Add ratings (thumbs up/down influence generation)
+- **v1.1 Pending**: Hard rule - no duplicates per week
+- **v1.1 Pending**: Complexity defaults to medium (optional metadata)
+- **v1.1 Pending**: Progressive disclosure for swap filters (keep fast path fast)
 
 ### Pending Todos
 
+From v1.0 (may be resolved):
 - Debug production dashboard error (server-side exception)
 - Verify database schema initialized in production
 - Test full auth flow in production
-- Run local testing with proper database connection
 
 ### Blockers/Concerns
 
-**Active blocker**: Dashboard page showing server-side error in production
-- Error: "Application error: a server-side exception has occurred"
-- Digest: 180584549
-- Status: Investigating locally (dev server running on localhost:3001)
+None blocking v1.1 start. v1.0 shipped successfully, v1.1 roadmap complete and ready for Phase 6 planning.
 
 ## Session Continuity
 
-Last session: 2026-02-10
-Stopped at: All phases complete, deployed to production, debugging dashboard error
-Resume file: Local dev server running for debugging
+Last session: 2026-02-12
+Stopped at: Created v1.1 roadmap with phases 6-10
+Resume file: None
+
+**Next action:** Run `/gsd:plan-phase 6` to create execution plan for Database Foundation phase

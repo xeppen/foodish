@@ -95,39 +95,46 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| RATING-01 | TBD | Pending |
-| RATING-02 | TBD | Pending |
-| RATING-03 | TBD | Pending |
-| RATING-04 | TBD | Pending |
-| RATING-05 | TBD | Pending |
-| RATING-06 | TBD | Pending |
-| VARIETY-01 | TBD | Pending |
-| VARIETY-02 | TBD | Pending |
-| VARIETY-03 | TBD | Pending |
-| VARIETY-04 | TBD | Pending |
-| VARIETY-05 | TBD | Pending |
-| COMPLEX-01 | TBD | Pending |
-| COMPLEX-02 | TBD | Pending |
-| COMPLEX-03 | TBD | Pending |
-| COMPLEX-04 | TBD | Pending |
-| COMPLEX-05 | TBD | Pending |
-| SWAP-01 | TBD | Pending |
-| SWAP-02 | TBD | Pending |
-| SWAP-03 | TBD | Pending |
-| SWAP-04 | TBD | Pending |
-| SWAP-05 | TBD | Pending |
-| SWAP-06 | TBD | Pending |
-| SWAP-07 | TBD | Pending |
-| SWAP-08 | TBD | Pending |
-| SWAP-09 | TBD | Pending |
-| SWAP-10 | TBD | Pending |
-| SWAP-11 | TBD | Pending |
+| RATING-01 | Phase 8 | Pending |
+| RATING-02 | Phase 6 | Pending |
+| RATING-03 | Phase 8 | Pending |
+| RATING-04 | Phase 8 | Pending |
+| RATING-05 | Phase 8 | Pending |
+| RATING-06 | Phase 8 | Pending |
+| VARIETY-01 | Phase 7 | Pending |
+| VARIETY-02 | Phase 7 | Pending |
+| VARIETY-03 | Phase 7 | Pending |
+| VARIETY-04 | Phase 6 | Pending |
+| VARIETY-05 | Phase 7 | Pending |
+| COMPLEX-01 | Phase 6 | Pending |
+| COMPLEX-02 | Phase 6 | Pending |
+| COMPLEX-03 | Phase 9 | Pending |
+| COMPLEX-04 | Phase 9 | Pending |
+| COMPLEX-05 | Phase 9 | Pending |
+| SWAP-01 | Phase 10 | Pending |
+| SWAP-02 | Phase 10 | Pending |
+| SWAP-03 | Phase 10 | Pending |
+| SWAP-04 | Phase 10 | Pending |
+| SWAP-05 | Phase 10 | Pending |
+| SWAP-06 | Phase 10 | Pending |
+| SWAP-07 | Phase 10 | Pending |
+| SWAP-08 | Phase 10 | Pending |
+| SWAP-09 | Phase 10 | Pending |
+| SWAP-10 | Phase 10 | Pending |
+| SWAP-11 | Phase 10 | Pending |
 
 **Coverage:**
 - v1.1 requirements: 27 total
-- Mapped to phases: 0 (roadmap not yet created)
-- Unmapped: 27
+- Mapped to phases: 27 (100% coverage)
+- Unmapped: 0
+
+**Coverage by Phase:**
+- Phase 6 (Database Foundation): 4 requirements (RATING-02, VARIETY-04, COMPLEX-01, COMPLEX-02)
+- Phase 7 (Variety Rules): 4 requirements (VARIETY-01, VARIETY-02, VARIETY-03, VARIETY-05)
+- Phase 8 (Rating System): 5 requirements (RATING-01, RATING-03, RATING-04, RATING-05, RATING-06)
+- Phase 9 (Complexity Levels): 3 requirements (COMPLEX-03, COMPLEX-04, COMPLEX-05)
+- Phase 10 (Progressive Swap): 11 requirements (SWAP-01 through SWAP-11)
 
 ---
 *Requirements defined: 2026-02-12*
-*Last updated: 2026-02-12 after v1.1 milestone definition*
+*Last updated: 2026-02-12 (traceability complete)*
