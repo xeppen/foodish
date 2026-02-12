@@ -3,6 +3,7 @@
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
+import { selectMeals, selectMealsWithConstraints, type SelectionWarning } from "@/lib/planning/selection";
 
 // Get the Monday of the current week (ISO week starts on Monday)
 function getMonday(date: Date): Date {
@@ -24,40 +25,82 @@ function formatDate(date: Date): string {
   return date.toISOString().split("T")[0];
 }
 
-// Get random meals avoiding recent ones
-async function selectRandomMeals(
-  userId: string,
-  count: number,
-  recentMealIds: Set<string>
-): Promise<string[]> {
-  // Get all user meals
-  const allMeals = await prisma.meal.findMany({
-    where: { userId },
-    orderBy: { lastUsed: "asc" },
+const RECENT_LOOKBACK_DAYS = 14;
+
+function subtractDays(date: Date, days: number): Date {
+  const d = new Date(date);
+  d.setDate(d.getDate() - days);
+  return d;
+}
+
+async function getRecentMealIds(userId: string, weekStart: Date): Promise<Set<string>> {
+  const cutoff = subtractDays(weekStart, RECENT_LOOKBACK_DAYS);
+  const recentUsage = await prisma.usageHistory.findMany({
+    where: {
+      userId,
+      usedDate: {
+        gte: cutoff,
+        lt: weekStart,
+      },
+    },
+    select: { mealId: true },
+  });
+  return new Set(recentUsage.map((entry) => entry.mealId));
+}
+
+async function getBlockedFavoriteIds(userId: string, weekStart: Date): Promise<Set<string>> {
+  const previousWeek = subtractDays(weekStart, 7);
+  const twoWeeksAgo = subtractDays(weekStart, 14);
+
+  const recentWeeklyUsage = await prisma.usageHistory.findMany({
+    where: {
+      userId,
+      weekStartDate: {
+        gte: twoWeeksAgo,
+        lt: weekStart,
+      },
+      meal: {
+        rating: "THUMBS_UP",
+      },
+    },
+    select: {
+      mealId: true,
+      weekStartDate: true,
+    },
   });
 
-  if (allMeals.length === 0) {
-    return [];
+  const weekAKey = formatDate(twoWeeksAgo);
+  const weekBKey = formatDate(previousWeek);
+  const usageByMeal = new Map<string, Set<string>>();
+
+  for (const entry of recentWeeklyUsage) {
+    const key = formatDate(entry.weekStartDate);
+    const seen = usageByMeal.get(entry.mealId) ?? new Set<string>();
+    seen.add(key);
+    usageByMeal.set(entry.mealId, seen);
   }
 
-  // Separate meals into recent and non-recent
-  const nonRecentMeals = allMeals.filter((m) => !recentMealIds.has(m.id));
-  const availableMeals = nonRecentMeals.length > 0 ? nonRecentMeals : allMeals;
-
-  // If we don't have enough meals, cycle through what we have
-  if (availableMeals.length < count) {
-    const selected: string[] = [];
-    let index = 0;
-    for (let i = 0; i < count; i++) {
-      selected.push(availableMeals[index % availableMeals.length].name);
-      index++;
+  const blocked = new Set<string>();
+  for (const [mealId, weekKeys] of usageByMeal.entries()) {
+    if (weekKeys.has(weekAKey) && weekKeys.has(weekBKey)) {
+      blocked.add(mealId);
     }
-    return selected;
   }
 
-  // Shuffle and select
-  const shuffled = [...availableMeals].sort(() => Math.random() - 0.5);
-  return shuffled.slice(0, count).map((m) => m.name);
+  return blocked;
+}
+
+function warningMessage(warnings: SelectionWarning[]): string | undefined {
+  if (warnings.includes("repeated_meal_due_to_small_library")) {
+    return "Vi upprepade en rätt eftersom din måltidslista är liten. Lägg till fler måltider för mer variation.";
+  }
+  if (warnings.includes("relaxed_favorite_streak")) {
+    return "Vi inkluderade en favorit igen för att kunna fylla veckan.";
+  }
+  if (warnings.includes("included_recent_meal")) {
+    return "Vi inkluderade en nyligen använd rätt för att kunna fylla veckan.";
+  }
+  return undefined;
 }
 
 export async function getCurrentWeekPlan() {
@@ -68,16 +111,25 @@ export async function getCurrentWeekPlan() {
 
   const weekStart = getWeekStart();
 
-  const plan = await prisma.weeklyPlan.findUnique({
-    where: {
-      userId_weekStartDate: {
-        userId: user.id,
-        weekStartDate: weekStart,
+  try {
+    const plan = await prisma.weeklyPlan.findUnique({
+      where: {
+        userId_weekStartDate: {
+          userId: user.id,
+          weekStartDate: weekStart,
+        },
       },
-    },
-  });
+    });
 
-  return plan;
+    return plan;
+  } catch (error) {
+    console.error("Failed to load current week plan", {
+      userId: user.id,
+      weekStart: weekStart.toISOString(),
+      error,
+    });
+    return null;
+  }
 }
 
 export async function generateWeeklyPlan() {
@@ -99,50 +151,23 @@ export async function generateWeeklyPlan() {
   });
 
   if (existingPlan) {
-    return { success: true, plan: existingPlan };
+    return { success: true, plan: existingPlan, warning: undefined };
   }
 
-  // Get meals from last week to avoid repetition
-  const lastWeekStart = new Date(weekStart);
-  lastWeekStart.setDate(lastWeekStart.getDate() - 7);
-
-  const lastWeekPlan = await prisma.weeklyPlan.findUnique({
-    where: {
-      userId_weekStartDate: {
-        userId: user.id,
-        weekStartDate: lastWeekStart,
-      },
-    },
+  const recentMealIds = await getRecentMealIds(user.id, weekStart);
+  const blockedFavoriteIds = await getBlockedFavoriteIds(user.id, weekStart);
+  const allMeals = await prisma.meal.findMany({
+    where: { userId: user.id },
+    select: { id: true, name: true, rating: true },
   });
+  const { selectedMeals, warnings } = selectMealsWithConstraints(
+    allMeals,
+    5,
+    recentMealIds,
+    blockedFavoriteIds
+  );
 
-  // Build set of recent meal names to avoid
-  const recentMealNames = new Set<string>();
-  if (lastWeekPlan) {
-    [
-      lastWeekPlan.monday,
-      lastWeekPlan.tuesday,
-      lastWeekPlan.wednesday,
-      lastWeekPlan.thursday,
-      lastWeekPlan.friday,
-    ].forEach((meal) => {
-      if (meal) recentMealNames.add(meal);
-    });
-  }
-
-  // Get meal IDs that match recent names
-  const recentMeals = await prisma.meal.findMany({
-    where: {
-      userId: user.id,
-      name: { in: Array.from(recentMealNames) },
-    },
-    select: { id: true },
-  });
-  const recentMealIds = new Set(recentMeals.map((m) => m.id));
-
-  // Select 5 random meals
-  const selectedMeals = await selectRandomMeals(user.id, 5, recentMealIds);
-
-  if (selectedMeals.length < 5) {
+  if (allMeals.length === 0 || selectedMeals.length < 5) {
     return {
       error: "Du behöver minst 5 rätter i din lista för att kunna skapa en plan. Lägg till fler rätter.",
     };
@@ -153,27 +178,30 @@ export async function generateWeeklyPlan() {
     data: {
       userId: user.id,
       weekStartDate: weekStart,
-      monday: selectedMeals[0],
-      tuesday: selectedMeals[1],
-      wednesday: selectedMeals[2],
-      thursday: selectedMeals[3],
-      friday: selectedMeals[4],
+      monday: selectedMeals[0].name,
+      tuesday: selectedMeals[1].name,
+      wednesday: selectedMeals[2].name,
+      thursday: selectedMeals[3].name,
+      friday: selectedMeals[4].name,
     },
   });
 
-  // Update lastUsed for selected meals
-  await prisma.meal.updateMany({
-    where: {
+  await prisma.usageHistory.createMany({
+    data: selectedMeals.map((meal) => ({
+      mealId: meal.id,
       userId: user.id,
-      name: { in: selectedMeals },
-    },
-    data: {
-      lastUsed: new Date(),
-    },
+      usedDate: new Date(),
+      weekStartDate: weekStart,
+    })),
   });
 
+  revalidatePath("/");
   revalidatePath("/plan");
-  return { success: true, plan };
+  return {
+    success: true,
+    plan,
+    warning: warningMessage(warnings),
+  };
 }
 
 export async function getWeekInfo() {
@@ -223,62 +251,31 @@ export async function swapDayMeal(day: "monday" | "tuesday" | "wednesday" | "thu
     plan.friday,
   ].filter((m): m is string => m !== null));
 
-  // Get meals from last week
-  const lastWeekStart = new Date(weekStart);
-  lastWeekStart.setDate(lastWeekStart.getDate() - 7);
-
-  const lastWeekPlan = await prisma.weeklyPlan.findUnique({
-    where: {
-      userId_weekStartDate: {
-        userId: user.id,
-        weekStartDate: lastWeekStart,
-      },
-    },
-  });
-
-  const recentMealNames = new Set<string>();
-  if (lastWeekPlan) {
-    [
-      lastWeekPlan.monday,
-      lastWeekPlan.tuesday,
-      lastWeekPlan.wednesday,
-      lastWeekPlan.thursday,
-      lastWeekPlan.friday,
-    ].forEach((meal) => {
-      if (meal) recentMealNames.add(meal);
-    });
-  }
-
-  // Get meal IDs for recent and current meals
-  const recentMeals = await prisma.meal.findMany({
-    where: {
-      userId: user.id,
-      name: { in: Array.from(recentMealNames) },
-    },
-    select: { id: true },
-  });
-  const recentMealIds = new Set(recentMeals.map((m) => m.id));
+  const recentMealIds = await getRecentMealIds(user.id, weekStart);
 
   const currentMeals = await prisma.meal.findMany({
     where: {
       userId: user.id,
       name: { in: Array.from(currentPlanMeals) },
     },
-    select: { id: true },
+    select: { id: true, name: true },
   });
   const currentMealIds = new Set(currentMeals.map((m) => m.id));
 
   // Combine both sets to avoid
   const mealsToAvoid = new Set([...recentMealIds, ...currentMealIds]);
 
-  // Select one new meal
-  const newMeals = await selectRandomMeals(user.id, 1, mealsToAvoid);
+  const allMeals = await prisma.meal.findMany({
+    where: { userId: user.id },
+    select: { id: true, name: true },
+  });
+  const newMeals = selectMeals(allMeals, 1, mealsToAvoid);
 
   if (newMeals.length === 0) {
     return { error: "Inga alternativa rätter tillgängliga" };
   }
 
-  const newMeal = newMeals[0];
+  const newMeal = newMeals[0].name;
 
   // Update the plan
   await prisma.weeklyPlan.update({
@@ -293,17 +290,16 @@ export async function swapDayMeal(day: "monday" | "tuesday" | "wednesday" | "thu
     },
   });
 
-  // Update lastUsed for the new meal
-  await prisma.meal.updateMany({
-    where: {
-      userId: user.id,
-      name: newMeal,
-    },
+  await prisma.usageHistory.create({
     data: {
-      lastUsed: new Date(),
+      mealId: newMeals[0].id,
+      userId: user.id,
+      usedDate: new Date(),
+      weekStartDate: weekStart,
     },
   });
 
+  revalidatePath("/");
   revalidatePath("/plan");
   return { success: true, newMeal };
 }
