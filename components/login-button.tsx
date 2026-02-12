@@ -13,7 +13,7 @@ type LoginButtonProps = {
 export function LoginButton({
   children,
   className = "",
-  redirectUrl = "/dashboard",
+  redirectUrl = "/",
 }: LoginButtonProps) {
   const { openSignIn } = useClerk();
   const { isSignedIn } = useUser();

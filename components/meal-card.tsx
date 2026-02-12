@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { getSwapOptions, swapDayMealWithChoice } from "@/lib/actions/plans";
 
@@ -130,6 +129,11 @@ export function MealCard({
   const displayImage =
     imageSrc ||
     `/api/meal-image?meal=${encodeURIComponent(currentMeal || dayLabel)}&style=warm-home-cooked-top-down`;
+  const [resolvedImage, setResolvedImage] = useState(displayImage);
+
+  useEffect(() => {
+    setResolvedImage(displayImage);
+  }, [displayImage]);
 
   async function applySwap(option: SwapOption) {
     if (!isAuthenticated) {
@@ -183,12 +187,17 @@ export function MealCard({
     <div className="group relative bg-white rounded-2xl shadow-sm hover:shadow-md transition-all duration-300 border border-[var(--cream-dark)] overflow-hidden flex flex-col h-full">
       {/* Image Area */}
       <div className="relative aspect-[4/3] w-full overflow-hidden bg-gray-100">
-        <Image
-          src={displayImage}
+        <img
+          src={resolvedImage}
           alt={currentMeal || "Meal"}
-          fill
-          className="object-cover transition-transform duration-700 group-hover:scale-105"
-          sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+          className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
+          loading="lazy"
+          referrerPolicy="no-referrer"
+          onError={() => {
+            setResolvedImage(
+              `/api/meal-image?meal=${encodeURIComponent(currentMeal || dayLabel)}&style=warm-home-cooked-top-down`
+            );
+          }}
         />
       </div>
 

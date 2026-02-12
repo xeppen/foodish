@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { List } from "lucide-react";
 import { useClerk } from "@clerk/nextjs";
 import { WeeklyPlanView } from "@/components/weekly-plan-view";
@@ -55,6 +55,14 @@ export function SingleViewShell({
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [authPrompt, setAuthPrompt] = useState<string | null>(null);
   const { openSignIn } = useClerk();
+  const mealImageByName = useMemo(() => {
+    return meals.reduce<Record<string, string>>((acc, meal) => {
+      if (meal.imageUrl) {
+        acc[meal.name.trim().toLowerCase()] = meal.imageUrl;
+      }
+      return acc;
+    }, {});
+  }, [meals]);
 
   const promptLogin = useCallback(() => {
     setAuthPrompt("Login to curate your own meals");
@@ -125,6 +133,7 @@ export function SingleViewShell({
             plan={plan}
             isAuthenticated={isAuthenticated}
             onAuthRequired={promptLogin}
+            mealImageByName={mealImageByName}
           />
         </section>
       </main>

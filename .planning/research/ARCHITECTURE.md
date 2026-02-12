@@ -180,11 +180,11 @@ model UsageHistory {
 
 ### Migration Strategy
 
-1. Add enums to schema
-2. Add new fields with defaults (backward compatible)
-3. Run migration: `npx prisma migrate dev --name add_rating_complexity`
+1. Add enums + defaulted fields to schema
+2. Add UsageHistory model and relation indexes
+3. Run migration: `npx prisma migrate dev --name add_rating_complexity_variety`
 4. Existing meals get `NEUTRAL` rating and `MEDIUM` complexity
-5. `usageHistory` starts empty, populates from next plan generation
+5. `usageHistory` starts empty and becomes primary recency source in plan logic
 
 ## Data Flow Changes
 

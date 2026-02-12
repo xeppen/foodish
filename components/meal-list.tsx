@@ -4,7 +4,6 @@ import { deleteMeal, updateMeal, voteMeal } from "@/lib/actions/meals";
 import { MoreHorizontal } from "lucide-react";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import Image from "next/image";
 
 type Meal = {
   id: string;
@@ -26,7 +25,9 @@ export function MealList({ meals }: { meals: Meal[] }) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
   const [editComplexity, setEditComplexity] = useState<Meal["complexity"]>("MEDIUM");
+  const [editImageMode, setEditImageMode] = useState<"upload" | "url">("upload");
   const [editImageFile, setEditImageFile] = useState<File | null>(null);
+  const [editImageUrl, setEditImageUrl] = useState("");
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [votes, setVotes] = useState<Record<string, { up: number; down: number }>>(
     Object.fromEntries(meals.map((meal) => [meal.id, { up: meal.thumbsUpCount, down: meal.thumbsDownCount }]))
@@ -39,6 +40,8 @@ export function MealList({ meals }: { meals: Meal[] }) {
     setEditName(meal.name);
     setEditComplexity(meal.complexity);
     setEditImageFile(null);
+    setEditImageMode(meal.imageUrl ? "url" : "upload");
+    setEditImageUrl(meal.imageUrl ?? "");
     setOpenMenuId(null);
   }
 
@@ -46,7 +49,9 @@ export function MealList({ meals }: { meals: Meal[] }) {
     setEditingId(null);
     setEditName("");
     setEditComplexity("MEDIUM");
+    setEditImageMode("upload");
     setEditImageFile(null);
+    setEditImageUrl("");
   }
 
   async function handleVote(id: string, direction: "up" | "down") {
@@ -87,8 +92,11 @@ export function MealList({ meals }: { meals: Meal[] }) {
     const formData = new FormData();
     formData.append("name", editName.trim());
     formData.append("complexity", editComplexity);
-    if (editImageFile) {
+    if (editImageMode === "upload" && editImageFile) {
       formData.append("image", editImageFile);
+    }
+    if (editImageMode === "url" && editImageUrl.trim()) {
+      formData.append("imageUrl", editImageUrl.trim());
     }
     const result = await updateMeal(id, formData);
     if (!result.error) {
@@ -124,12 +132,52 @@ export function MealList({ meals }: { meals: Meal[] }) {
                     <option value="MEDIUM">Medium</option>
                     <option value="COMPLEX">Avancerad</option>
                   </select>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => setEditImageFile(e.target.files?.[0] ?? null)}
-                    className="w-full text-xs"
-                  />
+                </div>
+
+                <div className="rounded-md border border-[var(--cream-dark)] bg-white/70 p-2">
+                  <div className="mb-2 grid grid-cols-2 gap-1 rounded-md bg-[var(--cream)] p-1 text-xs font-semibold">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditImageMode("upload");
+                        setEditImageUrl("");
+                      }}
+                      className={`rounded-md px-2 py-1 transition ${editImageMode === "upload" ? "bg-white text-[var(--charcoal)] shadow-sm" : "text-[var(--warm-gray)]"}`}
+                    >
+                      Ladda upp
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditImageMode("url");
+                        setEditImageFile(null);
+                      }}
+                      className={`rounded-md px-2 py-1 transition ${editImageMode === "url" ? "bg-white text-[var(--charcoal)] shadow-sm" : "text-[var(--warm-gray)]"}`}
+                    >
+                      Bild-URL
+                    </button>
+                  </div>
+
+                  {editImageMode === "upload" ? (
+                    <>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => setEditImageFile(e.target.files?.[0] ?? null)}
+                        className="w-full text-xs"
+                      />
+                      {editImageFile && (
+                        <p className="mt-1 text-xs text-[var(--warm-gray)]">Vald bild: {editImageFile.name}</p>
+                      )}
+                    </>
+                  ) : (
+                    <input
+                      type="url"
+                      value={editImageUrl}
+                      onChange={(e) => setEditImageUrl(e.target.value)}
+                      placeholder="https://example.com/meal.jpg"
+                    />
+                  )}
                 </div>
                 <div className="flex justify-end gap-2">
                   <button
@@ -151,7 +199,19 @@ export function MealList({ meals }: { meals: Meal[] }) {
             ) : (
               <div className="grid grid-cols-[auto_1fr_auto_auto] items-center gap-2">
               <div className="relative h-10 w-10 overflow-hidden rounded-md">
-                <Image src={imageSrc} alt={meal.name} fill className="object-cover" sizes="40px" />
+                <img
+                  src={imageSrc}
+                  alt={meal.name}
+                  className="h-full w-full object-cover"
+                  loading="lazy"
+                  referrerPolicy="no-referrer"
+                  onError={(event) => {
+                    const fallback = `/api/meal-image?meal=${encodeURIComponent(meal.name)}&style=warm-home-cooked-top-down`;
+                    if (event.currentTarget.src !== new URL(fallback, window.location.origin).toString()) {
+                      event.currentTarget.src = fallback;
+                    }
+                  }}
+                />
               </div>
 
               <div className="min-w-0">

@@ -1,3 +1,5 @@
+"use client";
+
 import { MealCard } from "./meal-card";
 
 type WeeklyPlan = {
@@ -7,14 +9,6 @@ type WeeklyPlan = {
   wednesday: string | null;
   thursday: string | null;
   friday: string | null;
-};
-
-type WeekInfo = {
-  monday: string;
-  tuesday: string;
-  wednesday: string;
-  thursday: string;
-  friday: string;
 };
 
 const DAYS = [
@@ -27,11 +21,17 @@ const DAYS = [
 
 export function WeeklyPlanView({
   plan,
-  weekInfo,
+  isAuthenticated,
+  onAuthRequired,
+  mealImageByName,
 }: {
   plan: WeeklyPlan;
-  weekInfo: WeekInfo;
+  isAuthenticated: boolean;
+  onAuthRequired: () => void;
+  mealImageByName?: Record<string, string>;
 }) {
+  const normalizeMealName = (value: string | null) => (value ?? "").trim().toLowerCase();
+
   return (
     <div className="w-full">
       <div className="flex items-center justify-between mb-6 text-white px-2"></div>
@@ -40,11 +40,18 @@ export function WeeklyPlanView({
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6 pb-4">
         {DAYS.map(({ key, label }) => {
           const meal = plan[key];
-          const date = weekInfo[key];
+          const imageSrc = mealImageByName?.[normalizeMealName(meal)];
 
           return (
             <div key={key} className="h-full">
-              <MealCard day={key} dateStr={date} mealName={meal} />
+              <MealCard
+                day={key}
+                dayLabel={label}
+                mealName={meal}
+                imageSrc={imageSrc}
+                isAuthenticated={isAuthenticated}
+                onAuthRequired={onAuthRequired}
+              />
             </div>
           );
         })}
@@ -52,8 +59,9 @@ export function WeeklyPlanView({
 
       <div className="mt-8 p-4 rounded-xl bg-white/10 backdrop-blur-md border border-white/20 text-center">
         <p className="text-sm text-[var(--cream)] font-medium">
-          💡 Tips: Klicka på &quot;Byt&quot; för att direkt ersätta en rätt med ett annat
-          slumpat alternativ från din lista.
+          {isAuthenticated
+            ? "Tips: Klicka på \"Byt\" för att ersätta en rätt direkt från din lista."
+            : "Demo-lage: Klicka på \"Byt\" eller \"Logga in\" for att kurera dina egna maltider."}
         </p>
       </div>
     </div>

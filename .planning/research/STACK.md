@@ -51,7 +51,7 @@ model Meal {
   name       String
   userId     String
   lastUsed   DateTime?
-  rating     Int?      @default(0)  // NEW: -1 (down), 0 (neutral), 1 (up)
+  rating     Rating    @default(NEUTRAL)
   createdAt  DateTime  @default(now())
   updatedAt  DateTime  @updatedAt
 
@@ -60,11 +60,11 @@ model Meal {
 }
 ```
 
-**Why Integer over Enum:**
-- Simpler queries: `rating >= 1` vs enum matching
-- PostgreSQL indexing more efficient for integers
-- No migration complexity (nullable with default)
-- Math operations possible (e.g., average ratings later)
+**Why Enum over Integer:**
+- Aligns with explicit product states (THUMBS_DOWN/NEUTRAL/THUMBS_UP)
+- Better type safety in Prisma + TypeScript
+- Easier to reason about than score thresholds
+- Matches milestone requirements and roadmap language
 
 **UI Implementation:**
 ```typescript
@@ -72,9 +72,9 @@ model Meal {
 import { ThumbsUp, ThumbsDown } from 'lucide-react';
 
 // Component pattern (existing useState + Server Action)
-const [rating, setRating] = useState(meal.rating || 0);
+const [rating, setRating] = useState(meal.rating || 'NEUTRAL');
 
-async function handleRating(newRating: number) {
+async function handleRating(newRating: 'THUMBS_UP' | 'NEUTRAL' | 'THUMBS_DOWN') {
   setRating(newRating); // Optimistic local update
   await updateMealRating(meal.id, newRating);
 }
@@ -84,7 +84,7 @@ async function handleRating(newRating: number) {
 - Icons: lucide-react already installed
 - State: React `useState` (built-in)
 - Server mutation: Extend existing `updateMeal` Server Action
-- Validation: Zod schema extends to `rating: z.number().int().min(-1).max(1).optional()`
+- Validation: Zod schema extends to `rating: z.enum(['THUMBS_DOWN','NEUTRAL','THUMBS_UP']).optional()`
 
 **Sources:**
 - [lucide-react thumbs-up icon](https://lucide.dev/icons/thumbs-up)
@@ -108,8 +108,8 @@ model Meal {
   name       String
   userId     String
   lastUsed   DateTime?
-  rating     Int?        @default(0)
-  complexity Complexity? @default(SIMPLE) // NEW: Meal difficulty
+  rating     Rating      @default(NEUTRAL)
+  complexity Complexity  @default(MEDIUM) // NEW: Meal difficulty
   createdAt  DateTime    @default(now())
   updatedAt  DateTime    @updatedAt
 
@@ -155,8 +155,7 @@ const simpleMeals = await prisma.meal.findMany({
 
 **Schema Change:**
 ```prisma
-// NO TABLE CHANGES NEEDED
-// WeeklyPlan already stores history; extend query logic only
+  // Add UsageHistory model; use it as primary recency source
 
 model WeeklyPlan {
   id            String   @id @default(cuid())

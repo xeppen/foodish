@@ -3,8 +3,9 @@
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
-import { STARTER_MEALS } from "@/lib/starter-meals";
+import { listCommonMeals } from "@/lib/common-meals";
 import { Prisma } from "@prisma/client";
+import { UTApi } from "uploadthing/server";
 import { z } from "zod";
 
 const mealSchema = z.object({
@@ -20,8 +21,45 @@ const voteSchema = z.object({
 });
 
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+const imageUrlSchema = z.string().trim().url("Bild-URL är ogiltig");
 
-async function getUploadedImageDataUrl(file: File): Promise<string> {
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function getUploadedFileUrl(result: unknown): string | null {
+  if (!isRecord(result)) {
+    return null;
+  }
+
+  const sdkResult = result as {
+    _tag?: string;
+    right?: { ufsUrl?: string; url?: string };
+    left?: { message?: string };
+    data?: { ufsUrl?: string; url?: string };
+    error?: { message?: string };
+  };
+
+  if (sdkResult._tag === "Left") {
+    throw new Error(sdkResult.left?.message ?? "Bilduppladdning misslyckades");
+  }
+
+  if (sdkResult._tag === "Right") {
+    return sdkResult.right?.ufsUrl ?? sdkResult.right?.url ?? null;
+  }
+
+  if (sdkResult.error) {
+    throw new Error(sdkResult.error.message ?? "Bilduppladdning misslyckades");
+  }
+
+  if (sdkResult.data) {
+    return sdkResult.data.ufsUrl ?? sdkResult.data.url ?? null;
+  }
+
+  return null;
+}
+
+async function uploadImageToUploadThing(file: File): Promise<string> {
   if (!file.type.startsWith("image/")) {
     throw new Error("Bilden måste vara en bildfil");
   }
@@ -29,9 +67,39 @@ async function getUploadedImageDataUrl(file: File): Promise<string> {
     throw new Error("Bilden får vara max 5MB");
   }
 
-  const bytes = await file.arrayBuffer();
-  const base64 = Buffer.from(bytes).toString("base64");
-  return `data:${file.type};base64,${base64}`;
+  const token = process.env.UPLOADTHING_TOKEN;
+  if (!token) {
+    throw new Error("Bilduppladdning är inte konfigurerad");
+  }
+
+  const utapi = new UTApi({ token });
+  const result = await utapi.uploadFiles(file, { contentDisposition: "inline" });
+  const url = getUploadedFileUrl(result);
+
+  if (!url) {
+    throw new Error("Bilduppladdning misslyckades");
+  }
+
+  return url;
+}
+
+function parseExternalImageUrl(value: string): string | undefined {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return undefined;
+  }
+
+  const parsed = imageUrlSchema.safeParse(trimmed);
+  if (!parsed.success) {
+    throw new Error(parsed.error.issues[0].message);
+  }
+
+  const protocol = new URL(parsed.data).protocol;
+  if (protocol !== "https:" && protocol !== "http:") {
+    throw new Error("Bild-URL måste börja med http:// eller https://");
+  }
+
+  return parsed.data;
 }
 
 function inferComplexity(name: string): "SIMPLE" | "MEDIUM" | "COMPLEX" {
@@ -120,17 +188,18 @@ export async function initializeStarterMeals() {
     return { success: true, message: "Måltider finns redan" };
   }
 
+  const commonMeals = await listCommonMeals();
   const starterData = await Promise.all(
-    STARTER_MEALS.map(async (name) => {
-      const enriched = await enrichMeal(name);
+    commonMeals.map(async (commonMeal) => {
+      const enriched = await enrichMeal(commonMeal.name);
       return {
-        name,
+        name: commonMeal.name,
         userId: user.id,
-        complexity: enriched.complexity,
+        complexity: commonMeal.complexity ?? enriched.complexity,
         tags: enriched.tags,
         ingredients: enriched.ingredients,
         imagePrompt: enriched.imagePrompt,
-        imageUrl: enriched.imageUrl,
+        imageUrl: commonMeal.imageUrl ?? enriched.imageUrl,
       };
     })
   );
@@ -191,6 +260,7 @@ export async function addMeal(formData: FormData) {
   const name = (formData.get("name") as string) ?? "";
   const complexity = formData.get("complexity");
   const image = formData.get("image");
+  const imageUrlInput = (formData.get("imageUrl") as string) ?? "";
   const validation = mealSchema.safeParse({
     name,
     complexity: typeof complexity === "string" && complexity.length > 0 ? complexity : undefined,
@@ -202,10 +272,17 @@ export async function addMeal(formData: FormData) {
 
   const enriched = await enrichMeal(validation.data.name);
   let uploadedImageUrl: string | undefined;
+  let providedImageUrl: string | undefined;
+
+  try {
+    providedImageUrl = parseExternalImageUrl(imageUrlInput);
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "Ogiltig bild-URL" };
+  }
 
   if (image instanceof File && image.size > 0) {
     try {
-      uploadedImageUrl = await getUploadedImageDataUrl(image);
+      uploadedImageUrl = await uploadImageToUploadThing(image);
     } catch (error) {
       return { error: error instanceof Error ? error.message : "Ogiltig bild" };
     }
@@ -219,7 +296,7 @@ export async function addMeal(formData: FormData) {
       tags: enriched.tags,
       ingredients: enriched.ingredients,
       imagePrompt: enriched.imagePrompt,
-      imageUrl: uploadedImageUrl ?? enriched.imageUrl,
+      imageUrl: uploadedImageUrl ?? providedImageUrl ?? enriched.imageUrl,
     },
   });
 
@@ -244,6 +321,7 @@ export async function updateMeal(id: string, formData: FormData) {
   const name = (formData.get("name") as string) ?? "";
   const complexity = formData.get("complexity");
   const image = formData.get("image");
+  const imageUrlInput = (formData.get("imageUrl") as string) ?? "";
   const validation = mealSchema.safeParse({
     name,
     complexity: typeof complexity === "string" && complexity.length > 0 ? complexity : undefined,
@@ -259,9 +337,16 @@ export async function updateMeal(id: string, formData: FormData) {
   }
 
   let uploadedImageUrl: string | undefined;
+  let providedImageUrl: string | undefined;
+  try {
+    providedImageUrl = parseExternalImageUrl(imageUrlInput);
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "Ogiltig bild-URL" };
+  }
+
   if (image instanceof File && image.size > 0) {
     try {
-      uploadedImageUrl = await getUploadedImageDataUrl(image);
+      uploadedImageUrl = await uploadImageToUploadThing(image);
     } catch (error) {
       return { error: error instanceof Error ? error.message : "Ogiltig bild" };
     }
@@ -273,6 +358,7 @@ export async function updateMeal(id: string, formData: FormData) {
       name: validation.data.name,
       ...(validation.data.complexity ? { complexity: validation.data.complexity } : {}),
       ...(uploadedImageUrl ? { imageUrl: uploadedImageUrl } : {}),
+      ...(!uploadedImageUrl && providedImageUrl ? { imageUrl: providedImageUrl } : {}),
     },
   });
 

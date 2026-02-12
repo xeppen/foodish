@@ -30,7 +30,7 @@ Key risks center on maintaining v1.0's speed and simplicity while adding power u
 
 **Why no changes:** Next.js 15 Server Actions + Prisma's type generation + React Server Components already provide patterns for preference management, filtered queries, and optimistic updates. Adding UI libraries (Radix, Headless UI) would add 12KB+ for functionality achievable with 50 lines of Tailwind.
 
-**Migration strategy:** Add nullable fields with defaults (rating: 0, complexity: MEDIUM), ensuring backward compatibility. Existing meals work immediately without data backfill. Indexes on (userId, rating) and (userId, complexity) optimize filtered queries.
+**Migration strategy:** Add enum fields with explicit defaults (rating: NEUTRAL, complexity: MEDIUM). Since the app is pre-launch, use clean schema evolution over nullable transitional fields. Indexes on (userId, rating) and (userId, complexity) optimize filtered queries.
 
 ### Expected Features
 
@@ -63,7 +63,7 @@ Key risks center on maintaining v1.0's speed and simplicity while adding power u
 
 ### Architecture Approach
 
-All enhancements integrate cleanly with existing Next.js 15 + Prisma + RSC architecture. Database adds Rating/Complexity enums with defaults, UsageHistory model tracks meal usage over time. Server Actions extend to support filtered queries (complexity, rating, recency). UI components use progressive disclosure: main view unchanged from v1.0, filters revealed in swap modal on demand.
+All enhancements integrate cleanly with existing Next.js 15 + Prisma + RSC architecture. Database adds Rating/Complexity enums with defaults, UsageHistory model tracks meal usage over time. Server Actions extend to support filtered queries (complexity, rating, recency). UI components use progressive disclosure in the single-view plan experience: fast swap stays primary, advanced filters revealed on demand.
 
 **Major components:**
 1. **Enhanced Meal Model** - Adds rating (THUMBS_UP/NEUTRAL/THUMBS_DOWN) and complexity (SIMPLE/MEDIUM/COMPLEX) enums with indexes for filtered queries
@@ -97,7 +97,7 @@ All enhancements integrate cleanly with existing Next.js 15 + Prisma + RSC archi
 
 5. **Ratings encouraging meal library stagnation** - Users rate 5 favorites highly, algorithm only shows those 5 → repetitive plans despite variety features. Limit rating influence: 5-star meals 2x more likely than 3-star, but 3-star still appear regularly. Ratings adjust probability, don't override variety constraints. No "hide meals under X stars" option.
 
-6. **Database migration without backwards compatibility** - Schema migrated but old app code still running during rollout. Add columns as nullable in initial migration even if later NOT NULL. Multi-phase deployment: (1) Add nullable + deploy compatible code, (2) Backfill + defaults, (3) Add constraints if needed. Test old app code against new schema.
+6. **Database migration without schema/code alignment** - Schema evolves without matching app logic and tests. For pre-launch, apply schema + app updates together and verify with integration tests before release.
 
 7. **Complexity levels without clear definitions** - Users interpret "Quick" differently (time? technique? cleanup?). Provide explicit definitions: Quick = "30 min or less, minimal prep" (pasta, stir-fry), Medium = "30-60 min, standard" (roasted chicken), Advanced = "60+ min or special techniques" (braised dishes). Show examples in UI when adding complexity.
 
@@ -108,14 +108,14 @@ All enhancements integrate cleanly with existing Next.js 15 + Prisma + RSC archi
 Based on research, v1.1 breaks into 5 sequential phases with clear dependencies:
 
 ### Phase 1: Database Foundation
-**Rationale:** All features depend on schema changes; must come first with backward-compatible migration.
+**Rationale:** All features depend on schema changes; must come first with clean schema migration.
 **Delivers:** Prisma schema with Rating/Complexity enums, UsageHistory model, indexes for filtered queries.
 **Addresses:** Foundation for ratings (FEATURES.md), variety tracking (FEATURES.md), filtered swapping (FEATURES.md).
 **Avoids:** Null rating migration pitfall (PITFALLS.md #1), backwards compatibility issues (PITFALLS.md #6).
 **Components:**
 - Add Rating enum (THUMBS_DOWN/NEUTRAL/THUMBS_UP) with default NEUTRAL
 - Add Complexity enum (SIMPLE/MEDIUM/COMPLEX) with default MEDIUM
-- Extend Meal model with rating/complexity fields (nullable, indexed)
+- Extend Meal model with rating/complexity fields (defaulted, indexed)
 - Create UsageHistory model (mealId, usedDate, weekStartDate, userId)
 - Run migration: `npx prisma migrate dev --name add_ratings_complexity_variety`
 

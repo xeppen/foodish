@@ -101,4 +101,23 @@ describe("meals actions", () => {
       },
     });
   });
+
+  it("addMeal uses provided image URL when present", async () => {
+    prismaMock.meal.create.mockResolvedValue({ id: "m2" });
+
+    const formData = new FormData();
+    formData.append("name", "Tomatpasta");
+    formData.append("imageUrl", "https://images.example.com/tomatpasta.jpg");
+
+    const result = await addMeal(formData);
+
+    expect(result).toMatchObject({ success: true });
+    expect(prismaMock.meal.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          imageUrl: "https://images.example.com/tomatpasta.jpg",
+        }),
+      })
+    );
+  });
 });

@@ -134,11 +134,11 @@ Retained from previous research for context.
 
 Smart variety features to add to existing v1.0 base.
 
-- [x] **Binary rating system** — Thumbs up/down per meal. Stored per user-meal. Influences generation.
-- [x] **No duplicates in current week** — Hard constraint: filter out Mon-Fri meals from generation/swap pool.
-- [x] **Complexity levels (3-tier)** — Simple/Medium/Complex. Auto-default Medium on new meals. Shown in meal list.
-- [x] **Enhanced swap with progressive disclosure** — Keep one-click random. Add expand → filtered view (by complexity, by rating, by recency).
-- [x] **Long-term rotation tracking** — Track last_used per meal. Auto-boost meals unused 14+ days. Auto-deprioritize overused favorites.
+- [ ] **Binary rating system** — Thumbs up/down per meal. Stored per user-meal. Influences generation.
+- [ ] **No duplicates in current week** — Hard constraint: filter out Mon-Fri meals from generation/swap pool.
+- [ ] **Complexity levels (3-tier)** — Simple/Medium/Complex. Auto-default Medium on new meals. Shown in meal list.
+- [ ] **Enhanced swap with progressive disclosure** — Keep one-click random. Add expand → filtered view (by complexity, by rating, by recency).
+- [ ] **Long-term rotation tracking** — Track UsageHistory as primary recency source. Auto-boost meals unused 14+ days. Auto-deprioritize overused favorites.
 
 **Why this is minimal for v1.1:** Adds smart variety without setup burden. Ratings = implicit preferences. Complexity = minimal metadata. No complicated forms. Builds naturally on v1.0.
 

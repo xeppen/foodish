@@ -6,11 +6,11 @@
 
 ## Summary
 
-Phase 6 adds rating and complexity enums plus usage history tracking to the existing Prisma schema. The primary technical challenges are backward-compatible enum migrations in PostgreSQL and multi-field index optimization for filtered queries. All work uses existing stack (Prisma 5.22.0 + PostgreSQL/Neon + Next.js 15) with zero new dependencies.
+Phase 6 adds rating and complexity enums plus usage history tracking to the existing Prisma schema. The primary technical challenges are safe enum migration ordering in PostgreSQL and multi-field index optimization for filtered queries. All work uses existing stack (Prisma 5.22.0 + PostgreSQL/Neon + Next.js 15) with zero new dependencies.
 
-The critical constraint is production safety: the app is live with real users, so migrations must not break existing functionality during deployment rollout. PostgreSQL's enum safety restrictions require multi-step migrations when adding enum values with defaults. The expand-and-contract pattern ensures zero downtime by adding nullable fields first, then deploying compatible code before applying constraints.
+Current constraint is pre-launch correctness: schema, actions, and tests should land together and be validated end-to-end before release.
 
-**Primary recommendation:** Use two-migration approach for enums (add type, then apply default) + composite indexes on (userId, rating) and (userId, complexity) for filtered queries.
+**Primary recommendation:** Use explicit enum defaults (NEUTRAL/MEDIUM), add UsageHistory relations/indexes, and validate with unit + integration tests.
 
 ## Standard Stack
 

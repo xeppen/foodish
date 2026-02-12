@@ -13,7 +13,9 @@ type EnrichmentResult = {
 
 export function MagicMealInput() {
   const [value, setValue] = useState("");
+  const [imageMode, setImageMode] = useState<"upload" | "url">("upload");
   const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imageUrl, setImageUrl] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<EnrichmentResult | null>(null);
@@ -32,8 +34,11 @@ export function MagicMealInput() {
     try {
       const formData = new FormData();
       formData.append("name", value.trim());
-      if (imageFile) {
+      if (imageMode === "upload" && imageFile) {
         formData.append("image", imageFile);
+      }
+      if (imageMode === "url" && imageUrl.trim()) {
+        formData.append("imageUrl", imageUrl.trim());
       }
       const response = await addMeal(formData);
 
@@ -44,6 +49,8 @@ export function MagicMealInput() {
 
       setValue("");
       setImageFile(null);
+      setImageUrl("");
+      setImageMode("upload");
       setResult((response.enrichment as EnrichmentResult) ?? null);
       router.refresh();
     } catch {
@@ -71,14 +78,51 @@ export function MagicMealInput() {
           />
           <Sparkles className={`absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 ${loading ? "animate-pulse text-amber-500" : "text-[var(--warm-gray)]"}`} />
         </div>
-        <input
-          type="file"
-          accept="image/*"
-          disabled={loading}
-          onChange={(e) => setImageFile(e.target.files?.[0] ?? null)}
-          className="text-xs"
-        />
-        {imageFile && <p className="text-xs text-[var(--warm-gray)]">Vald bild: {imageFile.name}</p>}
+        <div className="rounded-lg border border-[var(--cream-dark)] bg-white/70 p-2">
+          <div className="mb-2 grid grid-cols-2 gap-1 rounded-md bg-[var(--cream)] p-1 text-xs font-semibold">
+            <button
+              type="button"
+              onClick={() => {
+                setImageMode("upload");
+                setImageUrl("");
+              }}
+              className={`rounded-md px-2 py-1 transition ${imageMode === "upload" ? "bg-white text-[var(--charcoal)] shadow-sm" : "text-[var(--warm-gray)]"}`}
+            >
+              Ladda upp
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setImageMode("url");
+                setImageFile(null);
+              }}
+              className={`rounded-md px-2 py-1 transition ${imageMode === "url" ? "bg-white text-[var(--charcoal)] shadow-sm" : "text-[var(--warm-gray)]"}`}
+            >
+              Bild-URL
+            </button>
+          </div>
+
+          {imageMode === "upload" ? (
+            <>
+              <input
+                type="file"
+                accept="image/*"
+                disabled={loading}
+                onChange={(e) => setImageFile(e.target.files?.[0] ?? null)}
+                className="text-xs"
+              />
+              {imageFile && <p className="mt-1 text-xs text-[var(--warm-gray)]">Vald bild: {imageFile.name}</p>}
+            </>
+          ) : (
+            <input
+              type="url"
+              value={imageUrl}
+              onChange={(e) => setImageUrl(e.target.value)}
+              placeholder="https://example.com/meal.jpg"
+              disabled={loading}
+            />
+          )}
+        </div>
       </form>
 
       {loading && <p className="text-xs text-[var(--warm-gray)]">AI tänker...</p>}

@@ -147,28 +147,24 @@ Phase 3 (Planning Algorithm with Ratings) — Rating weight must be tuned conser
 
 ---
 
-### Pitfall 6: Database Migration Without Backwards Compatibility
+### Pitfall 6: Database Migration Without Schema-Code-Test Alignment
 
 **What goes wrong:**
-Schema migration adds new columns (rating, complexity) to production, but the deployment pipeline doesn't coordinate database migration with application code deployment. During the rollout window (database migrated but old app code still running), the app crashes or writes invalid data because the old code doesn't know about new columns/constraints.
+Schema migration lands, but application code and tests are not updated at the same time. Recency logic, writes, or filters still assume old fields (like `lastUsed`) and break after schema changes.
 
 **Why it happens:**
-Developers test migration in local environment where database and code update atomically, but production uses a phased rollout (database → app servers over 10-15 minutes). This is a common issue with adding NOT NULL columns or columns with defaults that the application must be aware of.
+Teams apply schema changes without end-to-end verification of all affected actions and UI flows.
 
 **How to avoid:**
-- Make all new columns nullable in initial migration (even if they'll later be NOT NULL)
-- Use multi-phase deployment:
-  - Phase 1: Add nullable columns, deploy compatible code that can read/write them
-  - Phase 2 (next release): Backfill data, add defaults
-  - Phase 3 (future release): Add NOT NULL constraint if needed
-- Test with "mixed version" environment: Run old app code against new schema
-- Use feature flags to control when new features activate, separate from deployment
-- Document migration dependencies in code: `// MIGRATION: Requires schema v1.1+`
+- Apply schema + application updates together in pre-launch milestones
+- Use explicit defaults for new enum-backed fields (no ambiguous null semantics)
+- Add unit tests for selection logic and integration tests for actions touching new fields
+- Verify plan generation + swap flows after migration in CI before release
 
 **Warning signs:**
-- Migration runs successfully but app logs show "column not found" errors
-- Some users see new features while others see errors (during rollout)
-- Rollback is impossible because database schema changed
+- Migration succeeds but plan generation/swap fail in runtime
+- Tests pass for schema validation but fail for action behavior
+- Code still writes/reads deprecated recency fields
 
 **Phase to address:**
 Phase 1 (Schema & Migration) — Migration strategy must be defined before any schema changes
@@ -255,7 +251,7 @@ Phase 2 (Variety Rules) — Scope must be ruthlessly minimized to single rule wi
 
 | Integration | Common Mistake | Correct Approach |
 |-------------|----------------|------------------|
-| Prisma Schema | Adding NOT NULL constraint in same migration as column addition | Add column as nullable first, backfill, then add constraint in later migration |
+| Prisma Schema | Changing schema without updating actions and tests | Update schema + actions + tests in the same phase and verify end-to-end |
 | Next.js Caching | Forgetting to revalidatePath after rating updates | Add `revalidatePath("/meals")` after any rating mutation |
 | Clerk Auth | Assuming userId is integer when it's string | TypeScript will catch this, but watch for numeric comparisons |
 | Vercel Deployment | Long-running plan generation hitting serverless timeout | Current generation is fast (<1s), but complex algorithms might hit 10s default limit |
@@ -274,27 +270,27 @@ Phase 2 (Variety Rules) — Scope must be ruthlessly minimized to single rule wi
 
 ## "Looks Done But Isn't" Checklist
 
-- [ ] **Rating Migration:** Has default value for existing meals AND algorithm handles null ratings gracefully
+- [ ] **Rating Migration:** Has explicit enum defaults and algorithm uses consistent rating semantics
 - [ ] **Variety Rules:** Tested with user who has only 6-8 meals (edge case that must work)
 - [ ] **Complexity Filter:** Shows result count before applying filter, handles zero results
 - [ ] **Swap with Filters:** Works when filter matches zero meals (shows fallback)
 - [ ] **Plan Generation:** Still completes in <2 seconds with new algorithm complexity
 - [ ] **Empty States:** All new features have empty/zero states designed and implemented
-- [ ] **Backwards Compatibility:** Old app code doesn't crash when new database schema is deployed
+- [ ] **Schema-Logic Alignment:** App code and tests are updated for new schema in the same release
 - [ ] **Error Messages:** User-friendly messages, not "No meals found in database query"
 - [ ] **Loading States:** All async operations show loading indicators
 - [ ] **Mobile Responsive:** Rating stars, complexity badges, filter UI work on mobile
 - [ ] **Accessibility:** Star ratings, filters, complexity indicators keyboard accessible
-- [ ] **Database Indexes:** Added indexes for new query patterns (rating, complexity, lastUsed)
+- [ ] **Database Indexes:** Added indexes for new query patterns (rating, complexity, usage history)
 
 ## Recovery Strategies
 
 | Pitfall | Recovery Cost | Recovery Steps |
 |---------|---------------|----------------|
-| Null ratings break plan generation | LOW | Quick patch: Default null to 3 in query logic, deploy hotfix in <1 hour |
+| Rating semantics break plan generation | LOW | Quick patch: normalize enum handling in selection logic, deploy hotfix in <1 hour |
 | Variety rules too strict | MEDIUM | Feature flag to disable variety rules, relax constraints, deploy in 2-4 hours |
 | Complexity filter produces empty results | LOW | Add fallback logic to show unfiltered results with message |
-| Database migration broke production | HIGH | Rollback migration if no data written, otherwise forward fix with nullable columns |
+| Database migration broke release | HIGH | Forward-fix schema/action mismatch and re-run integration suite before redeploy |
 | Progressive disclosure confused users | MEDIUM | Move advanced features back to simple UI, simplify navigation |
 | Ratings caused repetitive plans | MEDIUM | Adjust rating weights in algorithm, redeploy (no data changes needed) |
 | Performance degradation | MEDIUM | Add database indexes, optimize queries, cache where appropriate |
@@ -303,12 +299,12 @@ Phase 2 (Variety Rules) — Scope must be ruthlessly minimized to single rule wi
 
 | Pitfall | Prevention Phase | Verification |
 |---------|------------------|--------------|
-| Null ratings breaking generation | Phase 1 (Schema) | Test plan generation with all-null ratings in test database |
+| Rating handling regression | Phase 1 (Schema) | Test plan generation with explicit enum defaults and mixed rating states |
 | Variety rules too strict | Phase 2 (Variety) | Test with small meal library (6-8 meals), verify plans generate for 2+ weeks |
 | Complexity filter empty results | Phase 4 (Filtered Swap) | Test with library where no meals match filter, verify fallback shown |
 | Progressive disclosure slows fast path | Phase 5 (UI Polish) | Time test: New user generates first plan in <60 seconds |
 | Ratings cause repetition | Phase 3 (Algorithm) | Generate 4 weeks of plans for user with 20 meals rated 1-5, measure variety |
-| Migration backwards incompatibility | Phase 1 (Schema) | Run old app code against new schema in staging, verify no crashes |
+| Migration/schema mismatch | Phase 1 (Schema) | Run full action integration tests against migrated schema |
 | Complexity definitions unclear | Phase 3 (Complexity) | User test: 5 users tag same 10 meals, check consistency |
 | Over-engineered variety | Phase 2 (Variety) | Measure plan generation time, must be <2 seconds |
 
@@ -316,10 +312,10 @@ Phase 2 (Variety Rules) — Scope must be ruthlessly minimized to single rule wi
 
 ### Phase 1: Schema & Migration
 - CRITICAL: Test migration with production database size (not empty dev database)
-- Add columns as nullable even if they'll later be required
+- Add explicit defaults for new enum-backed fields
 - Include rollback migration script
 - Document what happens to existing data
-- Test old app code against new schema
+- Test updated app code and action suite against new schema
 
 ### Phase 2: Variety Rules
 - CRITICAL: Test with minimal meal library (6-8 meals)
@@ -329,7 +325,7 @@ Phase 2 (Variety Rules) — Scope must be ruthlessly minimized to single rule wi
 
 ### Phase 3: Planning Algorithm Updates
 - CRITICAL: Test rating weight carefully — too high kills variety
-- Handle null ratings explicitly (don't just default to 3)
+- Handle enum ratings explicitly and consistently across selection logic
 - Validate that v1.0 behavior is preserved when no preferences set
 - Test with 4+ weeks of continuous plan generation
 

@@ -1,5 +1,4 @@
 import { SignIn } from "@clerk/nextjs";
-import { svSE } from "@clerk/localizations";
 
 export default function SignInPage() {
   return (
@@ -16,7 +15,6 @@ export default function SignInPage() {
 
         <div className="animate-scale-in delay-100">
           <SignIn
-            localization={svSE}
             appearance={{
               elements: {
                 rootBox: "mx-auto",
