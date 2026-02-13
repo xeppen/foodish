@@ -206,6 +206,7 @@ Phases execute in numeric order: 6 → 7 → 8 → 9 → 10
 | 8. Rating System & UI | v1.1 | 3/3 | Complete | 2026-02-12 |
 | 9. Complexity Levels & Badges | v1.1 | 3/3 | Complete | 2026-02-12 |
 | 10. Progressive Disclosure Swap | v1.1 | 4/4 | Complete | 2026-02-12 |
+| 11. Dish Image Generation & Reuse | v1.2 | 10/10 | Complete | 2026-02-13 |
 
 **Deployment:** https://foodish-red.vercel.app
 **Repository:** https://github.com/xeppen/foodish
