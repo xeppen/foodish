@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { generateDishImage } from "@/lib/image-generation/provider";
 import { uploadGeneratedDishImage } from "@/lib/image-generation/storage";
 import { buildFallbackMealImageUrl } from "@/lib/meal-image-url";
+import { findSimilarDishImage } from "@/lib/image-generation/similarity";
 
 const PENDING_WAIT_TIMEOUT_MS = 10000;
 const PENDING_POLL_INTERVAL_MS = 400;
@@ -65,6 +66,11 @@ export async function getOrGenerateDishImage(rawDishName: string, signal?: Abort
     return waitForPendingResolution(normalizedName);
   }
 
+  const similar = await findSimilarDishImage(mapped.canonicalSv);
+  if (similar) {
+    return { status: "ready", imageUrl: similar.imageUrl, wasGenerated: false };
+  }
+
   try {
     await prisma.generatedDishImage.create({
       data: {
@@ -113,4 +119,3 @@ export async function getOrGenerateDishImage(rawDishName: string, signal?: Abort
     };
   }
 }
-
