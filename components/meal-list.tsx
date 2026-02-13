@@ -4,6 +4,7 @@ import { deleteMeal, updateMeal, voteMeal } from "@/lib/actions/meals";
 import { MoreHorizontal } from "lucide-react";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { buildFallbackMealImageUrl, resolveMealImageUrl } from "@/lib/meal-image-url";
 
 type Meal = {
   id: string;
@@ -109,7 +110,7 @@ export function MealList({ meals }: { meals: Meal[] }) {
     <ul className="divide-y divide-[var(--cream-dark)] rounded-xl border border-[var(--cream-dark)] bg-white">
       {meals.map((meal) => {
         const mealVotes = votes[meal.id] ?? { up: meal.thumbsUpCount, down: meal.thumbsDownCount };
-        const imageSrc = meal.imageUrl || `/api/meal-image?meal=${encodeURIComponent(meal.name)}&style=warm-home-cooked-top-down`;
+        const imageSrc = resolveMealImageUrl(meal.imageUrl, meal.name);
 
         return (
           <li key={meal.id} className="relative px-2 py-2">
@@ -206,7 +207,7 @@ export function MealList({ meals }: { meals: Meal[] }) {
                   loading="lazy"
                   referrerPolicy="no-referrer"
                   onError={(event) => {
-                    const fallback = `/api/meal-image?meal=${encodeURIComponent(meal.name)}&style=warm-home-cooked-top-down`;
+                    const fallback = buildFallbackMealImageUrl(meal.name);
                     if (event.currentTarget.src !== new URL(fallback, window.location.origin).toString()) {
                       event.currentTarget.src = fallback;
                     }

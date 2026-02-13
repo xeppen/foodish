@@ -7,6 +7,7 @@ import { useClerk } from "@clerk/nextjs";
 import { WeeklyPlanView } from "@/components/weekly-plan-view";
 import { MealDrawer } from "@/components/meal-drawer";
 import { LoginButton } from "@/components/login-button";
+import { resolveMealImageUrl } from "@/lib/meal-image-url";
 
 type WeeklyPlan = {
   id: string;
@@ -37,11 +38,22 @@ type Meal = {
   createdAt: Date | string;
 };
 
+type CommonMeal = {
+  id: string;
+  name: string;
+  complexity: "SIMPLE" | "MEDIUM" | "COMPLEX";
+  imageUrl: string | null;
+  sortOrder: number;
+  createdAt: Date | string;
+  updatedAt: Date | string;
+};
+
 type SingleViewShellProps = {
   plan: WeeklyPlan;
   weekInfo: WeekInfo;
   isAuthenticated: boolean;
   meals: Meal[];
+  commonMeals?: CommonMeal[];
   planNotice?: string;
 };
 
@@ -50,19 +62,28 @@ export function SingleViewShell({
   weekInfo,
   isAuthenticated,
   meals,
+  commonMeals,
   planNotice,
 }: SingleViewShellProps) {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [authPrompt, setAuthPrompt] = useState<string | null>(null);
   const { openSignIn } = useClerk();
   const mealImageByName = useMemo(() => {
-    return meals.reduce<Record<string, string>>((acc, meal) => {
-      if (meal.imageUrl) {
-        acc[meal.name.trim().toLowerCase()] = meal.imageUrl;
+    const commonImageByName = (commonMeals ?? []).reduce<Record<string, string>>((acc, meal) => {
+      const key = meal.name.trim().toLowerCase();
+      if (meal.imageUrl?.trim()) {
+        acc[key] = meal.imageUrl.trim();
       }
       return acc;
     }, {});
-  }, [meals]);
+
+    return meals.reduce<Record<string, string>>((acc, meal) => {
+      const key = meal.name.trim().toLowerCase();
+      const preferredImage = meal.imageUrl?.trim() || commonImageByName[key] || null;
+      acc[key] = resolveMealImageUrl(preferredImage, meal.name);
+      return acc;
+    }, {});
+  }, [commonMeals, meals]);
 
   const promptLogin = useCallback(() => {
     setAuthPrompt("Login to curate your own meals");
@@ -104,16 +125,16 @@ export function SingleViewShell({
         </div>
       </header>
 
-      <main className="relative z-10 mx-auto flex min-h-screen w-full max-w-7xl items-center px-4 pb-12 pt-8 sm:px-6 lg:px-8">
-        <section className="w-full rounded-3xl border border-white/20 bg-black/35 p-6 shadow-2xl backdrop-blur-xl sm:p-8">
-          <div className="mb-6 text-center sm:mb-8">
+      <main className="relative z-10 mx-auto flex min-h-screen w-full max-w-7xl items-center px-0 pb-12 pt-8 sm:px-6 lg:px-8">
+        <section className="w-full rounded-none border-0 bg-transparent p-0 shadow-none backdrop-blur-none sm:rounded-3xl sm:border sm:border-white/20 sm:bg-black/35 sm:p-8 sm:shadow-2xl sm:backdrop-blur-xl">
+          <div className="mb-6 px-4 text-center sm:mb-8 sm:px-0">
             <h2 className="text-4xl font-bold text-white drop-shadow-md sm:text-5xl">
               Veckans middagsplan
             </h2>
           </div>
 
           {!isAuthenticated && (
-            <div className="mx-auto mb-6 flex max-w-xl flex-col items-center gap-3 rounded-2xl border border-[var(--terracotta)]/40 bg-black/45 px-4 py-3 text-center backdrop-blur-md sm:flex-row sm:justify-center sm:text-left">
+            <div className="mx-4 mb-6 flex flex-col items-center gap-3 rounded-2xl border border-[var(--terracotta)]/40 bg-black/45 px-4 py-3 text-center backdrop-blur-md sm:mx-auto sm:max-w-xl sm:flex-row sm:justify-center sm:text-left">
               <p className="text-sm font-semibold text-white">
                 {authPrompt ?? "Login to Save your weekly plan and votes"}
               </p>
@@ -124,7 +145,7 @@ export function SingleViewShell({
           )}
 
           {planNotice && isAuthenticated && (
-            <div className="mx-auto mb-6 max-w-3xl rounded-2xl border border-amber-300/40 bg-amber-500/10 px-4 py-3 text-center backdrop-blur-md">
+            <div className="mx-4 mb-6 rounded-2xl border border-amber-300/40 bg-amber-500/10 px-4 py-3 text-center backdrop-blur-md sm:mx-auto sm:max-w-3xl">
               <p className="text-sm font-medium text-amber-100">{planNotice}</p>
             </div>
           )}

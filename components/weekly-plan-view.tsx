@@ -34,10 +34,10 @@ export function WeeklyPlanView({
 
   return (
     <div className="w-full">
-      <div className="flex items-center justify-between mb-6 text-white px-2"></div>
+      <div className="mb-6 flex items-center justify-between px-0 text-white"></div>
 
       {/* Responsive Grid/Scroll Container */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6 pb-4">
+      <div className="grid grid-cols-1 gap-3 px-0 pb-4 sm:grid-cols-2 sm:gap-6 sm:px-4 lg:grid-cols-3 lg:px-0 xl:grid-cols-4 2xl:grid-cols-5">
         {DAYS.map(({ key, label }) => {
           const meal = plan[key];
           const imageSrc = mealImageByName?.[normalizeMealName(meal)];

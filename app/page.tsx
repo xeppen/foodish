@@ -18,6 +18,7 @@ export default async function HomePage() {
         plan={demoPlan}
         weekInfo={weekInfo}
         isAuthenticated={false}
+        commonMeals={commonMeals}
         meals={commonMeals.map((meal) => ({
           id: `common-${meal.id}`,
           name: meal.name,
@@ -47,6 +48,7 @@ export default async function HomePage() {
       plan={plan ?? demoPlan}
       weekInfo={weekInfo}
       isAuthenticated={true}
+      commonMeals={commonMeals}
       meals={meals}
       planNotice={planNotice}
     />
