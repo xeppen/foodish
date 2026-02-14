@@ -7,7 +7,14 @@ export type CandidateMeal = {
 
 export type PlannerDay = "monday" | "tuesday" | "wednesday" | "thursday" | "friday";
 
-export type PreferredDay = "MONDAY" | "TUESDAY" | "WEDNESDAY" | "THURSDAY" | "FRIDAY";
+export type PreferredDay =
+  | "MONDAY"
+  | "TUESDAY"
+  | "WEDNESDAY"
+  | "THURSDAY"
+  | "FRIDAY"
+  | "SATURDAY"
+  | "SUNDAY";
 
 export type AdaptiveDaySignal = {
   shownCount: number;

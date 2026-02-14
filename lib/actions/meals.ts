@@ -9,7 +9,15 @@ import { Prisma } from "@prisma/client";
 import { UTApi } from "uploadthing/server";
 import { z } from "zod";
 
-const weekdaySchema = z.enum(["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY"]);
+const weekdaySchema = z.enum([
+  "MONDAY",
+  "TUESDAY",
+  "WEDNESDAY",
+  "THURSDAY",
+  "FRIDAY",
+  "SATURDAY",
+  "SUNDAY",
+]);
 
 const mealSchema = z.object({
   name: z
@@ -17,7 +25,7 @@ const mealSchema = z.object({
     .min(1, "Måltidsnamnet är obligatoriskt")
     .max(140, "Måltidsnamnet är för långt"),
   complexity: z.enum(["SIMPLE", "MEDIUM", "COMPLEX"]).optional(),
-  preferredDays: z.array(weekdaySchema).max(5).default([]),
+  preferredDays: z.array(weekdaySchema).max(7).default([]),
 });
 
 const voteSchema = z.object({

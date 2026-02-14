@@ -23,6 +23,8 @@ enum Weekday {
   WEDNESDAY
   THURSDAY
   FRIDAY
+  SATURDAY
+  SUNDAY
 }
 
 enum GenerationStatus {

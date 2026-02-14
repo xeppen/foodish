@@ -32,7 +32,7 @@ type Meal = {
   id: string;
   name: string;
   complexity: "SIMPLE" | "MEDIUM" | "COMPLEX";
-  preferredDays: ("MONDAY" | "TUESDAY" | "WEDNESDAY" | "THURSDAY" | "FRIDAY")[];
+  preferredDays: ("MONDAY" | "TUESDAY" | "WEDNESDAY" | "THURSDAY" | "FRIDAY" | "SATURDAY" | "SUNDAY")[];
   thumbsUpCount: number;
   thumbsDownCount: number;
   imageUrl: string | null;
