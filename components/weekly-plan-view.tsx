@@ -37,8 +37,6 @@ export function WeeklyPlanView({
       <div className="flex snap-y snap-mandatory flex-col gap-3 px-0 pb-4 md:snap-none md:flex-row md:flex-wrap md:justify-center md:gap-8 md:pb-8">
         {DAYS.map(({ key, label }) => {
           const meal = plan[key];
-          const normalized = normalizeMealName(meal);
-          const imageSrc = mealImageByName?.[normalized];
 
           return (
             <div key={key} className="h-full w-full md:w-auto">
@@ -46,7 +44,7 @@ export function WeeklyPlanView({
                 day={key}
                 dayLabel={label}
                 mealName={meal}
-                imageSrc={imageSrc}
+                mealImageByName={mealImageByName}
                 isAuthenticated={isAuthenticated}
                 onAuthRequired={onAuthRequired}
               />

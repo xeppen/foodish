@@ -20,7 +20,7 @@ interface MealCardProps {
   mealName: string | null;
   isAuthenticated: boolean;
   onAuthRequired: () => void;
-  imageSrc?: string; // Optional override
+  mealImageByName?: Record<string, string>;
 }
 
 export function MealCard({
@@ -29,7 +29,7 @@ export function MealCard({
   mealName,
   isAuthenticated,
   onAuthRequired,
-  imageSrc,
+  mealImageByName,
 }: MealCardProps) {
   const [loading, setLoading] = useState(false);
   const [preloadedOptions, setPreloadedOptions] = useState<SwapOption[]>([]);
@@ -59,8 +59,10 @@ export function MealCard({
     void preloadSwapCandidates();
   }, [isAuthenticated, preloadSwapCandidates]);
 
+  const currentMealKey = (currentMeal ?? "").trim().toLowerCase();
+  const mappedImage = mealImageByName?.[currentMealKey];
   const displayImage =
-    imageSrc ||
+    mappedImage ||
     `/api/meal-image?meal=${encodeURIComponent(currentMeal || dayLabel)}&style=vertical-food-photography-dark-moody-lighting`;
   const [resolvedImage, setResolvedImage] = useState(displayImage);
 
@@ -118,7 +120,7 @@ export function MealCard({
   }
 
   return (
-    <div className="group relative mx-0 w-full snap-start aspect-[16/9] overflow-hidden rounded-none bg-black shadow-lg transition-shadow duration-500 md:w-[320px] md:aspect-[3/4] md:rounded-2xl lg:w-[340px]">
+    <div className="group relative mx-0 w-full snap-start aspect-[16/9] overflow-hidden rounded-none bg-black ring-1 ring-white/10 shadow-2xl shadow-black/80 transition-all duration-500 group-hover:ring-white/30 group-hover:shadow-black md:w-[320px] md:aspect-[3/4] md:rounded-2xl lg:w-[340px]">
       <img
         src={resolvedImage}
         alt={currentMeal || "Meal"}
@@ -131,7 +133,7 @@ export function MealCard({
           );
         }}
       />
-      <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent" />
+      <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/95 via-black/60 to-transparent" />
 
       <div className="absolute left-4 top-4">
         <p className="inline-block rounded-full bg-black/40 px-3 py-1 text-xs font-bold uppercase tracking-[0.1em] text-white drop-shadow-sm backdrop-blur-sm">
@@ -140,7 +142,7 @@ export function MealCard({
       </div>
 
       <div className="absolute inset-x-0 bottom-0 p-4 pr-20 md:pr-24">
-        <h3 className="mb-1 max-w-[85%] text-3xl font-bold leading-[0.96] text-white drop-shadow-sm md:text-4xl">
+        <h3 className="mb-1 line-clamp-3 max-w-[85%] text-2xl font-bold leading-tight text-white drop-shadow-sm md:text-3xl lg:text-[1.75rem]">
           {currentMeal || "Ingen måltid planerad"}
         </h3>
       </div>
