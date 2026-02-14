@@ -1,5 +1,3 @@
-import { prisma } from "@/lib/prisma";
-
 type SimilarDishHit = {
   imageUrl: string;
   normalizedName: string;
@@ -12,27 +10,6 @@ export async function findSimilarDishImage(_dishName: string): Promise<SimilarDi
     return null;
   }
 
-  // TODO: Replace with embedding generation + vector similarity query.
-  // Keeping a deterministic fallback query shape for future migration.
-  const latestReady = await prisma.generatedDishImage.findFirst({
-    where: {
-      status: "READY",
-      imageUrl: { not: null },
-    },
-    orderBy: { updatedAt: "desc" },
-    select: {
-      normalizedName: true,
-      imageUrl: true,
-    },
-  });
-
-  if (!latestReady?.imageUrl) {
-    return null;
-  }
-
-  return {
-    normalizedName: latestReady.normalizedName,
-    imageUrl: latestReady.imageUrl,
-  };
+  // TODO: Implement embedding/vector similarity. Until then, never reuse by "similarity".
+  return null;
 }
-

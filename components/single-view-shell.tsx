@@ -35,7 +35,7 @@ type Meal = {
   thumbsUpCount: number;
   thumbsDownCount: number;
   imageUrl: string | null;
-  ingredients?: string[];
+  ingredients?: unknown;
   createdAt: Date | string;
 };
 
@@ -94,8 +94,10 @@ export function SingleViewShell({
     const ingredients = new Set<string>();
     for (const planned of dayMeals) {
       const match = meals.find((meal) => meal.name.trim().toLowerCase() === planned);
-      for (const ingredient of match?.ingredients ?? []) {
-        if (ingredient.trim()) {
+      const rawIngredients = match?.ingredients;
+      const ingredientList = Array.isArray(rawIngredients) ? rawIngredients : [];
+      for (const ingredient of ingredientList) {
+        if (typeof ingredient === "string" && ingredient.trim()) {
           ingredients.add(ingredient.trim());
         }
       }
@@ -120,7 +122,7 @@ export function SingleViewShell({
   }
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-black">
+    <div className="relative min-h-screen overflow-hidden bg-black md:h-screen md:overflow-hidden">
       <div className="fixed inset-0 z-0">
         <Image
           src="/hero-dinner.png"
@@ -139,7 +141,7 @@ export function SingleViewShell({
           <button
             type="button"
             onClick={openManager}
-            className="inline-flex items-center gap-2 rounded-xl border border-white/25 bg-black/40 px-3 py-2 text-sm font-semibold text-white backdrop-blur-md hover:bg-black/55"
+            className="inline-flex items-center gap-2 rounded-xl border border-white/25 bg-black/40 px-3 py-2 text-sm font-semibold text-white backdrop-blur-md hover:bg-black/55 md:fixed md:right-6 md:top-6 md:z-30"
           >
             <List className="h-4 w-4" />
             <span>Måltider</span>
@@ -147,7 +149,7 @@ export function SingleViewShell({
         </div>
       </header>
 
-      <main className="relative z-10 mx-auto flex min-h-screen w-full max-w-7xl items-start px-0 pb-10 pt-12 sm:px-6 lg:px-8">
+      <main className="relative z-10 mx-auto flex min-h-screen w-full max-w-7xl items-start px-0 pb-10 pt-12 sm:px-6 lg:px-8 md:h-[calc(100vh-96px)] md:min-h-0 md:overflow-hidden">
         <section className="w-full">
           <div className="mb-6 px-4 text-center sm:mb-10 sm:px-0">
             <h1 className="text-5xl font-bold text-white drop-shadow-lg sm:text-6xl">Veckans middagsplan</h1>
@@ -182,7 +184,7 @@ export function SingleViewShell({
       <button
         type="button"
         onClick={() => setIsShoppingOpen((current) => !current)}
-        className="fixed bottom-5 right-5 z-30 inline-flex items-center gap-2 rounded-full border border-white/20 bg-black/55 px-4 py-3 text-sm font-semibold text-white shadow-xl backdrop-blur-md hover:bg-black/70"
+        className="fixed bottom-5 right-5 z-30 inline-flex items-center gap-2 rounded-full border border-white/20 bg-black/55 px-4 py-3 text-sm font-semibold text-white shadow-xl backdrop-blur-md hover:bg-black/70 md:bottom-6 md:right-6"
       >
         <ShoppingBasket className="h-4 w-4" />
         <span>Inköp</span>

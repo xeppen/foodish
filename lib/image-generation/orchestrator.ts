@@ -55,15 +55,18 @@ export async function getOrGenerateDishImage(rawDishName: string, signal?: Abort
   if (existing?.status === "READY" && existing.imageUrl) {
     return { status: "ready", imageUrl: existing.imageUrl, wasGenerated: false };
   }
-  if (existing?.status === "FAILED") {
-    return {
-      status: "error",
-      message: "Kunde inte generera bild just nu.",
-      imageUrl: buildFallbackMealImageUrl(existing.originalName),
-    };
-  }
   if (existing?.status === "PENDING") {
     return waitForPendingResolution(normalizedName);
+  }
+
+  if (existing?.status === "FAILED") {
+    const claim = await prisma.generatedDishImage.updateMany({
+      where: { normalizedName, status: "FAILED" },
+      data: { status: "PENDING", errorCode: null },
+    });
+    if (claim.count === 0) {
+      return waitForPendingResolution(normalizedName);
+    }
   }
 
   const similar = await findSimilarDishImage(mapped.canonicalSv);

@@ -44,11 +44,10 @@ export async function uploadGeneratedDishImage(canonicalName: string, image: Gen
   const file = new File([image.data], fileName, { type: image.mimeType });
 
   const utapi = new UTApi({ token });
-  const result = (await utapi.uploadFiles(file, { contentDisposition: "inline" })) as UploadThingResult;
+  const result = (await utapi.uploadFiles(file, { contentDisposition: "inline" })) as unknown as UploadThingResult;
   const url = getUploadedFileUrl(result);
   if (!url) {
     throw new Error("UploadThing did not return a file URL");
   }
   return url;
 }
-
