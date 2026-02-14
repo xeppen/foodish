@@ -126,6 +126,49 @@ describe("meals actions", () => {
     );
   });
 
+  it("addMeal stores preferred days from form data", async () => {
+    prismaMock.meal.create.mockResolvedValue({ id: "m3" });
+
+    const formData = new FormData();
+    formData.append("name", "Tacos");
+    formData.append("preferredDays", "FRIDAY");
+    formData.append("preferredDays", "SATURDAY");
+
+    const result = await addMeal(formData);
+
+    expect(result).toMatchObject({ success: true });
+    expect(prismaMock.meal.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          preferredDays: ["FRIDAY", "SATURDAY"],
+        }),
+      })
+    );
+  });
+
+  it("updateMeal persists preferred days changes", async () => {
+    prismaMock.meal.findUnique.mockResolvedValue({ id: "m1", userId: "user_1" });
+    prismaMock.meal.update.mockResolvedValue({ id: "m1" });
+
+    const formData = new FormData();
+    formData.append("name", "Pasta");
+    formData.append("complexity", "MEDIUM");
+    formData.append("preferredDays", "MONDAY");
+    formData.append("preferredDays", "THURSDAY");
+
+    const result = await updateMeal("m1", formData);
+
+    expect(result).toEqual({ success: true });
+    expect(prismaMock.meal.update).toHaveBeenCalledWith({
+      where: { id: "m1" },
+      data: {
+        name: "Pasta",
+        complexity: "MEDIUM",
+        preferredDays: ["MONDAY", "THURSDAY"],
+      },
+    });
+  });
+
   it("resetMealLearning clears day signals", async () => {
     prismaMock.mealDaySignal.deleteMany.mockResolvedValue({ count: 2 });
 
