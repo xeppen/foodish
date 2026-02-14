@@ -23,6 +23,7 @@ export default async function HomePage() {
           id: `common-${meal.id}`,
           name: meal.name,
           complexity: meal.complexity,
+          preferredDays: [],
           thumbsUpCount: 0,
           thumbsDownCount: 0,
           imageUrl: meal.imageUrl,

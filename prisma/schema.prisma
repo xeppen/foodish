@@ -17,6 +17,14 @@ enum Complexity {
   COMPLEX
 }
 
+enum Weekday {
+  MONDAY
+  TUESDAY
+  WEDNESDAY
+  THURSDAY
+  FRIDAY
+}
+
 enum GenerationStatus {
   PENDING
   READY
@@ -36,9 +44,11 @@ model Meal {
   imagePrompt     String?
   tags            Json?
   ingredients     Json?
+  preferredDays   Weekday[]       @default([])
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
   usageHistory    UsageHistory[]
+  daySignals      MealDaySignal[]
 
   @@index([userId])
   @@index([userId, complexity])
@@ -79,9 +89,28 @@ model UsageHistory {
   userId        String
   usedDate      DateTime @default(now())
   weekStartDate DateTime
+  day           Weekday?
   createdAt     DateTime @default(now())
 
   @@index([userId, usedDate])
+  @@index([mealId])
+}
+
+model MealDaySignal {
+  id               String   @id @default(cuid())
+  meal             Meal     @relation(fields: [mealId], references: [id], onDelete: Cascade)
+  mealId           String
+  userId           String
+  day              Weekday
+  shownCount       Int      @default(0)
+  swappedAwayCount Int      @default(0)
+  selectedCount    Int      @default(0)
+  lastShownAt      DateTime?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@unique([mealId, userId, day])
+  @@index([userId, day])
   @@index([mealId])
 }
 

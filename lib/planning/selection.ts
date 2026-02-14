@@ -5,6 +5,20 @@ export type CandidateMeal = {
   thumbsDownCount?: number;
 };
 
+export type PlannerDay = "monday" | "tuesday" | "wednesday" | "thursday" | "friday";
+
+export type PreferredDay = "MONDAY" | "TUESDAY" | "WEDNESDAY" | "THURSDAY" | "FRIDAY";
+
+export type AdaptiveDaySignal = {
+  shownCount: number;
+  swappedAwayCount: number;
+  selectedCount: number;
+};
+
+export type DayAwareCandidateMeal = CandidateMeal & {
+  preferredDays?: PreferredDay[];
+};
+
 export type SelectionWarning =
   | "included_recent_meal"
   | "relaxed_favorite_streak"
@@ -61,6 +75,122 @@ function weightedOrder(items: CandidateMeal[], randomFn: () => number): Candidat
   }
 
   return ordered;
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
+}
+
+function voteScore(meal: CandidateMeal): number {
+  const delta = (meal.thumbsUpCount ?? 0) - (meal.thumbsDownCount ?? 0);
+  if (delta === 0) {
+    return 0;
+  }
+  return clamp(delta * 0.2, -0.5, 0.8);
+}
+
+function adaptiveScore(signal: AdaptiveDaySignal | undefined): number {
+  if (!signal) {
+    return 0;
+  }
+
+  const shown = signal.shownCount;
+  const keptApprox = Math.max(0, shown - signal.swappedAwayCount);
+  const selected = signal.selectedCount;
+  const quality = (keptApprox + selected + 1) / (shown + selected + 2);
+  return clamp((quality - 0.5) * 1.6, -0.8, 0.8);
+}
+
+function explorationScore(signal: AdaptiveDaySignal | undefined): number {
+  if (!signal || signal.shownCount < 2) {
+    return 0.3;
+  }
+  return 0;
+}
+
+function dayToPreferred(day: PlannerDay): PreferredDay {
+  switch (day) {
+    case "monday":
+      return "MONDAY";
+    case "tuesday":
+      return "TUESDAY";
+    case "wednesday":
+      return "WEDNESDAY";
+    case "thursday":
+      return "THURSDAY";
+    case "friday":
+      return "FRIDAY";
+  }
+}
+
+function dayScore(meal: DayAwareCandidateMeal, day: PlannerDay, signal: AdaptiveDaySignal | undefined): number {
+  const preferred = meal.preferredDays?.includes(dayToPreferred(day)) ? 1.2 : 0;
+  return voteScore(meal) + preferred + adaptiveScore(signal) + explorationScore(signal);
+}
+
+function weightedPickByDay(
+  meals: DayAwareCandidateMeal[],
+  day: PlannerDay,
+  recentMealIds: Set<string>,
+  blockedFavoriteIds: Set<string>,
+  signals: Map<string, AdaptiveDaySignal>,
+  randomFn: () => number,
+  warnings: Set<SelectionWarning>
+): DayAwareCandidateMeal | null {
+  if (meals.length === 0) {
+    return null;
+  }
+
+  const strict = meals.filter((meal) => !recentMealIds.has(meal.id) && !blockedFavoriteIds.has(meal.id));
+  const recentFallback = meals.filter((meal) => recentMealIds.has(meal.id) && !blockedFavoriteIds.has(meal.id));
+  const favoriteFallback = meals.filter((meal) => blockedFavoriteIds.has(meal.id));
+
+  const pool =
+    strict.length > 0
+      ? strict
+      : recentFallback.length > 0
+        ? recentFallback
+        : favoriteFallback.length > 0
+          ? favoriteFallback
+          : meals;
+
+  if (pool.some((meal) => recentMealIds.has(meal.id))) {
+    warnings.add("included_recent_meal");
+  }
+  if (pool.some((meal) => blockedFavoriteIds.has(meal.id))) {
+    warnings.add("relaxed_favorite_streak");
+  }
+
+  const scored = pool.map((meal) => {
+    const signal = signals.get(`${meal.id}:${day}`);
+    return {
+      meal,
+      score: dayScore(meal, day, signal),
+    };
+  });
+
+  const temperature = 0.9;
+  const weighted = scored.map((item) => ({
+    meal: item.meal,
+    weight: Math.exp(item.score / temperature),
+  }));
+  const totalWeight = weighted.reduce((sum, item) => sum + item.weight, 0);
+
+  if (totalWeight <= 0) {
+    return shuffle(pool, randomFn)[0] ?? null;
+  }
+
+  const target = randomFn() * totalWeight;
+  let cumulative = 0;
+
+  for (const item of weighted) {
+    cumulative += item.weight;
+    if (target <= cumulative) {
+      return item.meal;
+    }
+  }
+
+  return weighted[weighted.length - 1]?.meal ?? null;
 }
 
 export function selectMeals(
@@ -138,6 +268,59 @@ export function selectMealsWithConstraints(
     warnings.add("repeated_meal_due_to_small_library");
     const baseCycle = selected.length > 0 ? [...selected] : [...allMeals];
     for (let i = selected.length; i < count; i++) {
+      selected.push(baseCycle[i % baseCycle.length]);
+    }
+  }
+
+  return { selectedMeals: selected, warnings: Array.from(warnings) };
+}
+
+export function selectMealsByDay(
+  allMeals: DayAwareCandidateMeal[],
+  days: PlannerDay[],
+  recentMealIds: Set<string>,
+  blockedFavoriteIds: Set<string>,
+  signals: Map<string, AdaptiveDaySignal>,
+  randomFn: () => number = Math.random
+): { selectedMeals: DayAwareCandidateMeal[]; warnings: SelectionWarning[] } {
+  if (allMeals.length === 0 || days.length === 0) {
+    return { selectedMeals: [], warnings: [] };
+  }
+
+  const selected: DayAwareCandidateMeal[] = [];
+  const selectedIds = new Set<string>();
+  const warnings = new Set<SelectionWarning>();
+
+  for (const day of days) {
+    const uniquePool = allMeals.filter((meal) => !selectedIds.has(meal.id));
+    const candidatePool = uniquePool.length > 0 ? uniquePool : allMeals;
+
+    if (uniquePool.length === 0) {
+      warnings.add("repeated_meal_due_to_small_library");
+    }
+
+    const picked = weightedPickByDay(
+      candidatePool,
+      day,
+      recentMealIds,
+      blockedFavoriteIds,
+      signals,
+      randomFn,
+      warnings
+    );
+
+    if (!picked) {
+      break;
+    }
+
+    selected.push(picked);
+    selectedIds.add(picked.id);
+  }
+
+  if (selected.length < days.length) {
+    warnings.add("repeated_meal_due_to_small_library");
+    const baseCycle = selected.length > 0 ? [...selected] : [...allMeals];
+    for (let i = selected.length; i < days.length; i++) {
       selected.push(baseCycle[i % baseCycle.length]);
     }
   }

@@ -13,6 +13,9 @@ const { mockGetCurrentUser, mockRevalidatePath, prismaMock } = vi.hoisted(() => 
       update: vi.fn(),
       delete: vi.fn(),
     },
+    mealDaySignal: {
+      deleteMany: vi.fn(),
+    },
   },
 }));
 
@@ -28,7 +31,7 @@ vi.mock("next/cache", () => ({
   revalidatePath: mockRevalidatePath,
 }));
 
-import { addMeal, updateMeal, voteMeal } from "@/lib/actions/meals";
+import { addMeal, resetMealLearning, updateMeal, voteMeal } from "@/lib/actions/meals";
 
 describe("meals actions", () => {
   beforeEach(() => {
@@ -55,6 +58,7 @@ describe("meals actions", () => {
           ingredients: expect.any(Array),
           imagePrompt: expect.any(String),
           imageUrl: expect.stringContaining("/api/meal-image?meal="),
+          preferredDays: [],
         }),
       })
     );
@@ -76,6 +80,7 @@ describe("meals actions", () => {
       data: {
         name: "Kycklinggryta",
         complexity: "SIMPLE",
+        preferredDays: [],
       },
     });
   });
@@ -119,5 +124,16 @@ describe("meals actions", () => {
         }),
       })
     );
+  });
+
+  it("resetMealLearning clears day signals", async () => {
+    prismaMock.mealDaySignal.deleteMany.mockResolvedValue({ count: 2 });
+
+    const result = await resetMealLearning();
+
+    expect(result).toEqual({ success: true });
+    expect(prismaMock.mealDaySignal.deleteMany).toHaveBeenCalledWith({
+      where: { userId: "user_1" },
+    });
   });
 });

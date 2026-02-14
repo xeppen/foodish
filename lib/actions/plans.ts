@@ -3,9 +3,18 @@
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
-import { selectMeals, selectMealsWithConstraints, type SelectionWarning } from "@/lib/planning/selection";
+import { selectMeals, selectMealsByDay, type SelectionWarning } from "@/lib/planning/selection";
+import {
+  dayToEnum,
+  loadMealDaySignals,
+  recordMealDayShown,
+  recordMealSelectedForDay,
+  recordMealSwappedAway,
+} from "@/lib/planning/day-signals";
 
 type Day = "monday" | "tuesday" | "wednesday" | "thursday" | "friday";
+const DAY_ORDER: Day[] = ["monday", "tuesday", "wednesday", "thursday", "friday"];
+
 type SwapFilterInput = {
   complexity?: "SIMPLE" | "MEDIUM" | "COMPLEX";
   rating?: "THUMBS_UP";
@@ -175,14 +184,14 @@ export async function generateWeeklyPlan(options?: { force?: boolean; revalidate
   const blockedFavoriteIds = await getBlockedFavoriteIds(user.id, weekStart);
   const allMeals = await prisma.meal.findMany({
     where: { userId: user.id },
-    select: { id: true, name: true, thumbsUpCount: true, thumbsDownCount: true },
+    select: { id: true, name: true, thumbsUpCount: true, thumbsDownCount: true, preferredDays: true },
   });
-  const { selectedMeals, warnings } = selectMealsWithConstraints(
-    allMeals,
-    5,
-    recentMealIds,
-    blockedFavoriteIds
+
+  const daySignals = await loadMealDaySignals(
+    user.id,
+    allMeals.map((meal) => meal.id)
   );
+  const { selectedMeals, warnings } = selectMealsByDay(allMeals, DAY_ORDER, recentMealIds, blockedFavoriteIds, daySignals);
 
   if (allMeals.length === 0 || selectedMeals.length < 5) {
     return {
@@ -218,13 +227,17 @@ export async function generateWeeklyPlan(options?: { force?: boolean; revalidate
   });
 
   await prisma.usageHistory.createMany({
-    data: selectedMeals.map((meal) => ({
+    data: selectedMeals.map((meal, index) => ({
       mealId: meal.id,
       userId: user.id,
       usedDate: new Date(),
       weekStartDate: weekStart,
+      day: dayToEnum(DAY_ORDER[index]),
     })),
   });
+  await Promise.all(
+    selectedMeals.map((meal, index) => recordMealDayShown(user.id, meal.id, DAY_ORDER[index]))
+  );
 
   const shouldRevalidate = options?.revalidate !== false;
   if (shouldRevalidate) {
@@ -424,6 +437,15 @@ export async function swapDayMealWithChoice(day: Day, mealId: string) {
     return { error: "Måltiden finns redan i veckoplanen" };
   }
 
+  const previousMealName = plan[day];
+  const previousMeal =
+    typeof previousMealName === "string"
+      ? await prisma.meal.findFirst({
+          where: { userId: user.id, name: previousMealName },
+          select: { id: true },
+        })
+      : null;
+
   await prisma.weeklyPlan.update({
     where: {
       userId_weekStartDate: {
@@ -440,8 +462,13 @@ export async function swapDayMealWithChoice(day: Day, mealId: string) {
       userId: user.id,
       usedDate: new Date(),
       weekStartDate: weekStart,
+      day: dayToEnum(day),
     },
   });
+  await recordMealSelectedForDay(user.id, meal.id, day);
+  if (previousMeal?.id) {
+    await recordMealSwappedAway(user.id, previousMeal.id, day);
+  }
 
   revalidatePath("/");
   revalidatePath("/plan");
@@ -518,14 +545,28 @@ export async function swapDayMeal(day: Day) {
     },
   });
 
+  const previousMealName = plan[day];
+  const previousMeal =
+    typeof previousMealName === "string"
+      ? await prisma.meal.findFirst({
+          where: { userId: user.id, name: previousMealName },
+          select: { id: true },
+        })
+      : null;
+
   await prisma.usageHistory.create({
     data: {
       mealId: newMeals[0].id,
       userId: user.id,
       usedDate: new Date(),
       weekStartDate: weekStart,
+      day: dayToEnum(day),
     },
   });
+  await recordMealSelectedForDay(user.id, newMeals[0].id, day);
+  if (previousMeal?.id) {
+    await recordMealSwappedAway(user.id, previousMeal.id, day);
+  }
 
   revalidatePath("/");
   revalidatePath("/plan");

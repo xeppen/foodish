@@ -11,6 +11,7 @@ type Meal = {
   id: string;
   name: string;
   complexity: "SIMPLE" | "MEDIUM" | "COMPLEX";
+  preferredDays: ("MONDAY" | "TUESDAY" | "WEDNESDAY" | "THURSDAY" | "FRIDAY")[];
   thumbsUpCount: number;
   thumbsDownCount: number;
   imageUrl: string | null;
@@ -23,10 +24,19 @@ const DOT_COLOR: Record<Meal["complexity"], string> = {
   COMPLEX: "bg-red-500",
 };
 
+const DAY_OPTIONS: Array<{ value: Meal["preferredDays"][number]; label: string }> = [
+  { value: "MONDAY", label: "Mån" },
+  { value: "TUESDAY", label: "Tis" },
+  { value: "WEDNESDAY", label: "Ons" },
+  { value: "THURSDAY", label: "Tor" },
+  { value: "FRIDAY", label: "Fre" },
+];
+
 export function MealList({ meals }: { meals: Meal[] }) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
   const [editComplexity, setEditComplexity] = useState<Meal["complexity"]>("MEDIUM");
+  const [editPreferredDays, setEditPreferredDays] = useState<Meal["preferredDays"]>([]);
   const [editImageMode, setEditImageMode] = useState<"upload" | "url">("upload");
   const [editImageFile, setEditImageFile] = useState<File | null>(null);
   const [editImageUrl, setEditImageUrl] = useState("");
@@ -44,6 +54,7 @@ export function MealList({ meals }: { meals: Meal[] }) {
     setEditingId(meal.id);
     setEditName(meal.name);
     setEditComplexity(meal.complexity);
+    setEditPreferredDays(meal.preferredDays ?? []);
     setEditImageFile(null);
     setEditImageMode(meal.imageUrl ? "url" : "upload");
     setEditImageUrl(meal.imageUrl ?? "");
@@ -57,6 +68,7 @@ export function MealList({ meals }: { meals: Meal[] }) {
     setEditingId(null);
     setEditName("");
     setEditComplexity("MEDIUM");
+    setEditPreferredDays([]);
     setEditImageMode("upload");
     setEditImageFile(null);
     setEditImageUrl("");
@@ -126,6 +138,9 @@ export function MealList({ meals }: { meals: Meal[] }) {
     const formData = new FormData();
     formData.append("name", editName.trim());
     formData.append("complexity", editComplexity);
+    for (const day of editPreferredDays) {
+      formData.append("preferredDays", day);
+    }
     if (editImageMode === "upload" && editImageFile) {
       formData.append("image", editImageFile);
     }
@@ -166,6 +181,37 @@ export function MealList({ meals }: { meals: Meal[] }) {
                     <option value="MEDIUM">Medium</option>
                     <option value="COMPLEX">Avancerad</option>
                   </select>
+                </div>
+
+                <div>
+                  <p className="mb-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--warm-gray)]">
+                    Föredragen dag
+                  </p>
+                  <div className="flex flex-wrap gap-1">
+                    {DAY_OPTIONS.map((dayOption) => {
+                      const selected = editPreferredDays.includes(dayOption.value);
+                      return (
+                        <button
+                          key={dayOption.value}
+                          type="button"
+                          onClick={() =>
+                            setEditPreferredDays((current) =>
+                              current.includes(dayOption.value)
+                                ? current.filter((day) => day !== dayOption.value)
+                                : [...current, dayOption.value]
+                            )
+                          }
+                          className={`rounded-full border px-2 py-1 text-[11px] font-semibold ${
+                            selected
+                              ? "border-[var(--terracotta)] bg-[var(--terracotta)]/10 text-[var(--terracotta-dark)]"
+                              : "border-[var(--cream-dark)] bg-white text-[var(--warm-gray)]"
+                          }`}
+                        >
+                          {dayOption.label}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
 
                 <div className="rounded-md border border-[var(--cream-dark)] bg-white/70 p-2">
@@ -284,6 +330,14 @@ export function MealList({ meals }: { meals: Meal[] }) {
                   <span className={`h-2 w-2 rounded-full ${DOT_COLOR[meal.complexity]}`} />
                   <p className="truncate text-sm font-medium text-[var(--charcoal)]">{meal.name}</p>
                 </div>
+                {meal.preferredDays.length > 0 && (
+                  <p className="truncate text-[11px] text-[var(--warm-gray)]">
+                    {meal.preferredDays
+                      .map((day) => DAY_OPTIONS.find((option) => option.value === day)?.label)
+                      .filter((value): value is string => Boolean(value))
+                      .join(", ")}
+                  </p>
+                )}
               </div>
 
               <div className="flex items-center gap-1">

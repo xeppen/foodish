@@ -32,6 +32,7 @@ type Meal = {
   id: string;
   name: string;
   complexity: "SIMPLE" | "MEDIUM" | "COMPLEX";
+  preferredDays: ("MONDAY" | "TUESDAY" | "WEDNESDAY" | "THURSDAY" | "FRIDAY")[];
   thumbsUpCount: number;
   thumbsDownCount: number;
   imageUrl: string | null;
