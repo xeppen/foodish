@@ -5,17 +5,6 @@ import { buildFallbackMealImageUrl } from "@/lib/meal-image-url";
 
 const FETCH_TIMEOUT_MS = 7000;
 const MAX_REDIRECTS = 3;
-const DEFAULT_ALLOWED_HOSTS = [
-  "images.unsplash.com",
-  "source.unsplash.com",
-  "images.pexels.com",
-  "utfs.io",
-  "*.ufs.sh",
-  "i.imgur.com",
-  "res.cloudinary.com",
-  "cdn.pixabay.com",
-];
-
 function withTimeout(signal: AbortSignal, timeoutMs: number): AbortSignal {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
@@ -31,7 +20,7 @@ function withTimeout(signal: AbortSignal, timeoutMs: number): AbortSignal {
 function getAllowedHosts(): string[] {
   const raw = process.env.IMAGE_PROXY_ALLOWED_HOSTS?.trim();
   if (!raw) {
-    return DEFAULT_ALLOWED_HOSTS;
+    return [];
   }
   return raw
     .split(",")
@@ -40,6 +29,9 @@ function getAllowedHosts(): string[] {
 }
 
 function isAllowedHost(hostname: string, allowedHosts: string[]): boolean {
+  if (allowedHosts.length === 0) {
+    return true;
+  }
   const host = hostname.toLowerCase();
   return allowedHosts.some((pattern) => {
     if (pattern.startsWith("*.")) {
