@@ -5,6 +5,7 @@ import { MoreHorizontal } from "lucide-react";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { buildFallbackMealImageUrl, resolveMealImageUrl } from "@/lib/meal-image-url";
+import { generateDishImageUrl } from "@/lib/image-generation/client";
 
 type Meal = {
   id: string;
@@ -29,6 +30,9 @@ export function MealList({ meals }: { meals: Meal[] }) {
   const [editImageMode, setEditImageMode] = useState<"upload" | "url">("upload");
   const [editImageFile, setEditImageFile] = useState<File | null>(null);
   const [editImageUrl, setEditImageUrl] = useState("");
+  const [editGenerationLoading, setEditGenerationLoading] = useState(false);
+  const [editGenerationError, setEditGenerationError] = useState<string | null>(null);
+  const [editPreviewError, setEditPreviewError] = useState(false);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [votes, setVotes] = useState<Record<string, { up: number; down: number }>>(
     Object.fromEntries(meals.map((meal) => [meal.id, { up: meal.thumbsUpCount, down: meal.thumbsDownCount }]))
@@ -43,6 +47,9 @@ export function MealList({ meals }: { meals: Meal[] }) {
     setEditImageFile(null);
     setEditImageMode(meal.imageUrl ? "url" : "upload");
     setEditImageUrl(meal.imageUrl ?? "");
+    setEditGenerationLoading(false);
+    setEditGenerationError(null);
+    setEditPreviewError(false);
     setOpenMenuId(null);
   }
 
@@ -53,6 +60,32 @@ export function MealList({ meals }: { meals: Meal[] }) {
     setEditImageMode("upload");
     setEditImageFile(null);
     setEditImageUrl("");
+    setEditGenerationLoading(false);
+    setEditGenerationError(null);
+    setEditPreviewError(false);
+  }
+
+  async function handleGenerateEditImage() {
+    const dishName = editName.trim();
+    if (!dishName) {
+      setEditGenerationError("Skriv ett måltidsnamn först.");
+      return;
+    }
+
+    setEditGenerationError(null);
+    setEditGenerationLoading(true);
+
+    try {
+      const result = await generateDishImageUrl(dishName);
+      setEditImageMode("url");
+      setEditImageFile(null);
+      setEditImageUrl(result.imageUrl);
+      setEditPreviewError(false);
+    } catch (error) {
+      setEditGenerationError(error instanceof Error ? error.message : "Kunde inte generera bild");
+    } finally {
+      setEditGenerationLoading(false);
+    }
   }
 
   async function handleVote(id: string, direction: "up" | "down") {
@@ -152,12 +185,23 @@ export function MealList({ meals }: { meals: Meal[] }) {
                       onClick={() => {
                         setEditImageMode("url");
                         setEditImageFile(null);
+                        setEditPreviewError(false);
                       }}
                       className={`rounded-md px-2 py-1 transition ${editImageMode === "url" ? "bg-white text-[var(--charcoal)] shadow-sm" : "text-[var(--warm-gray)]"}`}
                     >
                       Bild-URL
                     </button>
                   </div>
+
+                  <button
+                    type="button"
+                    onClick={() => void handleGenerateEditImage()}
+                    disabled={editGenerationLoading || !editName.trim()}
+                    className="mb-2 w-full rounded-md border border-[var(--cream-dark)] bg-white px-2 py-1 text-xs font-semibold text-[var(--charcoal)] disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {editGenerationLoading ? "Genererar bild..." : "Generera bild"}
+                  </button>
+                  {editGenerationError && <p className="mb-2 text-xs text-red-600">{editGenerationError}</p>}
 
                   {editImageMode === "upload" ? (
                     <>
@@ -175,9 +219,29 @@ export function MealList({ meals }: { meals: Meal[] }) {
                     <input
                       type="url"
                       value={editImageUrl}
-                      onChange={(e) => setEditImageUrl(e.target.value)}
+                      onChange={(e) => {
+                        setEditImageUrl(e.target.value);
+                        setEditPreviewError(false);
+                      }}
                       placeholder="https://example.com/meal.jpg"
                     />
+                  )}
+
+                  {editImageMode === "url" && editImageUrl.trim() && (
+                    <div className="mt-2 overflow-hidden rounded-md border border-[var(--cream-dark)] bg-black/5">
+                      {!editPreviewError ? (
+                        <img
+                          src={resolveMealImageUrl(editImageUrl, editName || "Meal")}
+                          alt={editName || "Meal preview"}
+                          className="h-28 w-full object-cover"
+                          loading="lazy"
+                          referrerPolicy="no-referrer"
+                          onError={() => setEditPreviewError(true)}
+                        />
+                      ) : (
+                        <p className="px-2 py-3 text-xs text-rose-600">Kunde inte ladda förhandsvisning av bilden.</p>
+                      )}
+                    </div>
                   )}
                 </div>
                 <div className="flex justify-end gap-2">
