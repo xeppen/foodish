@@ -16,12 +16,17 @@ const {
     meal: {
       findMany: vi.fn(),
       findUnique: vi.fn(),
+      findFirst: vi.fn(),
       updateMany: vi.fn(),
     },
     usageHistory: {
       findMany: vi.fn(),
       createMany: vi.fn(),
       create: vi.fn(),
+    },
+    mealDaySignal: {
+      findMany: vi.fn(),
+      upsert: vi.fn(),
     },
   },
 }));
@@ -55,6 +60,7 @@ describe("plans actions (phase 6)", () => {
     prismaMock.weeklyPlan.findUnique.mockResolvedValueOnce(null);
     prismaMock.usageHistory.findMany.mockResolvedValueOnce([]);
     prismaMock.usageHistory.findMany.mockResolvedValueOnce([]);
+    prismaMock.mealDaySignal.findMany.mockResolvedValueOnce([]);
     prismaMock.meal.findMany.mockResolvedValueOnce([
       { id: "m1", name: "Meal 1" },
       { id: "m2", name: "Meal 2" },
@@ -79,6 +85,7 @@ describe("plans actions (phase 6)", () => {
     prismaMock.weeklyPlan.findUnique.mockResolvedValueOnce(null);
     prismaMock.usageHistory.findMany.mockResolvedValueOnce([]);
     prismaMock.usageHistory.findMany.mockResolvedValueOnce([]);
+    prismaMock.mealDaySignal.findMany.mockResolvedValueOnce([]);
     prismaMock.meal.findMany.mockResolvedValueOnce([
       { id: "m1", name: "Meal 1" },
       { id: "m2", name: "Meal 2" },
@@ -172,6 +179,8 @@ describe("plans actions (phase 6)", () => {
     });
     prismaMock.weeklyPlan.update.mockResolvedValueOnce({ id: "p1" });
     prismaMock.usageHistory.create.mockResolvedValueOnce({ id: "u1" });
+    prismaMock.meal.findFirst.mockResolvedValueOnce({ id: "mA" });
+    prismaMock.mealDaySignal.upsert.mockResolvedValue({});
 
     const result = await swapDayMealWithChoice("monday", "mZ");
 
@@ -195,6 +204,7 @@ describe("plans actions (phase 6)", () => {
       { id: "mF", name: "Meal F", complexity: "MEDIUM", thumbsUpCount: 1, thumbsDownCount: 1 },
       { id: "mG", name: "Meal G", complexity: "COMPLEX", thumbsUpCount: 0, thumbsDownCount: 2 },
     ]);
+    prismaMock.mealDaySignal.findMany.mockResolvedValueOnce([]);
 
     const result = await getSwapOptions("monday", {
       complexity: "SIMPLE",

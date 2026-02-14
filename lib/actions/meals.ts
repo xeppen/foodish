@@ -4,9 +4,20 @@ import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 import { listCommonMeals } from "@/lib/common-meals";
+import { resetUserMealDaySignals } from "@/lib/planning/day-signals";
 import { Prisma } from "@prisma/client";
 import { UTApi } from "uploadthing/server";
 import { z } from "zod";
+
+const weekdaySchema = z.enum([
+  "MONDAY",
+  "TUESDAY",
+  "WEDNESDAY",
+  "THURSDAY",
+  "FRIDAY",
+  "SATURDAY",
+  "SUNDAY",
+]);
 
 const mealSchema = z.object({
   name: z
@@ -14,6 +25,7 @@ const mealSchema = z.object({
     .min(1, "Måltidsnamnet är obligatoriskt")
     .max(140, "Måltidsnamnet är för långt"),
   complexity: z.enum(["SIMPLE", "MEDIUM", "COMPLEX"]).optional(),
+  preferredDays: z.array(weekdaySchema).max(7).default([]),
 });
 
 const voteSchema = z.object({
@@ -259,11 +271,13 @@ export async function addMeal(formData: FormData) {
 
   const name = (formData.get("name") as string) ?? "";
   const complexity = formData.get("complexity");
+  const preferredDaysInput = formData.getAll("preferredDays");
   const image = formData.get("image");
   const imageUrlInput = (formData.get("imageUrl") as string) ?? "";
   const validation = mealSchema.safeParse({
     name,
     complexity: typeof complexity === "string" && complexity.length > 0 ? complexity : undefined,
+    preferredDays: preferredDaysInput,
   });
 
   if (!validation.success) {
@@ -296,6 +310,7 @@ export async function addMeal(formData: FormData) {
       tags: enriched.tags,
       ingredients: enriched.ingredients,
       imagePrompt: enriched.imagePrompt,
+      preferredDays: validation.data.preferredDays,
       imageUrl: uploadedImageUrl ?? providedImageUrl ?? enriched.imageUrl,
     },
   });
@@ -320,11 +335,13 @@ export async function updateMeal(id: string, formData: FormData) {
 
   const name = (formData.get("name") as string) ?? "";
   const complexity = formData.get("complexity");
+  const preferredDaysInput = formData.getAll("preferredDays");
   const image = formData.get("image");
   const imageUrlInput = (formData.get("imageUrl") as string) ?? "";
   const validation = mealSchema.safeParse({
     name,
     complexity: typeof complexity === "string" && complexity.length > 0 ? complexity : undefined,
+    preferredDays: preferredDaysInput,
   });
 
   if (!validation.success) {
@@ -357,6 +374,7 @@ export async function updateMeal(id: string, formData: FormData) {
     data: {
       name: validation.data.name,
       ...(validation.data.complexity ? { complexity: validation.data.complexity } : {}),
+      preferredDays: validation.data.preferredDays,
       ...(uploadedImageUrl ? { imageUrl: uploadedImageUrl } : {}),
       ...(!uploadedImageUrl && providedImageUrl ? { imageUrl: providedImageUrl } : {}),
     },
@@ -419,4 +437,16 @@ export async function voteMeal(id: string, direction: "up" | "down") {
   revalidatePath("/");
   revalidatePath("/meals");
   return { success: true, meal: updated };
+}
+
+export async function resetMealLearning() {
+  const user = await getCurrentUser();
+  if (!user) {
+    return { error: "Ej behörig" };
+  }
+
+  await resetUserMealDaySignals(user.id);
+  revalidatePath("/");
+  revalidatePath("/meals");
+  return { success: true };
 }

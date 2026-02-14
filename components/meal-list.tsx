@@ -11,6 +11,7 @@ type Meal = {
   id: string;
   name: string;
   complexity: "SIMPLE" | "MEDIUM" | "COMPLEX";
+  preferredDays: ("MONDAY" | "TUESDAY" | "WEDNESDAY" | "THURSDAY" | "FRIDAY" | "SATURDAY" | "SUNDAY")[];
   thumbsUpCount: number;
   thumbsDownCount: number;
   imageUrl: string | null;
@@ -23,13 +24,25 @@ const DOT_COLOR: Record<Meal["complexity"], string> = {
   COMPLEX: "bg-red-500",
 };
 
+const DAY_OPTIONS: Array<{ value: Meal["preferredDays"][number]; label: string; short: string }> = [
+  { value: "MONDAY", label: "Måndag", short: "M" },
+  { value: "TUESDAY", label: "Tisdag", short: "T" },
+  { value: "WEDNESDAY", label: "Onsdag", short: "O" },
+  { value: "THURSDAY", label: "Torsdag", short: "T" },
+  { value: "FRIDAY", label: "Fredag", short: "F" },
+  { value: "SATURDAY", label: "Lördag", short: "L" },
+  { value: "SUNDAY", label: "Söndag", short: "S" },
+];
+
 export function MealList({ meals }: { meals: Meal[] }) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
   const [editComplexity, setEditComplexity] = useState<Meal["complexity"]>("MEDIUM");
+  const [editPreferredDays, setEditPreferredDays] = useState<Meal["preferredDays"]>([]);
   const [editImageMode, setEditImageMode] = useState<"upload" | "url">("upload");
   const [editImageFile, setEditImageFile] = useState<File | null>(null);
   const [editImageUrl, setEditImageUrl] = useState("");
+  const [editImageUrlExpanded, setEditImageUrlExpanded] = useState(false);
   const [editGenerationLoading, setEditGenerationLoading] = useState(false);
   const [editGenerationError, setEditGenerationError] = useState<string | null>(null);
   const [editPreviewError, setEditPreviewError] = useState(false);
@@ -44,9 +57,11 @@ export function MealList({ meals }: { meals: Meal[] }) {
     setEditingId(meal.id);
     setEditName(meal.name);
     setEditComplexity(meal.complexity);
+    setEditPreferredDays(meal.preferredDays ?? []);
     setEditImageFile(null);
     setEditImageMode(meal.imageUrl ? "url" : "upload");
     setEditImageUrl(meal.imageUrl ?? "");
+    setEditImageUrlExpanded(false);
     setEditGenerationLoading(false);
     setEditGenerationError(null);
     setEditPreviewError(false);
@@ -57,9 +72,11 @@ export function MealList({ meals }: { meals: Meal[] }) {
     setEditingId(null);
     setEditName("");
     setEditComplexity("MEDIUM");
+    setEditPreferredDays([]);
     setEditImageMode("upload");
     setEditImageFile(null);
     setEditImageUrl("");
+    setEditImageUrlExpanded(false);
     setEditGenerationLoading(false);
     setEditGenerationError(null);
     setEditPreviewError(false);
@@ -126,6 +143,9 @@ export function MealList({ meals }: { meals: Meal[] }) {
     const formData = new FormData();
     formData.append("name", editName.trim());
     formData.append("complexity", editComplexity);
+    for (const day of editPreferredDays) {
+      formData.append("preferredDays", day);
+    }
     if (editImageMode === "upload" && editImageFile) {
       formData.append("image", editImageFile);
     }
@@ -139,6 +159,18 @@ export function MealList({ meals }: { meals: Meal[] }) {
     }
   }
 
+  function applyDayPreset(preset: "weekday" | "friday" | "weekend") {
+    if (preset === "weekday") {
+      setEditPreferredDays(["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY"]);
+      return;
+    }
+    if (preset === "friday") {
+      setEditPreferredDays(["FRIDAY"]);
+      return;
+    }
+    setEditPreferredDays(["SATURDAY", "SUNDAY"]);
+  }
+
   return (
     <ul className="divide-y divide-[var(--cream-dark)] rounded-xl border border-[var(--cream-dark)] bg-white">
       {meals.map((meal) => {
@@ -148,92 +180,104 @@ export function MealList({ meals }: { meals: Meal[] }) {
         return (
           <li key={meal.id} className="relative px-2 py-2">
             {editingId === meal.id ? (
-              <div className="space-y-2 rounded-md border border-[var(--cream-dark)] bg-[var(--cream)]/50 p-2">
+              <div className="space-y-5 rounded-xl border border-[var(--cream-dark)] bg-[var(--cream)]/60 p-3">
                 <input
                   type="text"
                   value={editName}
                   onChange={(e) => setEditName(e.target.value)}
-                  className="w-full"
+                  className="w-full border-none bg-transparent p-0 text-xl font-bold text-[var(--charcoal)] focus:ring-0"
                   autoFocus
                 />
-                <div className="flex items-center gap-2">
-                  <select
-                    value={editComplexity}
-                    onChange={(e) => setEditComplexity(e.target.value as Meal["complexity"])}
-                    className="w-full text-sm"
-                  >
-                    <option value="SIMPLE">Enkel</option>
-                    <option value="MEDIUM">Medium</option>
-                    <option value="COMPLEX">Avancerad</option>
-                  </select>
+
+                <div>
+                  <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--warm-gray)]">
+                    Komplexitet
+                  </p>
+                  <div className="grid grid-cols-3 gap-1 rounded-lg bg-white/75 p-1">
+                    {[
+                      { value: "SIMPLE", label: "🟢 Enkel" },
+                      { value: "MEDIUM", label: "🟡 Medium" },
+                      { value: "COMPLEX", label: "🔴 Avancerad" },
+                    ].map((option) => (
+                      <button
+                        key={option.value}
+                        type="button"
+                        onClick={() => setEditComplexity(option.value as Meal["complexity"])}
+                        className={`rounded-md px-2 py-1.5 text-xs font-semibold transition ${
+                          editComplexity === option.value
+                            ? "bg-[var(--charcoal)] text-white shadow-sm"
+                            : "text-[var(--warm-gray)] hover:text-[var(--charcoal)]"
+                        }`}
+                      >
+                        {option.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--warm-gray)]">
+                    Passar bäst...
+                  </p>
+                  <div className="mb-2 flex flex-wrap gap-2">
+                    {DAY_OPTIONS.map((dayOption) => {
+                      const selected = editPreferredDays.includes(dayOption.value);
+                      return (
+                        <button
+                          key={dayOption.value}
+                          aria-label={dayOption.label}
+                          type="button"
+                          onClick={() =>
+                            setEditPreferredDays((current) =>
+                              current.includes(dayOption.value)
+                                ? current.filter((day) => day !== dayOption.value)
+                                : [...current, dayOption.value]
+                            )
+                          }
+                          className={`flex h-8 w-8 items-center justify-center rounded-full border text-xs font-bold transition ${
+                            selected
+                              ? "border-[var(--terracotta)] bg-[var(--terracotta)] text-white"
+                              : "border-[var(--cream-dark)] bg-white text-[var(--warm-gray)]"
+                          }`}
+                        >
+                          {dayOption.short}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <div className="flex items-center gap-3 text-[11px] font-semibold text-[var(--warm-gray)]">
+                    <button type="button" onClick={() => applyDayPreset("friday")} className="hover:text-[var(--charcoal)]">
+                      Fredagsmys
+                    </button>
+                    <button type="button" onClick={() => applyDayPreset("weekday")} className="hover:text-[var(--charcoal)]">
+                      Vardag
+                    </button>
+                    <button type="button" onClick={() => applyDayPreset("weekend")} className="hover:text-[var(--charcoal)]">
+                      Helg
+                    </button>
+                  </div>
                 </div>
 
                 <div className="rounded-md border border-[var(--cream-dark)] bg-white/70 p-2">
-                  <div className="mb-2 grid grid-cols-2 gap-1 rounded-md bg-[var(--cream)] p-1 text-xs font-semibold">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setEditImageMode("upload");
-                        setEditImageUrl("");
-                      }}
-                      className={`rounded-md px-2 py-1 transition ${editImageMode === "upload" ? "bg-white text-[var(--charcoal)] shadow-sm" : "text-[var(--warm-gray)]"}`}
-                    >
-                      Ladda upp
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setEditImageMode("url");
-                        setEditImageFile(null);
-                        setEditPreviewError(false);
-                      }}
-                      className={`rounded-md px-2 py-1 transition ${editImageMode === "url" ? "bg-white text-[var(--charcoal)] shadow-sm" : "text-[var(--warm-gray)]"}`}
-                    >
-                      Bild-URL
-                    </button>
-                  </div>
+                  <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--warm-gray)]">Bild</p>
 
                   <button
                     type="button"
                     onClick={() => void handleGenerateEditImage()}
                     disabled={editGenerationLoading || !editName.trim()}
-                    className="mb-2 w-full rounded-md border border-[var(--cream-dark)] bg-white px-2 py-1 text-xs font-semibold text-[var(--charcoal)] disabled:cursor-not-allowed disabled:opacity-60"
+                    className="mb-2 w-full rounded-md bg-[var(--charcoal)] px-3 py-2 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
                   >
-                    {editGenerationLoading ? "Genererar bild..." : "Generera bild"}
+                    {editGenerationLoading ? "Genererar bild..." : "✨ Generera ny"}
                   </button>
                   {editGenerationError && <p className="mb-2 text-xs text-red-600">{editGenerationError}</p>}
 
-                  {editImageMode === "upload" ? (
-                    <>
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={(e) => setEditImageFile(e.target.files?.[0] ?? null)}
-                        className="w-full text-xs"
-                      />
-                      {editImageFile && (
-                        <p className="mt-1 text-xs text-[var(--warm-gray)]">Vald bild: {editImageFile.name}</p>
-                      )}
-                    </>
-                  ) : (
-                    <input
-                      type="url"
-                      value={editImageUrl}
-                      onChange={(e) => {
-                        setEditImageUrl(e.target.value);
-                        setEditPreviewError(false);
-                      }}
-                      placeholder="https://example.com/meal.jpg"
-                    />
-                  )}
-
-                  {editImageMode === "url" && editImageUrl.trim() && (
-                    <div className="mt-2 overflow-hidden rounded-md border border-[var(--cream-dark)] bg-black/5">
+                  {(editImageMode === "url" && editImageUrl.trim()) || editImageFile ? (
+                    <div className="overflow-hidden rounded-lg border border-[var(--cream-dark)] bg-black/5">
                       {!editPreviewError ? (
                         <img
-                          src={resolveMealImageUrl(editImageUrl, editName || "Meal")}
+                          src={resolveMealImageUrl(editImageUrl || meal.imageUrl || "", editName || "Meal")}
                           alt={editName || "Meal preview"}
-                          className="h-28 w-full object-cover"
+                          className="h-32 w-full object-cover"
                           loading="lazy"
                           referrerPolicy="no-referrer"
                           onError={() => setEditPreviewError(true)}
@@ -242,6 +286,48 @@ export function MealList({ meals }: { meals: Meal[] }) {
                         <p className="px-2 py-3 text-xs text-rose-600">Kunde inte ladda förhandsvisning av bilden.</p>
                       )}
                     </div>
+                  ) : (
+                    <div className="rounded-lg border border-dashed border-[var(--cream-dark)] px-3 py-4 text-center text-xs text-[var(--warm-gray)]">
+                      Ingen bild vald ännu.
+                    </div>
+                  )}
+
+                  <div className="mt-2 flex items-center justify-between">
+                    <button
+                      type="button"
+                      onClick={() => setEditImageUrlExpanded((current) => !current)}
+                      className="text-xs font-semibold text-[var(--warm-gray)] hover:text-[var(--charcoal)]"
+                    >
+                      {editImageUrlExpanded ? "Dölj URL" : "Ändra URL manuellt"}
+                    </button>
+                    <label className="cursor-pointer text-xs font-semibold text-[var(--warm-gray)] hover:text-[var(--charcoal)]">
+                      Ladda upp
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => {
+                          setEditImageMode("upload");
+                          setEditImageFile(e.target.files?.[0] ?? null);
+                          setEditPreviewError(false);
+                        }}
+                        className="hidden"
+                      />
+                    </label>
+                  </div>
+
+                  {editImageUrlExpanded && (
+                    <input
+                      type="url"
+                      value={editImageUrl}
+                      onChange={(e) => {
+                        setEditImageMode("url");
+                        setEditImageFile(null);
+                        setEditImageUrl(e.target.value);
+                        setEditPreviewError(false);
+                      }}
+                      placeholder="https://example.com/meal.jpg"
+                      className="mt-2 w-full"
+                    />
                   )}
                 </div>
                 <div className="flex justify-end gap-2">
@@ -284,6 +370,14 @@ export function MealList({ meals }: { meals: Meal[] }) {
                   <span className={`h-2 w-2 rounded-full ${DOT_COLOR[meal.complexity]}`} />
                   <p className="truncate text-sm font-medium text-[var(--charcoal)]">{meal.name}</p>
                 </div>
+                {meal.preferredDays.length > 0 && (
+                  <p className="truncate text-[11px] text-[var(--warm-gray)]">
+                    {meal.preferredDays
+                      .map((day) => DAY_OPTIONS.find((option) => option.value === day)?.short)
+                      .filter((value): value is string => Boolean(value))
+                      .join(", ")}
+                  </p>
+                )}
               </div>
 
               <div className="flex items-center gap-1">

@@ -1,17 +1,20 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { X } from "lucide-react";
 import { MagicMealInput } from "@/components/magic-meal-input";
 import { MealList } from "@/components/meal-list";
 import { EmptyState } from "@/components/empty-state";
 import { LoginButton } from "@/components/login-button";
 import { SignOutButton } from "@/components/sign-out-button";
+import { resetMealLearning } from "@/lib/actions/meals";
+import { useRouter } from "next/navigation";
 
 type Meal = {
   id: string;
   name: string;
   complexity: "SIMPLE" | "MEDIUM" | "COMPLEX";
+  preferredDays: ("MONDAY" | "TUESDAY" | "WEDNESDAY" | "THURSDAY" | "FRIDAY" | "SATURDAY" | "SUNDAY")[];
   thumbsUpCount: number;
   thumbsDownCount: number;
   imageUrl: string | null;
@@ -33,6 +36,9 @@ export function MealDrawer({
   onClose,
   onAuthRequired,
 }: MealDrawerProps) {
+  const [isResetting, setIsResetting] = useState(false);
+  const router = useRouter();
+
   useEffect(() => {
     if (!isOpen) {
       return;
@@ -44,6 +50,22 @@ export function MealDrawer({
       document.body.style.overflow = originalOverflow;
     };
   }, [isOpen]);
+
+  async function handleResetLearning() {
+    if (!confirm("Detta nollställer lärda dagspreferenser. Fortsätta?")) {
+      return;
+    }
+
+    setIsResetting(true);
+    try {
+      const result = await resetMealLearning();
+      if (!result.error) {
+        router.refresh();
+      }
+    } finally {
+      setIsResetting(false);
+    }
+  }
 
   return (
     <div
@@ -118,7 +140,15 @@ export function MealDrawer({
 
           <footer className="border-t border-[var(--cream-dark)] px-5 py-4">
             {isAuthenticated ? (
-              <div className="flex">
+              <div className="space-y-2">
+                <button
+                  type="button"
+                  onClick={() => void handleResetLearning()}
+                  disabled={isResetting}
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-[var(--cream-dark)] bg-white px-4 py-2.5 text-sm font-semibold text-[var(--charcoal)] hover:bg-[var(--cream)] disabled:opacity-60"
+                >
+                  {isResetting ? "Nollställer..." : "Nollställ lärda preferenser"}
+                </button>
                 <SignOutButton className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-red-200 bg-red-50/60 px-4 py-2.5 text-sm font-semibold text-red-700 hover:bg-red-100/80" />
               </div>
             ) : (
