@@ -35,12 +35,10 @@ export default async function HomePage() {
   const meals = await getMeals();
 
   let plan = await getCurrentWeekPlan();
-  if (!plan) {
-    const result = await generateWeeklyPlan();
-    if (result.success && result.plan) {
-      plan = result.plan;
-      planNotice = result.warning;
-    }
+  const result = await generateWeeklyPlan({ force: true });
+  if (result.success && result.plan) {
+    plan = result.plan;
+    planNotice = result.warning;
   }
 
   return (

@@ -10,7 +10,7 @@ const {
   prismaMock: {
     weeklyPlan: {
       findUnique: vi.fn(),
-      create: vi.fn(),
+      upsert: vi.fn(),
       update: vi.fn(),
     },
     meal: {
@@ -62,7 +62,7 @@ describe("plans actions (phase 6)", () => {
       { id: "m4", name: "Meal 4" },
       { id: "m5", name: "Meal 5" },
     ]);
-    prismaMock.weeklyPlan.create.mockResolvedValueOnce({ id: "p1" });
+    prismaMock.weeklyPlan.upsert.mockResolvedValueOnce({ id: "p1" });
     prismaMock.usageHistory.createMany.mockResolvedValueOnce({ count: 5 });
 
     const result = await generateWeeklyPlan();
@@ -83,7 +83,7 @@ describe("plans actions (phase 6)", () => {
       { id: "m1", name: "Meal 1" },
       { id: "m2", name: "Meal 2" },
     ]);
-    prismaMock.weeklyPlan.create.mockResolvedValueOnce({ id: "p1" });
+    prismaMock.weeklyPlan.upsert.mockResolvedValueOnce({ id: "p1" });
     prismaMock.usageHistory.createMany.mockResolvedValueOnce({ count: 5 });
 
     const result = await generateWeeklyPlan();

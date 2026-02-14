@@ -16,7 +16,7 @@ export function GeneratePlanButton() {
     setError(null);
 
     try {
-      const result = await generateWeeklyPlan();
+      const result = await generateWeeklyPlan({ force: true });
 
       if (result.error) {
         setError(result.error);
