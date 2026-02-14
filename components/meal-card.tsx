@@ -24,6 +24,9 @@ interface MealCardProps {
   day: Day;
   dayLabel: string;
   mealName: string | null;
+  complexity: Complexity;
+  thumbsUpCount: number;
+  thumbsDownCount: number;
   isAuthenticated: boolean;
   onAuthRequired: () => void;
   imageSrc?: string; // Optional override
@@ -33,6 +36,9 @@ export function MealCard({
   day,
   dayLabel,
   mealName,
+  complexity,
+  thumbsUpCount,
+  thumbsDownCount,
   isAuthenticated,
   onAuthRequired,
   imageSrc,
@@ -40,11 +46,18 @@ export function MealCard({
   const [loading, setLoading] = useState(false);
   const [preloadedOptions, setPreloadedOptions] = useState<SwapOption[]>([]);
   const [currentMeal, setCurrentMeal] = useState(mealName);
-  const [currentComplexity, setCurrentComplexity] = useState<Complexity>("MEDIUM");
+  const [currentComplexity, setCurrentComplexity] = useState<Complexity>(complexity);
+  const [currentVotes, setCurrentVotes] = useState({ up: thumbsUpCount, down: thumbsDownCount });
 
   useEffect(() => {
     setCurrentMeal(mealName);
   }, [mealName]);
+  useEffect(() => {
+    setCurrentComplexity(complexity);
+  }, [complexity]);
+  useEffect(() => {
+    setCurrentVotes({ up: thumbsUpCount, down: thumbsDownCount });
+  }, [thumbsUpCount, thumbsDownCount]);
 
   const preloadSwapCandidates = useCallback(async (): Promise<SwapOption[]> => {
     if (!isAuthenticated) {
@@ -83,14 +96,17 @@ export function MealCard({
 
     const previousMeal = currentMeal;
     const previousComplexity = currentComplexity;
+    const previousVotes = currentVotes;
     setCurrentMeal(option.name);
     setCurrentComplexity(option.complexity);
+    setCurrentVotes({ up: option.thumbsUpCount, down: option.thumbsDownCount });
     setLoading(true);
     try {
       const result = await swapDayMealWithChoice(day, option.id);
       if ("error" in result) {
         setCurrentMeal(previousMeal);
         setCurrentComplexity(previousComplexity);
+        setCurrentVotes(previousVotes);
       } else if (result.newMeal) {
         setCurrentMeal(result.newMeal);
       }
@@ -98,6 +114,7 @@ export function MealCard({
       console.error("Kunde inte byta måltid", error);
       setCurrentMeal(previousMeal);
       setCurrentComplexity(previousComplexity);
+      setCurrentVotes(previousVotes);
     } finally {
       setLoading(false);
       void preloadSwapCandidates();
@@ -148,8 +165,10 @@ export function MealCard({
 
       <div className="absolute right-4 top-4">
         <div className="flex items-center gap-2 rounded-full border border-white/10 bg-black/30 px-3 py-1 text-xs font-medium text-white backdrop-blur-md">
-          <span className="h-2 w-2 rounded-full bg-emerald-400" />
+          <span className={`h-2 w-2 rounded-full ${currentComplexity === "SIMPLE" ? "bg-emerald-400" : currentComplexity === "MEDIUM" ? "bg-amber-400" : "bg-rose-400"}`} />
           <span>{COMPLEXITY_TIME_LABEL[currentComplexity]}</span>
+          <span className="text-white/70">•</span>
+          <span>👍 {currentVotes.up - currentVotes.down}</span>
         </div>
       </div>
 

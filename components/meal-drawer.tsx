@@ -72,10 +72,10 @@ export function MealDrawer({
         <div className="flex h-full flex-col">
           <header className="flex items-center justify-between border-b border-[var(--cream-dark)] px-5 py-4">
             <div>
-              <h2 className="text-2xl font-bold text-[var(--charcoal)]">Mina måltider</h2>
+              <h2 className="text-2xl font-bold text-[var(--charcoal)]">Måltider</h2>
               <p className="text-sm text-[var(--warm-gray)]">
                 {isAuthenticated
-                  ? "Lägg till, redigera och ta bort rätter."
+                  ? "Skriv en rätt och hantera listan."
                   : "Logga in för att kurera din egen lista."}
               </p>
             </div>
@@ -93,9 +93,6 @@ export function MealDrawer({
               <div className="space-y-6">
                 <section className="rounded-2xl bg-[var(--cream)]/70 p-4">
                   <MagicMealInput />
-                  <p className="mt-3 text-xs text-[var(--warm-gray)]">
-                    Enkel: under 30 min, Medium: 30-60 min, Avancerad: over 60 min.
-                  </p>
                 </section>
 
                 <section>

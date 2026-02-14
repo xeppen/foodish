@@ -84,6 +84,33 @@ export function SingleViewShell({
       return acc;
     }, {});
   }, [commonMeals, meals]);
+  const mealMetaByName = useMemo(() => {
+    const commonMetaByName = (commonMeals ?? []).reduce<
+      Record<string, { complexity: Meal["complexity"]; thumbsUpCount: number; thumbsDownCount: number }>
+    >((acc, meal) => {
+      const key = meal.name.trim().toLowerCase();
+      acc[key] = {
+        complexity: meal.complexity,
+        thumbsUpCount: 0,
+        thumbsDownCount: 0,
+      };
+      return acc;
+    }, {});
+
+    return meals.reduce<Record<string, { complexity: Meal["complexity"]; thumbsUpCount: number; thumbsDownCount: number }>>(
+      (acc, meal) => {
+        const key = meal.name.trim().toLowerCase();
+        const fallback = commonMetaByName[key];
+        acc[key] = {
+          complexity: meal.complexity ?? fallback?.complexity ?? "MEDIUM",
+          thumbsUpCount: meal.thumbsUpCount ?? fallback?.thumbsUpCount ?? 0,
+          thumbsDownCount: meal.thumbsDownCount ?? fallback?.thumbsDownCount ?? 0,
+        };
+        return acc;
+      },
+      { ...commonMetaByName }
+    );
+  }, [commonMeals, meals]);
 
   const promptLogin = useCallback(() => {
     setAuthPrompt("Login to curate your own meals");
@@ -125,18 +152,16 @@ export function SingleViewShell({
         </div>
       </header>
 
-      <main className="relative z-10 mx-auto flex min-h-screen w-full max-w-7xl items-center px-0 pb-12 pt-8 sm:px-6 lg:px-8">
-        <section className="w-full rounded-none border-0 bg-transparent p-0 shadow-none backdrop-blur-none sm:rounded-3xl sm:border sm:border-white/20 sm:bg-black/35 sm:p-8 sm:shadow-2xl sm:backdrop-blur-xl">
-          <div className="mb-6 px-4 text-center sm:mb-8 sm:px-0">
-            <h2 className="text-4xl font-bold text-white drop-shadow-md sm:text-5xl">
-              Veckans middagsplan
-            </h2>
+      <main className="relative z-10 mx-auto flex min-h-screen w-full max-w-7xl items-start px-0 pb-10 pt-12 sm:px-6 lg:px-8">
+        <section className="w-full">
+          <div className="mb-6 px-4 text-center sm:mb-10 sm:px-0">
+            <h1 className="text-5xl font-bold text-white drop-shadow-lg sm:text-6xl">Veckans middagsplan</h1>
           </div>
 
           {!isAuthenticated && (
             <div className="mx-4 mb-6 flex flex-col items-center gap-3 rounded-2xl border border-[var(--terracotta)]/40 bg-black/45 px-4 py-3 text-center backdrop-blur-md sm:mx-auto sm:max-w-xl sm:flex-row sm:justify-center sm:text-left">
               <p className="text-sm font-semibold text-white">
-                {authPrompt ?? "Login to Save your weekly plan and votes"}
+                {authPrompt ?? "Login to Save"}
               </p>
               <LoginButton className="rounded-lg bg-[var(--terracotta)] px-3 py-1.5 text-xs font-bold uppercase tracking-wide text-white hover:bg-[var(--terracotta-dark)]">
                 Logga in
@@ -155,6 +180,7 @@ export function SingleViewShell({
             isAuthenticated={isAuthenticated}
             onAuthRequired={promptLogin}
             mealImageByName={mealImageByName}
+            mealMetaByName={mealMetaByName}
           />
         </section>
       </main>

@@ -24,23 +24,31 @@ export function WeeklyPlanView({
   isAuthenticated,
   onAuthRequired,
   mealImageByName,
+  mealMetaByName,
 }: {
   plan: WeeklyPlan;
   isAuthenticated: boolean;
   onAuthRequired: () => void;
   mealImageByName?: Record<string, string>;
+  mealMetaByName?: Record<
+    string,
+    {
+      complexity: "SIMPLE" | "MEDIUM" | "COMPLEX";
+      thumbsUpCount: number;
+      thumbsDownCount: number;
+    }
+  >;
 }) {
   const normalizeMealName = (value: string | null) => (value ?? "").trim().toLowerCase();
 
   return (
     <div className="w-full">
-      <div className="mb-6 flex items-center justify-between px-0 text-white"></div>
-
-      {/* Responsive Grid/Scroll Container */}
-      <div className="grid grid-cols-1 gap-3 px-0 pb-4 sm:grid-cols-2 sm:gap-6 sm:px-4 lg:grid-cols-3 lg:px-0 xl:grid-cols-4 2xl:grid-cols-5">
+      <div className="grid grid-cols-1 gap-3 px-0 pb-2 sm:grid-cols-2 sm:gap-6 sm:px-0 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
         {DAYS.map(({ key, label }) => {
           const meal = plan[key];
-          const imageSrc = mealImageByName?.[normalizeMealName(meal)];
+          const normalized = normalizeMealName(meal);
+          const imageSrc = mealImageByName?.[normalized];
+          const meta = mealMetaByName?.[normalized];
 
           return (
             <div key={key} className="h-full">
@@ -49,20 +57,15 @@ export function WeeklyPlanView({
                 dayLabel={label}
                 mealName={meal}
                 imageSrc={imageSrc}
+                complexity={meta?.complexity ?? "MEDIUM"}
+                thumbsUpCount={meta?.thumbsUpCount ?? 0}
+                thumbsDownCount={meta?.thumbsDownCount ?? 0}
                 isAuthenticated={isAuthenticated}
                 onAuthRequired={onAuthRequired}
               />
             </div>
           );
         })}
-      </div>
-
-      <div className="mt-8 p-4 rounded-xl bg-white/10 backdrop-blur-md border border-white/20 text-center">
-        <p className="text-sm text-[var(--cream)] font-medium">
-          {isAuthenticated
-            ? "Tips: Klicka på \"Byt\" för att ersätta en rätt direkt från din lista."
-            : "Demo-lage: Klicka på \"Byt\" eller \"Logga in\" for att kurera dina egna maltider."}
-        </p>
       </div>
     </div>
   );
