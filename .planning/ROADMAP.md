@@ -207,11 +207,12 @@ Phases execute in numeric order: 6 → 7 → 8 → 9 → 10
 | 9. Complexity Levels & Badges | v1.1 | 3/3 | Complete | 2026-02-12 |
 | 10. Progressive Disclosure Swap | v1.1 | 4/4 | Complete | 2026-02-12 |
 | 11. Dish Image Generation & Reuse | v1.2 | 10/10 | Complete | 2026-02-13 |
+| 12. Dynamic Shopping List + AI Ingredients | v1.3 | 6/6 | Complete | 2026-02-15 |
 
 **Deployment:** https://foodish-red.vercel.app
 **Repository:** https://github.com/xeppen/foodish
-**Current Status:** v1.0 deployed, v1.1 milestone phases 6-10 complete
+**Current Status:** v1.3 features shipped on branch (`feat/dynamic-shopping-list-ai-v1`), ready for merge/deploy
 
 ---
 *Roadmap created: 2026-02-09*
-*Last updated: 2026-02-12 (Phase 10 completed)*
+*Last updated: 2026-02-15 (Phase 12 completed)*

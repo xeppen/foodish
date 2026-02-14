@@ -13,6 +13,11 @@ const {
       upsert: vi.fn(),
       update: vi.fn(),
     },
+    weeklyPlanEntry: {
+      deleteMany: vi.fn(),
+      createMany: vi.fn(),
+      upsert: vi.fn(),
+    },
     meal: {
       findMany: vi.fn(),
       findUnique: vi.fn(),
@@ -28,6 +33,7 @@ const {
       findMany: vi.fn(),
       upsert: vi.fn(),
     },
+    $transaction: vi.fn(),
   },
 }));
 
@@ -53,6 +59,18 @@ import {
 describe("plans actions (phase 6)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    prismaMock.$transaction.mockImplementation(async (ops: unknown) => {
+      if (typeof ops === "function") {
+        return ops(prismaMock);
+      }
+      if (Array.isArray(ops)) {
+        return Promise.all(ops as Promise<unknown>[]);
+      }
+      return null;
+    });
+    prismaMock.weeklyPlanEntry.deleteMany.mockResolvedValue({ count: 0 });
+    prismaMock.weeklyPlanEntry.createMany.mockResolvedValue({ count: 5 });
+    prismaMock.weeklyPlanEntry.upsert.mockResolvedValue({});
   });
 
   it("generateWeeklyPlan writes UsageHistory entries for selected meals", async () => {
@@ -102,6 +120,7 @@ describe("plans actions (phase 6)", () => {
   it("swapDayMeal logs selected replacement to UsageHistory", async () => {
     mockGetCurrentUser.mockResolvedValue({ id: "user_1", name: "Test User" });
     prismaMock.weeklyPlan.findUnique.mockResolvedValueOnce({
+      id: "p1",
       monday: "Meal A",
       tuesday: "Meal B",
       wednesday: "Meal C",
@@ -138,6 +157,7 @@ describe("plans actions (phase 6)", () => {
   it("getSwapOptions returns filtered options with counts", async () => {
     mockGetCurrentUser.mockResolvedValue({ id: "user_1", name: "Test User" });
     prismaMock.weeklyPlan.findUnique.mockResolvedValueOnce({
+      id: "p1",
       monday: "Meal A",
       tuesday: "Meal B",
       wednesday: "Meal C",
@@ -166,6 +186,7 @@ describe("plans actions (phase 6)", () => {
   it("swapDayMealWithChoice updates plan and writes usage history", async () => {
     mockGetCurrentUser.mockResolvedValue({ id: "user_1", name: "Test User" });
     prismaMock.weeklyPlan.findUnique.mockResolvedValueOnce({
+      id: "p1",
       monday: "Meal A",
       tuesday: "Meal B",
       wednesday: "Meal C",

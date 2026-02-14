@@ -13,9 +13,14 @@ const { mockGetCurrentUser, mockRevalidatePath, prismaMock } = vi.hoisted(() => 
       update: vi.fn(),
       delete: vi.fn(),
     },
+    mealIngredient: {
+      deleteMany: vi.fn(),
+      createMany: vi.fn(),
+    },
     mealDaySignal: {
       deleteMany: vi.fn(),
     },
+    $transaction: vi.fn(),
   },
 }));
 
@@ -37,6 +42,15 @@ describe("meals actions", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockGetCurrentUser.mockResolvedValue({ id: "user_1", name: "Test User" });
+    prismaMock.$transaction.mockImplementation(async (arg: unknown) => {
+      if (typeof arg === "function") {
+        return arg(prismaMock);
+      }
+      if (Array.isArray(arg)) {
+        return Promise.all(arg as Promise<unknown>[]);
+      }
+      return null;
+    });
   });
 
   it("addMeal enriches meal metadata and stores defaults", async () => {
