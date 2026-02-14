@@ -149,7 +149,7 @@ export async function getCurrentWeekPlan() {
   }
 }
 
-export async function generateWeeklyPlan(options?: { force?: boolean }) {
+export async function generateWeeklyPlan(options?: { force?: boolean; revalidate?: boolean }) {
   const user = await getCurrentUser();
   if (!user) {
     return { error: "Ej behörig" };
@@ -226,8 +226,11 @@ export async function generateWeeklyPlan(options?: { force?: boolean }) {
     })),
   });
 
-  revalidatePath("/");
-  revalidatePath("/plan");
+  const shouldRevalidate = options?.revalidate !== false;
+  if (shouldRevalidate) {
+    revalidatePath("/");
+    revalidatePath("/plan");
+  }
   return {
     success: true,
     plan,
