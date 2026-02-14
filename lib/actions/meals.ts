@@ -5,6 +5,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 import { listCommonMeals } from "@/lib/common-meals";
 import { resetUserMealDaySignals } from "@/lib/planning/day-signals";
+import { normalizeIngredientName } from "@/lib/shopping/normalize";
 import { Prisma } from "@prisma/client";
 import { UTApi } from "uploadthing/server";
 import { z } from "zod";
@@ -27,6 +28,38 @@ const mealSchema = z.object({
   complexity: z.enum(["SIMPLE", "MEDIUM", "COMPLEX"]).optional(),
   preferredDays: z.array(weekdaySchema).max(7).default([]),
 });
+
+const ingredientDraftSchema = z.object({
+  name: z.string().trim().min(1).max(80),
+  amount: z
+    .union([z.number().positive().max(10000), z.null(), z.undefined()])
+    .transform((value) => (value == null ? null : Number(value))),
+  unit: z
+    .union([z.string().trim().max(20), z.null(), z.undefined()])
+    .transform((value) => (value == null || value === "" ? null : value)),
+  note: z
+    .union([z.string().trim().max(120), z.null(), z.undefined()])
+    .transform((value) => (value == null || value === "" ? null : value)),
+  optional: z.boolean().optional().default(false),
+  confidence: z
+    .union([z.number().min(0).max(1), z.null(), z.undefined()])
+    .transform((value) => (value == null ? null : Number(value))),
+  needsReview: z.boolean().optional().default(false),
+});
+
+const ingredientsInputSchema = z.array(ingredientDraftSchema).max(80);
+
+type MealIngredientInput = {
+  position: number;
+  name: string;
+  canonicalName: string;
+  amount: number | null;
+  unit: string | null;
+  note: string | null;
+  optional: boolean;
+  confidence: number | null;
+  needsReview: boolean;
+};
 
 const voteSchema = z.object({
   direction: z.enum(["up", "down"]),
@@ -165,6 +198,20 @@ function inferIngredients(name: string): string[] {
   return ingredients;
 }
 
+function inferStructuredIngredients(name: string): MealIngredientInput[] {
+  return inferIngredients(name).map((ingredient, index) => ({
+    position: index,
+    name: ingredient,
+    canonicalName: normalizeIngredientName(ingredient),
+    amount: null,
+    unit: null,
+    note: null,
+    optional: false,
+    confidence: null,
+    needsReview: false,
+  }));
+}
+
 function buildImagePrompt(name: string): string {
   return `Vertical food photography of ${name}, dark moody lighting, realistic home-cooked plating, editorial magazine look`;
 }
@@ -184,9 +231,35 @@ async function enrichMeal(name: string) {
     complexity: inferComplexity(name),
     tags: inferTags(name),
     ingredients: inferIngredients(name),
+    structuredIngredients: inferStructuredIngredients(name),
     imagePrompt: buildImagePrompt(name),
     imageUrl: buildImageUrl(name),
   };
+}
+
+function parseIngredientsFromFormData(formData: FormData): MealIngredientInput[] | null {
+  const payload = formData.get("ingredients");
+  if (typeof payload !== "string" || payload.trim().length === 0) {
+    return null;
+  }
+
+  let parsedPayload: unknown;
+  try {
+    parsedPayload = JSON.parse(payload);
+  } catch {
+    throw new Error("Ingredienslistan är ogiltig");
+  }
+
+  const parsed = ingredientsInputSchema.safeParse(parsedPayload);
+  if (!parsed.success) {
+    throw new Error(parsed.error.issues[0]?.message ?? "Ingredienslistan är ogiltig");
+  }
+
+  return parsed.data.map((ingredient, index): MealIngredientInput => ({
+    ...ingredient,
+    position: index,
+    canonicalName: normalizeIngredientName(ingredient.name),
+  }));
 }
 
 export async function initializeStarterMeals() {
@@ -201,22 +274,24 @@ export async function initializeStarterMeals() {
   }
 
   const commonMeals = await listCommonMeals();
-  const starterData = await Promise.all(
-    commonMeals.map(async (commonMeal) => {
-      const enriched = await enrichMeal(commonMeal.name);
-      return {
-        name: commonMeal.name,
-        userId: user.id,
-        complexity: commonMeal.complexity ?? enriched.complexity,
-        tags: enriched.tags,
-        ingredients: enriched.ingredients,
-        imagePrompt: enriched.imagePrompt,
-        imageUrl: commonMeal.imageUrl ?? enriched.imageUrl,
-      };
-    })
+  await prisma.$transaction(
+    commonMeals.map((commonMeal) =>
+      prisma.meal.create({
+        data: {
+          name: commonMeal.name,
+          userId: user.id,
+          complexity: commonMeal.complexity,
+          tags: inferTags(commonMeal.name),
+          ingredients: inferIngredients(commonMeal.name),
+          imagePrompt: buildImagePrompt(commonMeal.name),
+          imageUrl: commonMeal.imageUrl ?? buildImageUrl(commonMeal.name),
+          mealIngredients: {
+            create: inferStructuredIngredients(commonMeal.name),
+          },
+        },
+      })
+    )
   );
-
-  await prisma.meal.createMany({ data: starterData });
 
   revalidatePath("/");
   revalidatePath("/meals");
@@ -232,6 +307,11 @@ export async function getMeals() {
   try {
     let meals = await prisma.meal.findMany({
       where: { userId: user.id },
+      include: {
+        mealIngredients: {
+          orderBy: { position: "asc" },
+        },
+      },
       orderBy: { createdAt: "desc" },
     });
 
@@ -239,6 +319,11 @@ export async function getMeals() {
       await initializeStarterMeals();
       meals = await prisma.meal.findMany({
         where: { userId: user.id },
+        include: {
+          mealIngredients: {
+            orderBy: { position: "asc" },
+          },
+        },
         orderBy: { createdAt: "desc" },
       });
     }
@@ -285,6 +370,12 @@ export async function addMeal(formData: FormData) {
   }
 
   const enriched = await enrichMeal(validation.data.name);
+  let structuredIngredients: MealIngredientInput[];
+  try {
+    structuredIngredients = parseIngredientsFromFormData(formData) ?? enriched.structuredIngredients;
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "Ogiltig ingredienslista" };
+  }
   let uploadedImageUrl: string | undefined;
   let providedImageUrl: string | undefined;
 
@@ -308,10 +399,13 @@ export async function addMeal(formData: FormData) {
       userId: user.id,
       complexity: validation.data.complexity ?? enriched.complexity,
       tags: enriched.tags,
-      ingredients: enriched.ingredients,
+      ingredients: structuredIngredients.map((ingredient) => ingredient.name),
       imagePrompt: enriched.imagePrompt,
       preferredDays: validation.data.preferredDays,
       imageUrl: uploadedImageUrl ?? providedImageUrl ?? enriched.imageUrl,
+      mealIngredients: {
+        create: structuredIngredients,
+      },
     },
   });
 
@@ -322,7 +416,7 @@ export async function addMeal(formData: FormData) {
     enrichment: {
       tags: enriched.tags,
       complexity: enriched.complexity,
-      ingredients: enriched.ingredients,
+      ingredients: structuredIngredients,
     },
   };
 }
@@ -353,6 +447,13 @@ export async function updateMeal(id: string, formData: FormData) {
     return { error: "Måltiden hittades inte" };
   }
 
+  let structuredIngredients: MealIngredientInput[] | null = null;
+  try {
+    structuredIngredients = parseIngredientsFromFormData(formData);
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "Ogiltig ingredienslista" };
+  }
+
   let uploadedImageUrl: string | undefined;
   let providedImageUrl: string | undefined;
   try {
@@ -369,15 +470,34 @@ export async function updateMeal(id: string, formData: FormData) {
     }
   }
 
-  await prisma.meal.update({
-    where: { id },
-    data: {
-      name: validation.data.name,
-      ...(validation.data.complexity ? { complexity: validation.data.complexity } : {}),
-      preferredDays: validation.data.preferredDays,
-      ...(uploadedImageUrl ? { imageUrl: uploadedImageUrl } : {}),
-      ...(!uploadedImageUrl && providedImageUrl ? { imageUrl: providedImageUrl } : {}),
-    },
+  await prisma.$transaction(async (tx) => {
+    await tx.meal.update({
+      where: { id },
+      data: {
+        name: validation.data.name,
+        ...(validation.data.complexity ? { complexity: validation.data.complexity } : {}),
+        preferredDays: validation.data.preferredDays,
+        ...(uploadedImageUrl ? { imageUrl: uploadedImageUrl } : {}),
+        ...(!uploadedImageUrl && providedImageUrl ? { imageUrl: providedImageUrl } : {}),
+        ...(structuredIngredients
+          ? {
+              ingredients: structuredIngredients.map((ingredient) => ingredient.name),
+            }
+          : {}),
+      },
+    });
+
+    if (structuredIngredients) {
+      await tx.mealIngredient.deleteMany({ where: { mealId: id } });
+      if (structuredIngredients.length > 0) {
+        await tx.mealIngredient.createMany({
+          data: structuredIngredients.map((ingredient) => ({
+            mealId: id,
+            ...ingredient,
+          })),
+        });
+      }
+    }
   });
 
   revalidatePath("/");
