@@ -154,7 +154,7 @@ function inferIngredients(name: string): string[] {
 }
 
 function buildImagePrompt(name: string): string {
-  return `Warm, home-cooked, top-down photography of ${name}, cozy dinner table, natural light`;
+  return `Vertical food photography of ${name}, dark moody lighting, realistic home-cooked plating, editorial magazine look`;
 }
 
 function buildImageUrl(name: string): string {

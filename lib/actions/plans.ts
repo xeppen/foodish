@@ -149,7 +149,7 @@ export async function getCurrentWeekPlan() {
   }
 }
 
-export async function generateWeeklyPlan() {
+export async function generateWeeklyPlan(options?: { force?: boolean; revalidate?: boolean }) {
   const user = await getCurrentUser();
   if (!user) {
     return { error: "Ej behörig" };
@@ -167,7 +167,7 @@ export async function generateWeeklyPlan() {
     },
   });
 
-  if (existingPlan) {
+  if (existingPlan && !options?.force) {
     return { success: true, plan: existingPlan, warning: undefined };
   }
 
@@ -190,9 +190,23 @@ export async function generateWeeklyPlan() {
     };
   }
 
-  // Create the plan
-  const plan = await prisma.weeklyPlan.create({
-    data: {
+  // Create or replace the current week plan
+  const plan = await prisma.weeklyPlan.upsert({
+    where: {
+      userId_weekStartDate: {
+        userId: user.id,
+        weekStartDate: weekStart,
+      },
+    },
+    update: {
+      monday: selectedMeals[0].name,
+      tuesday: selectedMeals[1].name,
+      wednesday: selectedMeals[2].name,
+      thursday: selectedMeals[3].name,
+      friday: selectedMeals[4].name,
+      updatedAt: new Date(),
+    },
+    create: {
       userId: user.id,
       weekStartDate: weekStart,
       monday: selectedMeals[0].name,
@@ -212,8 +226,11 @@ export async function generateWeeklyPlan() {
     })),
   });
 
-  revalidatePath("/");
-  revalidatePath("/plan");
+  const shouldRevalidate = options?.revalidate !== false;
+  if (shouldRevalidate) {
+    revalidatePath("/");
+    revalidatePath("/plan");
+  }
   return {
     success: true,
     plan,

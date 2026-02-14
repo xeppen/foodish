@@ -18,6 +18,7 @@ export default async function HomePage() {
         plan={demoPlan}
         weekInfo={weekInfo}
         isAuthenticated={false}
+        commonMeals={commonMeals}
         meals={commonMeals.map((meal) => ({
           id: `common-${meal.id}`,
           name: meal.name,
@@ -35,7 +36,7 @@ export default async function HomePage() {
 
   let plan = await getCurrentWeekPlan();
   if (!plan) {
-    const result = await generateWeeklyPlan();
+    const result = await generateWeeklyPlan({ force: true, revalidate: false });
     if (result.success && result.plan) {
       plan = result.plan;
       planNotice = result.warning;
@@ -47,6 +48,7 @@ export default async function HomePage() {
       plan={plan ?? demoPlan}
       weekInfo={weekInfo}
       isAuthenticated={true}
+      commonMeals={commonMeals}
       meals={meals}
       planNotice={planNotice}
     />

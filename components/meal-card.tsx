@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { getSwapOptions, swapDayMealWithChoice } from "@/lib/actions/plans";
 
 type Day = "monday" | "tuesday" | "wednesday" | "thursday" | "friday";
@@ -14,19 +14,13 @@ type SwapOption = {
   thumbsDownCount: number;
 };
 
-type FilterState = {
-  complexity: "ALL" | Complexity;
-  rating: "ALL" | "THUMBS_UP";
-  recency: "ALL" | "FRESH_ONLY";
-};
-
 interface MealCardProps {
   day: Day;
   dayLabel: string;
   mealName: string | null;
   isAuthenticated: boolean;
   onAuthRequired: () => void;
-  imageSrc?: string; // Optional override
+  mealImageByName?: Record<string, string>;
 }
 
 export function MealCard({
@@ -35,47 +29,16 @@ export function MealCard({
   mealName,
   isAuthenticated,
   onAuthRequired,
-  imageSrc,
+  mealImageByName,
 }: MealCardProps) {
   const [loading, setLoading] = useState(false);
   const [preloadedOptions, setPreloadedOptions] = useState<SwapOption[]>([]);
-  const [isFilterOpen, setIsFilterOpen] = useState(false);
-  const [filterLoading, setFilterLoading] = useState(false);
-  const [filterOptions, setFilterOptions] = useState<SwapOption[]>([]);
-  const [fallbackOptions, setFallbackOptions] = useState<SwapOption[]>([]);
-  const [fallbackUsed, setFallbackUsed] = useState(false);
-  const [counts, setCounts] = useState({
-    simple: 0,
-    medium: 0,
-    complex: 0,
-    thumbsUp: 0,
-    fresh: 0,
-    total: 0,
-  });
-  const [filters, setFilters] = useState<FilterState>({
-    complexity: "ALL",
-    rating: "ALL",
-    recency: "ALL",
-  });
   const [currentMeal, setCurrentMeal] = useState(mealName);
+  const [currentComplexity, setCurrentComplexity] = useState<Complexity>("MEDIUM");
 
   useEffect(() => {
     setCurrentMeal(mealName);
   }, [mealName]);
-
-  const swapFilters = useMemo(
-    (): {
-      complexity?: Complexity;
-      rating?: "THUMBS_UP";
-      recency?: "FRESH_ONLY";
-    } => ({
-      complexity: filters.complexity === "ALL" ? undefined : filters.complexity,
-      rating: filters.rating === "ALL" ? undefined : "THUMBS_UP",
-      recency: filters.recency === "ALL" ? undefined : "FRESH_ONLY",
-    }),
-    [filters]
-  );
-
   const preloadSwapCandidates = useCallback(async (): Promise<SwapOption[]> => {
     if (!isAuthenticated) {
       return [];
@@ -89,29 +52,6 @@ export function MealCard({
     return options;
   }, [day, isAuthenticated]);
 
-  const refreshFilteredOptions = useCallback(async () => {
-    if (!isAuthenticated) {
-      return;
-    }
-
-    setFilterLoading(true);
-    try {
-      const result = await getSwapOptions(day, {
-        ...swapFilters,
-        limit: 8,
-      });
-      if ("error" in result) {
-        return;
-      }
-      setFilterOptions(result.options as SwapOption[]);
-      setFallbackOptions((result.fallbackOptions ?? []) as SwapOption[]);
-      setFallbackUsed(result.fallbackUsed);
-      setCounts(result.counts);
-    } finally {
-      setFilterLoading(false);
-    }
-  }, [day, isAuthenticated, swapFilters]);
-
   useEffect(() => {
     if (!isAuthenticated) {
       return;
@@ -119,16 +59,11 @@ export function MealCard({
     void preloadSwapCandidates();
   }, [isAuthenticated, preloadSwapCandidates]);
 
-  useEffect(() => {
-    if (!isFilterOpen || !isAuthenticated) {
-      return;
-    }
-    void refreshFilteredOptions();
-  }, [isFilterOpen, isAuthenticated, refreshFilteredOptions]);
-
+  const currentMealKey = (currentMeal ?? "").trim().toLowerCase();
+  const mappedImage = mealImageByName?.[currentMealKey];
   const displayImage =
-    imageSrc ||
-    `/api/meal-image?meal=${encodeURIComponent(currentMeal || dayLabel)}&style=warm-home-cooked-top-down`;
+    mappedImage ||
+    `/api/meal-image?meal=${encodeURIComponent(currentMeal || dayLabel)}&style=vertical-food-photography-dark-moody-lighting`;
   const [resolvedImage, setResolvedImage] = useState(displayImage);
 
   useEffect(() => {
@@ -142,24 +77,25 @@ export function MealCard({
     }
 
     const previousMeal = currentMeal;
+    const previousComplexity = currentComplexity;
     setCurrentMeal(option.name);
+    setCurrentComplexity(option.complexity);
     setLoading(true);
     try {
       const result = await swapDayMealWithChoice(day, option.id);
       if ("error" in result) {
         setCurrentMeal(previousMeal);
+        setCurrentComplexity(previousComplexity);
       } else if (result.newMeal) {
         setCurrentMeal(result.newMeal);
       }
     } catch (error) {
       console.error("Kunde inte byta måltid", error);
       setCurrentMeal(previousMeal);
+      setCurrentComplexity(previousComplexity);
     } finally {
       setLoading(false);
       void preloadSwapCandidates();
-      if (isFilterOpen) {
-        void refreshFilteredOptions();
-      }
     }
   }
 
@@ -184,187 +120,54 @@ export function MealCard({
   }
 
   return (
-    <div className="group relative bg-white rounded-2xl shadow-sm hover:shadow-md transition-all duration-300 border border-[var(--cream-dark)] overflow-hidden flex flex-col h-full">
-      {/* Image Area */}
-      <div className="relative aspect-[4/3] w-full overflow-hidden bg-gray-100">
-        <img
-          src={resolvedImage}
-          alt={currentMeal || "Meal"}
-          className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
-          loading="lazy"
-          referrerPolicy="no-referrer"
-          onError={() => {
-            setResolvedImage(
-              `/api/meal-image?meal=${encodeURIComponent(currentMeal || dayLabel)}&style=warm-home-cooked-top-down`
-            );
-          }}
-        />
-      </div>
+    <div className="group relative mx-0 w-full snap-start aspect-[16/9] overflow-hidden rounded-none bg-black ring-1 ring-white/10 shadow-2xl shadow-black/80 transition-all duration-500 group-hover:ring-white/30 group-hover:shadow-black md:w-[320px] md:aspect-[3/4] md:rounded-2xl lg:w-[340px]">
+      <img
+        src={resolvedImage}
+        alt={currentMeal || "Meal"}
+        className="absolute inset-0 h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-105"
+        loading="lazy"
+        referrerPolicy="no-referrer"
+        onError={() => {
+          setResolvedImage(
+            `/api/meal-image?meal=${encodeURIComponent(currentMeal || dayLabel)}&style=vertical-food-photography-dark-moody-lighting`
+          );
+        }}
+      />
+      <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/95 via-black/60 to-transparent" />
 
-      {/* Content Area */}
-      <div className="p-5 flex flex-col flex-grow">
-        <p className="mb-2 text-lg font-bold uppercase tracking-[0.12em] text-[var(--terracotta)]">
+      <div className="absolute left-4 top-4">
+        <p className="inline-block rounded-full bg-black/40 px-3 py-1 text-xs font-bold uppercase tracking-[0.1em] text-white drop-shadow-sm backdrop-blur-sm">
           {dayLabel}
         </p>
-        <h3 className="font-playfair font-bold text-lg text-[var(--charcoal)] mb-1 line-clamp-2 min-h-[3.5rem]">
+      </div>
+
+      <div className="absolute inset-x-0 bottom-0 p-4 pr-20 md:pr-24">
+        <h3 className="mb-1 line-clamp-3 max-w-[85%] text-2xl font-bold leading-tight text-white drop-shadow-sm md:text-3xl lg:text-[1.75rem]">
           {currentMeal || "Ingen måltid planerad"}
         </h3>
+      </div>
 
-        <div className="mt-auto pt-4 space-y-2">
-          <button
-            onClick={handleQuickSwap}
-            disabled={loading}
-            className="flex w-full items-center justify-center gap-2 rounded-lg bg-[var(--cream)] px-3 py-1.5 text-sm font-semibold text-[var(--terracotta)] transition-colors hover:bg-[var(--terracotta)]/10 disabled:opacity-50"
+      <div className="absolute bottom-0 right-0 p-4">
+        <button
+          onClick={handleQuickSwap}
+          disabled={loading}
+          aria-label={loading ? "Byter måltid" : "Byt måltid"}
+          className={`flex h-10 w-10 items-center justify-center rounded-full border border-white/20 bg-black/35 text-white backdrop-blur-sm transition-opacity duration-300 ${loading ? "opacity-100" : "opacity-70 hover:opacity-100 md:opacity-0 md:group-hover:opacity-100"} disabled:cursor-not-allowed`}
+        >
+          <svg
+            className={`h-4 w-4 ${loading ? "animate-spin" : ""}`}
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
           >
-            <svg
-              className={`w-4 h-4 ${loading ? "animate-spin" : ""}`}
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              {loading ? (
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-                />
-              ) : (
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-                />
-              )}
-            </svg>
-            {loading ? "Byter..." : "Byt"}
-          </button>
-
-          <button
-            type="button"
-            onClick={() => {
-              if (!isAuthenticated) {
-                onAuthRequired();
-                return;
-              }
-              setIsFilterOpen((open) => !open);
-            }}
-            className="w-full rounded-lg border border-[var(--cream-dark)] px-3 py-1.5 text-xs font-semibold text-[var(--charcoal)] transition-colors hover:bg-[var(--cream)]"
-          >
-            {isFilterOpen ? "Stäng filter" : "Byt med filter"}
-          </button>
-
-          {isFilterOpen && (
-            <div className="rounded-lg border border-[var(--cream-dark)] bg-[var(--cream)]/40 p-2.5">
-              <div className="mb-2 grid grid-cols-3 gap-1.5 text-[11px]">
-                <button
-                  type="button"
-                  onClick={() =>
-                    setFilters((state) => ({
-                      ...state,
-                      complexity: state.complexity === "SIMPLE" ? "ALL" : "SIMPLE",
-                    }))
-                  }
-                  className={`rounded-md px-2 py-1 ${filters.complexity === "SIMPLE" ? "bg-emerald-100 text-emerald-700" : "bg-white text-[var(--warm-gray)]"}`}
-                >
-                  Enkel ({counts.simple})
-                </button>
-                <button
-                  type="button"
-                  onClick={() =>
-                    setFilters((state) => ({
-                      ...state,
-                      complexity: state.complexity === "MEDIUM" ? "ALL" : "MEDIUM",
-                    }))
-                  }
-                  className={`rounded-md px-2 py-1 ${filters.complexity === "MEDIUM" ? "bg-amber-100 text-amber-700" : "bg-white text-[var(--warm-gray)]"}`}
-                >
-                  Medium ({counts.medium})
-                </button>
-                <button
-                  type="button"
-                  onClick={() =>
-                    setFilters((state) => ({
-                      ...state,
-                      complexity: state.complexity === "COMPLEX" ? "ALL" : "COMPLEX",
-                    }))
-                  }
-                  className={`rounded-md px-2 py-1 ${filters.complexity === "COMPLEX" ? "bg-orange-100 text-orange-700" : "bg-white text-[var(--warm-gray)]"}`}
-                >
-                  Avancerad ({counts.complex})
-                </button>
-                <button
-                  type="button"
-                  onClick={() =>
-                    setFilters((state) => ({
-                      ...state,
-                      rating: state.rating === "THUMBS_UP" ? "ALL" : "THUMBS_UP",
-                    }))
-                  }
-                  className={`rounded-md px-2 py-1 ${filters.rating === "THUMBS_UP" ? "bg-emerald-100 text-emerald-700" : "bg-white text-[var(--warm-gray)]"}`}
-                >
-                  Favoriter ({counts.thumbsUp})
-                </button>
-                <button
-                  type="button"
-                  onClick={() =>
-                    setFilters((state) => ({
-                      ...state,
-                      recency: state.recency === "FRESH_ONLY" ? "ALL" : "FRESH_ONLY",
-                    }))
-                  }
-                  className={`col-span-2 rounded-md px-2 py-1 ${filters.recency === "FRESH_ONLY" ? "bg-sky-100 text-sky-700" : "bg-white text-[var(--warm-gray)]"}`}
-                >
-                  Ej nyligen ({counts.fresh})
-                </button>
-              </div>
-
-              {filterLoading ? (
-                <p className="text-xs text-[var(--warm-gray)]">Laddar alternativ...</p>
-              ) : filterOptions.length > 0 ? (
-                <div className="space-y-1">
-                  {filterOptions.map((option) => (
-                    <button
-                      key={option.id}
-                      type="button"
-                      onClick={() => applySwap(option)}
-                      className="flex w-full items-center justify-between rounded-md bg-white px-2 py-1.5 text-left text-xs hover:bg-[var(--cream)]"
-                    >
-                      <span className="truncate pr-2 text-[var(--charcoal)]">{option.name}</span>
-                      <span className="text-[10px] text-[var(--warm-gray)]">
-                        👍 {option.thumbsUpCount} / 👎 {option.thumbsDownCount}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  <p className="text-xs text-[var(--warm-gray)]">
-                    Inga träffar med valda filter. Visar förslag utan filter:
-                  </p>
-                  {fallbackUsed && fallbackOptions.length > 0 && (
-                    <div className="space-y-1">
-                      {fallbackOptions.map((option) => (
-                        <button
-                          key={option.id}
-                          type="button"
-                          onClick={() => applySwap(option)}
-                          className="flex w-full items-center justify-between rounded-md bg-white px-2 py-1.5 text-left text-xs hover:bg-[var(--cream)]"
-                        >
-                          <span className="truncate pr-2 text-[var(--charcoal)]">{option.name}</span>
-                          <span className="text-[10px] text-[var(--warm-gray)]">
-                            👍 {option.thumbsUpCount} / 👎 {option.thumbsDownCount}
-                          </span>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
-        </div>
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+            />
+          </svg>
+        </button>
       </div>
     </div>
   );

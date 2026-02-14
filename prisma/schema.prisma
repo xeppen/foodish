@@ -17,6 +17,12 @@ enum Complexity {
   COMPLEX
 }
 
+enum GenerationStatus {
+  PENDING
+  READY
+  FAILED
+}
+
 // Application models
 // Note: userId is the Clerk user ID (string)
 model Meal {
@@ -77,4 +83,21 @@ model UsageHistory {
 
   @@index([userId, usedDate])
   @@index([mealId])
+}
+
+model GeneratedDishImage {
+  id                 String           @id @default(cuid())
+  normalizedName     String           @unique
+  canonicalName      String
+  originalName       String
+  imageUrl           String?
+  generationPrompt   String?
+  generationVersion  String           @default("v1")
+  generationModel    String?
+  status             GenerationStatus @default(PENDING)
+  errorCode          String?
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+
+  @@index([status])
 }

@@ -33,36 +33,24 @@ export function WeeklyPlanView({
   const normalizeMealName = (value: string | null) => (value ?? "").trim().toLowerCase();
 
   return (
-    <div className="w-full">
-      <div className="flex items-center justify-between mb-6 text-white px-2"></div>
-
-      {/* Responsive Grid/Scroll Container */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6 pb-4">
+    <div className="w-full md:mx-auto md:max-w-6xl">
+      <div className="flex snap-y snap-mandatory flex-col gap-3 px-0 pb-4 md:snap-none md:flex-row md:flex-wrap md:justify-center md:gap-8 md:pb-8">
         {DAYS.map(({ key, label }) => {
           const meal = plan[key];
-          const imageSrc = mealImageByName?.[normalizeMealName(meal)];
 
           return (
-            <div key={key} className="h-full">
+            <div key={key} className="h-full w-full md:w-auto">
               <MealCard
                 day={key}
                 dayLabel={label}
                 mealName={meal}
-                imageSrc={imageSrc}
+                mealImageByName={mealImageByName}
                 isAuthenticated={isAuthenticated}
                 onAuthRequired={onAuthRequired}
               />
             </div>
           );
         })}
-      </div>
-
-      <div className="mt-8 p-4 rounded-xl bg-white/10 backdrop-blur-md border border-white/20 text-center">
-        <p className="text-sm text-[var(--cream)] font-medium">
-          {isAuthenticated
-            ? "Tips: Klicka på \"Byt\" för att ersätta en rätt direkt från din lista."
-            : "Demo-lage: Klicka på \"Byt\" eller \"Logga in\" for att kurera dina egna maltider."}
-        </p>
       </div>
     </div>
   );

@@ -11,11 +11,14 @@ type EnrichmentResult = {
   ingredients: string[];
 };
 
+const COMPLEXITY_LABEL: Record<EnrichmentResult["complexity"], string> = {
+  SIMPLE: "Enkel",
+  MEDIUM: "Medium",
+  COMPLEX: "Avancerad",
+};
+
 export function MagicMealInput() {
   const [value, setValue] = useState("");
-  const [imageMode, setImageMode] = useState<"upload" | "url">("upload");
-  const [imageFile, setImageFile] = useState<File | null>(null);
-  const [imageUrl, setImageUrl] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<EnrichmentResult | null>(null);
@@ -23,7 +26,8 @@ export function MagicMealInput() {
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    if (!value.trim()) {
+    const name = value.trim();
+    if (!name || loading) {
       return;
     }
 
@@ -33,13 +37,7 @@ export function MagicMealInput() {
 
     try {
       const formData = new FormData();
-      formData.append("name", value.trim());
-      if (imageMode === "upload" && imageFile) {
-        formData.append("image", imageFile);
-      }
-      if (imageMode === "url" && imageUrl.trim()) {
-        formData.append("imageUrl", imageUrl.trim());
-      }
+      formData.append("name", name);
       const response = await addMeal(formData);
 
       if (response.error) {
@@ -48,9 +46,6 @@ export function MagicMealInput() {
       }
 
       setValue("");
-      setImageFile(null);
-      setImageUrl("");
-      setImageMode("upload");
       setResult((response.enrichment as EnrichmentResult) ?? null);
       router.refresh();
     } catch {
@@ -61,9 +56,9 @@ export function MagicMealInput() {
   }
 
   return (
-    <div className="space-y-2">
-      <form onSubmit={handleSubmit} className="space-y-2">
-        <label htmlFor="magic-input" className="block text-xs font-semibold uppercase tracking-wide text-[var(--warm-gray)]">
+    <div className="space-y-3">
+      <form onSubmit={handleSubmit}>
+        <label htmlFor="magic-input" className="mb-2 block text-xs font-semibold uppercase tracking-[0.12em] text-[var(--warm-gray)]">
           Magic Input
         </label>
         <div className="relative">
@@ -72,67 +67,24 @@ export function MagicMealInput() {
             type="text"
             value={value}
             onChange={(e) => setValue(e.target.value)}
-            placeholder="Spicy Chicken Curry with Rice"
+            placeholder="Skriv en rätt, t.ex. Korv stroganoff"
             disabled={loading}
-            className="pr-10"
+            className="pr-11"
           />
           <Sparkles className={`absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 ${loading ? "animate-pulse text-amber-500" : "text-[var(--warm-gray)]"}`} />
         </div>
-        <div className="rounded-lg border border-[var(--cream-dark)] bg-white/70 p-2">
-          <div className="mb-2 grid grid-cols-2 gap-1 rounded-md bg-[var(--cream)] p-1 text-xs font-semibold">
-            <button
-              type="button"
-              onClick={() => {
-                setImageMode("upload");
-                setImageUrl("");
-              }}
-              className={`rounded-md px-2 py-1 transition ${imageMode === "upload" ? "bg-white text-[var(--charcoal)] shadow-sm" : "text-[var(--warm-gray)]"}`}
-            >
-              Ladda upp
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setImageMode("url");
-                setImageFile(null);
-              }}
-              className={`rounded-md px-2 py-1 transition ${imageMode === "url" ? "bg-white text-[var(--charcoal)] shadow-sm" : "text-[var(--warm-gray)]"}`}
-            >
-              Bild-URL
-            </button>
-          </div>
-
-          {imageMode === "upload" ? (
-            <>
-              <input
-                type="file"
-                accept="image/*"
-                disabled={loading}
-                onChange={(e) => setImageFile(e.target.files?.[0] ?? null)}
-                className="text-xs"
-              />
-              {imageFile && <p className="mt-1 text-xs text-[var(--warm-gray)]">Vald bild: {imageFile.name}</p>}
-            </>
-          ) : (
-            <input
-              type="url"
-              value={imageUrl}
-              onChange={(e) => setImageUrl(e.target.value)}
-              placeholder="https://example.com/meal.jpg"
-              disabled={loading}
-            />
-          )}
-        </div>
+        <p className="mt-2 text-xs text-[var(--warm-gray)]">
+          Tryck Enter. Foodish fyller i komplexitet, taggar och ingredienser automatiskt.
+        </p>
       </form>
 
-      {loading && <p className="text-xs text-[var(--warm-gray)]">AI tänker...</p>}
       {error && <p className="text-xs text-red-600">{error}</p>}
 
       {result && (
-        <div className="rounded-lg border border-[var(--cream-dark)] bg-white/80 p-2 text-xs text-[var(--charcoal)]">
-          <p className="font-semibold">AI-förslag</p>
-          <p>Taggar: {result.tags.join(" ")}</p>
-          <p>Komplexitet: {result.complexity}</p>
+        <div className="rounded-lg border border-[var(--cream-dark)] bg-white p-3 text-xs text-[var(--charcoal)]">
+          <p className="mb-1 font-semibold">AI-forslag</p>
+          <p className="mb-1">Komplexitet: {COMPLEXITY_LABEL[result.complexity]}</p>
+          <p className="mb-1">Taggar: {result.tags.join(" ")}</p>
           <p>Ingredienser: {result.ingredients.join(", ")}</p>
         </div>
       )}
