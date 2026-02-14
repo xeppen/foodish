@@ -2,8 +2,10 @@
 
 import { addMeal } from "@/lib/actions/meals";
 import { Sparkles } from "lucide-react";
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { generateDishImageUrl } from "@/lib/image-generation/client";
+import { resolveMealImageUrl } from "@/lib/meal-image-url";
 
 type EnrichmentResult = {
   tags: string[];
@@ -17,12 +19,75 @@ const COMPLEXITY_LABEL: Record<EnrichmentResult["complexity"], string> = {
   COMPLEX: "Avancerad",
 };
 
+const DAY_OPTIONS = [
+  { value: "MONDAY", short: "M", label: "Måndag" },
+  { value: "TUESDAY", short: "T", label: "Tisdag" },
+  { value: "WEDNESDAY", short: "O", label: "Onsdag" },
+  { value: "THURSDAY", short: "T", label: "Torsdag" },
+  { value: "FRIDAY", short: "F", label: "Fredag" },
+  { value: "SATURDAY", short: "L", label: "Lördag" },
+  { value: "SUNDAY", short: "S", label: "Söndag" },
+] as const;
+
+type PreferredDay = (typeof DAY_OPTIONS)[number]["value"];
+
 export function MagicMealInput() {
   const [value, setValue] = useState("");
   const [loading, setLoading] = useState(false);
+  const [generationLoading, setGenerationLoading] = useState(false);
+  const [complexity, setComplexity] = useState<EnrichmentResult["complexity"]>("MEDIUM");
+  const [preferredDays, setPreferredDays] = useState<PreferredDay[]>([]);
+  const [imageUrl, setImageUrl] = useState("");
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [showUrlInput, setShowUrlInput] = useState(false);
+  const [previewError, setPreviewError] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<EnrichmentResult | null>(null);
   const router = useRouter();
+
+  useEffect(() => {
+    if (!imageFile) {
+      setPreviewUrl(null);
+      return;
+    }
+    const objectUrl = URL.createObjectURL(imageFile);
+    setPreviewUrl(objectUrl);
+    return () => URL.revokeObjectURL(objectUrl);
+  }, [imageFile]);
+
+  function applyDayPreset(preset: "weekday" | "friday" | "weekend") {
+    if (preset === "weekday") {
+      setPreferredDays(["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY"]);
+      return;
+    }
+    if (preset === "friday") {
+      setPreferredDays(["FRIDAY"]);
+      return;
+    }
+    setPreferredDays(["SATURDAY", "SUNDAY"]);
+  }
+
+  async function handleGenerateImage() {
+    const name = value.trim();
+    if (!name || generationLoading || loading) {
+      return;
+    }
+
+    setError(null);
+    setGenerationLoading(true);
+    try {
+      const generated = await generateDishImageUrl(name);
+      setImageUrl(generated.imageUrl);
+      setImageFile(null);
+      setShowUrlInput(false);
+      setPreviewError(false);
+    } catch (generationError) {
+      setError(generationError instanceof Error ? generationError.message : "Kunde inte generera bild.");
+    } finally {
+      setGenerationLoading(false);
+    }
+  }
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -38,6 +103,15 @@ export function MagicMealInput() {
     try {
       const formData = new FormData();
       formData.append("name", name);
+      formData.append("complexity", complexity);
+      for (const day of preferredDays) {
+        formData.append("preferredDays", day);
+      }
+      if (imageFile) {
+        formData.append("image", imageFile);
+      } else if (imageUrl.trim()) {
+        formData.append("imageUrl", imageUrl.trim());
+      }
       const response = await addMeal(formData);
 
       if (response.error) {
@@ -46,6 +120,12 @@ export function MagicMealInput() {
       }
 
       setValue("");
+      setComplexity("MEDIUM");
+      setPreferredDays([]);
+      setImageUrl("");
+      setImageFile(null);
+      setShowUrlInput(false);
+      setPreviewError(false);
       setResult((response.enrichment as EnrichmentResult) ?? null);
       router.refresh();
     } catch {
@@ -59,7 +139,7 @@ export function MagicMealInput() {
     <div className="space-y-3">
       <form onSubmit={handleSubmit}>
         <label htmlFor="magic-input" className="mb-2 block text-xs font-semibold uppercase tracking-[0.12em] text-[var(--warm-gray)]">
-          Magic Input
+          Ny måltid
         </label>
         <div className="relative">
           <input
@@ -69,13 +149,153 @@ export function MagicMealInput() {
             onChange={(e) => setValue(e.target.value)}
             placeholder="Skriv en rätt, t.ex. Korv stroganoff"
             disabled={loading}
-            className="pr-11"
+            className="pr-11 text-lg font-bold"
           />
           <Sparkles className={`absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 ${loading ? "animate-pulse text-amber-500" : "text-[var(--warm-gray)]"}`} />
         </div>
-        <p className="mt-2 text-xs text-[var(--warm-gray)]">
-          Tryck Enter. Foodish fyller i komplexitet, taggar och ingredienser automatiskt.
-        </p>
+
+        <div className="mt-4">
+          <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--warm-gray)]">Komplexitet</p>
+          <div className="grid grid-cols-3 gap-1 rounded-lg bg-white/75 p-1">
+            {[
+              { value: "SIMPLE", label: "🟢 Enkel" },
+              { value: "MEDIUM", label: "🟡 Medium" },
+              { value: "COMPLEX", label: "🔴 Avancerad" },
+            ].map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => setComplexity(option.value as EnrichmentResult["complexity"])}
+                className={`rounded-md px-2 py-1.5 text-xs font-semibold transition ${
+                  complexity === option.value
+                    ? "bg-[var(--charcoal)] text-white shadow-sm"
+                    : "text-[var(--warm-gray)] hover:text-[var(--charcoal)]"
+                }`}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="mt-4">
+          <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--warm-gray)]">Passar bäst...</p>
+          <div className="mb-2 flex flex-wrap gap-2">
+            {DAY_OPTIONS.map((dayOption) => {
+              const active = preferredDays.includes(dayOption.value);
+              return (
+                <button
+                  key={dayOption.value}
+                  type="button"
+                  aria-label={dayOption.label}
+                  onClick={() =>
+                    setPreferredDays((current) =>
+                      current.includes(dayOption.value)
+                        ? current.filter((day) => day !== dayOption.value)
+                        : [...current, dayOption.value]
+                    )
+                  }
+                  className={`flex h-8 w-8 items-center justify-center rounded-full border text-xs font-bold transition ${
+                    active
+                      ? "border-[var(--terracotta)] bg-[var(--terracotta)] text-white"
+                      : "border-[var(--cream-dark)] bg-white text-[var(--warm-gray)]"
+                  }`}
+                >
+                  {dayOption.short}
+                </button>
+              );
+            })}
+          </div>
+          <div className="flex items-center gap-3 text-[11px] font-semibold text-[var(--warm-gray)]">
+            <button type="button" onClick={() => applyDayPreset("friday")} className="hover:text-[var(--charcoal)]">
+              Fredagsmys
+            </button>
+            <button type="button" onClick={() => applyDayPreset("weekday")} className="hover:text-[var(--charcoal)]">
+              Vardag
+            </button>
+            <button type="button" onClick={() => applyDayPreset("weekend")} className="hover:text-[var(--charcoal)]">
+              Helg
+            </button>
+          </div>
+        </div>
+
+        <div className="mt-4 rounded-md border border-[var(--cream-dark)] bg-white/70 p-2">
+          <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--warm-gray)]">Bild</p>
+          <button
+            type="button"
+            onClick={() => void handleGenerateImage()}
+            disabled={generationLoading || loading || !value.trim()}
+            className="mb-2 w-full rounded-md bg-[var(--charcoal)] px-3 py-2 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {generationLoading ? "Genererar bild..." : "✨ Generera ny"}
+          </button>
+
+          {previewUrl || imageUrl.trim() ? (
+            <div className="overflow-hidden rounded-lg border border-[var(--cream-dark)] bg-black/5">
+              {!previewError ? (
+                <img
+                  src={previewUrl ?? resolveMealImageUrl(imageUrl, value || "Meal")}
+                  alt={value || "Meal preview"}
+                  className="h-32 w-full object-cover"
+                  loading="lazy"
+                  referrerPolicy="no-referrer"
+                  onError={() => setPreviewError(true)}
+                />
+              ) : (
+                <p className="px-2 py-3 text-xs text-rose-600">Kunde inte ladda förhandsvisning av bilden.</p>
+              )}
+            </div>
+          ) : (
+            <div className="rounded-lg border border-dashed border-[var(--cream-dark)] px-3 py-4 text-center text-xs text-[var(--warm-gray)]">
+              Ingen bild vald ännu.
+            </div>
+          )}
+
+          <div className="mt-2 flex items-center justify-between">
+            <button
+              type="button"
+              onClick={() => setShowUrlInput((current) => !current)}
+              className="text-xs font-semibold text-[var(--warm-gray)] hover:text-[var(--charcoal)]"
+            >
+              {showUrlInput ? "Dölj URL" : "Ändra URL manuellt"}
+            </button>
+            <label className="cursor-pointer text-xs font-semibold text-[var(--warm-gray)] hover:text-[var(--charcoal)]">
+              Ladda upp
+              <input
+                type="file"
+                accept="image/*"
+                onChange={(event) => {
+                  setImageFile(event.target.files?.[0] ?? null);
+                  setImageUrl("");
+                  setPreviewError(false);
+                }}
+                className="hidden"
+              />
+            </label>
+          </div>
+
+          {showUrlInput && (
+            <input
+              type="url"
+              value={imageUrl}
+              onChange={(event) => {
+                setImageUrl(event.target.value);
+                setImageFile(null);
+                setPreviewError(false);
+              }}
+              placeholder="https://example.com/meal.jpg"
+              className="mt-2 w-full"
+            />
+          )}
+        </div>
+
+        <button
+          type="submit"
+          disabled={loading || !value.trim()}
+          className="mt-4 w-full rounded-md bg-[var(--terracotta)] px-3 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {loading ? "Sparar..." : "Lägg till måltid"}
+        </button>
       </form>
 
       {error && <p className="text-xs text-red-600">{error}</p>}
