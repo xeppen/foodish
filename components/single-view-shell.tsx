@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { useCallback, useMemo, useState } from "react";
-import { List } from "lucide-react";
+import { List, ShoppingBasket, X } from "lucide-react";
 import { useClerk } from "@clerk/nextjs";
 import { WeeklyPlanView } from "@/components/weekly-plan-view";
 import { MealDrawer } from "@/components/meal-drawer";
@@ -35,6 +35,7 @@ type Meal = {
   thumbsUpCount: number;
   thumbsDownCount: number;
   imageUrl: string | null;
+  ingredients?: string[];
   createdAt: Date | string;
 };
 
@@ -66,6 +67,7 @@ export function SingleViewShell({
   planNotice,
 }: SingleViewShellProps) {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [isShoppingOpen, setIsShoppingOpen] = useState(false);
   const [authPrompt, setAuthPrompt] = useState<string | null>(null);
   const { openSignIn } = useClerk();
   const mealImageByName = useMemo(() => {
@@ -84,33 +86,26 @@ export function SingleViewShell({
       return acc;
     }, {});
   }, [commonMeals, meals]);
-  const mealMetaByName = useMemo(() => {
-    const commonMetaByName = (commonMeals ?? []).reduce<
-      Record<string, { complexity: Meal["complexity"]; thumbsUpCount: number; thumbsDownCount: number }>
-    >((acc, meal) => {
-      const key = meal.name.trim().toLowerCase();
-      acc[key] = {
-        complexity: meal.complexity,
-        thumbsUpCount: 0,
-        thumbsDownCount: 0,
-      };
-      return acc;
-    }, {});
+  const shoppingItems = useMemo(() => {
+    const dayMeals = [plan.monday, plan.tuesday, plan.wednesday, plan.thursday, plan.friday]
+      .filter((value): value is string => Boolean(value?.trim()))
+      .map((value) => value.trim().toLowerCase());
 
-    return meals.reduce<Record<string, { complexity: Meal["complexity"]; thumbsUpCount: number; thumbsDownCount: number }>>(
-      (acc, meal) => {
-        const key = meal.name.trim().toLowerCase();
-        const fallback = commonMetaByName[key];
-        acc[key] = {
-          complexity: meal.complexity ?? fallback?.complexity ?? "MEDIUM",
-          thumbsUpCount: meal.thumbsUpCount ?? fallback?.thumbsUpCount ?? 0,
-          thumbsDownCount: meal.thumbsDownCount ?? fallback?.thumbsDownCount ?? 0,
-        };
-        return acc;
-      },
-      { ...commonMetaByName }
-    );
-  }, [commonMeals, meals]);
+    const ingredients = new Set<string>();
+    for (const planned of dayMeals) {
+      const match = meals.find((meal) => meal.name.trim().toLowerCase() === planned);
+      for (const ingredient of match?.ingredients ?? []) {
+        if (ingredient.trim()) {
+          ingredients.add(ingredient.trim());
+        }
+      }
+    }
+
+    if (ingredients.size > 0) {
+      return Array.from(ingredients);
+    }
+    return dayMeals.map((mealName) => mealName.charAt(0).toUpperCase() + mealName.slice(1));
+  }, [meals, plan.friday, plan.monday, plan.thursday, plan.tuesday, plan.wednesday]);
 
   const promptLogin = useCallback(() => {
     setAuthPrompt("Login to curate your own meals");
@@ -180,10 +175,48 @@ export function SingleViewShell({
             isAuthenticated={isAuthenticated}
             onAuthRequired={promptLogin}
             mealImageByName={mealImageByName}
-            mealMetaByName={mealMetaByName}
           />
         </section>
       </main>
+
+      <button
+        type="button"
+        onClick={() => setIsShoppingOpen((current) => !current)}
+        className="fixed bottom-5 right-5 z-30 inline-flex items-center gap-2 rounded-full border border-white/20 bg-black/55 px-4 py-3 text-sm font-semibold text-white shadow-xl backdrop-blur-md hover:bg-black/70"
+      >
+        <ShoppingBasket className="h-4 w-4" />
+        <span>Inköp</span>
+        <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-[var(--terracotta)] px-1.5 text-[11px] font-bold text-white">
+          {shoppingItems.length}
+        </span>
+      </button>
+
+      {isShoppingOpen && (
+        <div className="fixed bottom-20 right-5 z-30 w-[min(90vw,360px)] rounded-2xl border border-white/20 bg-black/70 p-4 text-white shadow-2xl backdrop-blur-xl">
+          <div className="mb-3 flex items-center justify-between">
+            <p className="text-sm font-bold uppercase tracking-[0.12em] text-white/90">Shopping List</p>
+            <button
+              type="button"
+              onClick={() => setIsShoppingOpen(false)}
+              className="rounded-full border border-white/20 p-1 text-white/70 hover:text-white"
+              aria-label="Stäng inköpslista"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
+          <ul className="max-h-60 space-y-1 overflow-y-auto pr-1 text-sm">
+            {shoppingItems.length === 0 ? (
+              <li className="text-white/70">Lägg till måltider för att skapa inköpslista.</li>
+            ) : (
+              shoppingItems.map((item) => (
+                <li key={item} className="rounded-md bg-white/10 px-2 py-1">
+                  {item}
+                </li>
+              ))
+            )}
+          </ul>
+        </div>
+      )}
 
       <MealDrawer
         isOpen={isDrawerOpen}

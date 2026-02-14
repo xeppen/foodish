@@ -12,7 +12,8 @@ describe("image generation prompt", () => {
     const prompt = buildGenerationPrompt("Korv stroganoff");
     expect(prompt).toContain("Dish: Korv stroganoff.");
     expect(prompt).toContain("Realistic home-cooked Swedish family dinner.");
-    expect(prompt).toContain("1:1 aspect ratio.");
+    expect(prompt).toContain("Vertical food photography.");
+    expect(prompt).toContain("Dark moody lighting.");
+    expect(prompt).toContain("4:5 aspect ratio.");
   });
 });
-

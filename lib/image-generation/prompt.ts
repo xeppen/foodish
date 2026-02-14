@@ -12,12 +12,12 @@ export function buildGenerationPrompt(dishName: string): string {
     "Realistic home-cooked Swedish family dinner.",
     `Dish: ${dishName}.`,
     "Simple plating on a normal white plate.",
-    "Natural kitchen lighting.",
+    "Vertical food photography.",
+    "Dark moody lighting.",
     "Slightly imperfect presentation.",
     "Not restaurant quality.",
     "Not artistic.",
     "Looks like an ordinary weekday dinner.",
-    "1:1 aspect ratio.",
+    "4:5 aspect ratio.",
   ].join(" ");
 }
-

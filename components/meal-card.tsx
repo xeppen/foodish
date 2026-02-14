@@ -14,19 +14,10 @@ type SwapOption = {
   thumbsDownCount: number;
 };
 
-const COMPLEXITY_TIME_LABEL: Record<Complexity, string> = {
-  SIMPLE: "20 min",
-  MEDIUM: "30 min",
-  COMPLEX: "45 min",
-};
-
 interface MealCardProps {
   day: Day;
   dayLabel: string;
   mealName: string | null;
-  complexity: Complexity;
-  thumbsUpCount: number;
-  thumbsDownCount: number;
   isAuthenticated: boolean;
   onAuthRequired: () => void;
   imageSrc?: string; // Optional override
@@ -36,9 +27,6 @@ export function MealCard({
   day,
   dayLabel,
   mealName,
-  complexity,
-  thumbsUpCount,
-  thumbsDownCount,
   isAuthenticated,
   onAuthRequired,
   imageSrc,
@@ -46,19 +34,11 @@ export function MealCard({
   const [loading, setLoading] = useState(false);
   const [preloadedOptions, setPreloadedOptions] = useState<SwapOption[]>([]);
   const [currentMeal, setCurrentMeal] = useState(mealName);
-  const [currentComplexity, setCurrentComplexity] = useState<Complexity>(complexity);
-  const [currentVotes, setCurrentVotes] = useState({ up: thumbsUpCount, down: thumbsDownCount });
+  const [currentComplexity, setCurrentComplexity] = useState<Complexity>("MEDIUM");
 
   useEffect(() => {
     setCurrentMeal(mealName);
   }, [mealName]);
-  useEffect(() => {
-    setCurrentComplexity(complexity);
-  }, [complexity]);
-  useEffect(() => {
-    setCurrentVotes({ up: thumbsUpCount, down: thumbsDownCount });
-  }, [thumbsUpCount, thumbsDownCount]);
-
   const preloadSwapCandidates = useCallback(async (): Promise<SwapOption[]> => {
     if (!isAuthenticated) {
       return [];
@@ -81,7 +61,7 @@ export function MealCard({
 
   const displayImage =
     imageSrc ||
-    `/api/meal-image?meal=${encodeURIComponent(currentMeal || dayLabel)}&style=warm-home-cooked-top-down`;
+    `/api/meal-image?meal=${encodeURIComponent(currentMeal || dayLabel)}&style=vertical-food-photography-dark-moody-lighting`;
   const [resolvedImage, setResolvedImage] = useState(displayImage);
 
   useEffect(() => {
@@ -96,17 +76,14 @@ export function MealCard({
 
     const previousMeal = currentMeal;
     const previousComplexity = currentComplexity;
-    const previousVotes = currentVotes;
     setCurrentMeal(option.name);
     setCurrentComplexity(option.complexity);
-    setCurrentVotes({ up: option.thumbsUpCount, down: option.thumbsDownCount });
     setLoading(true);
     try {
       const result = await swapDayMealWithChoice(day, option.id);
       if ("error" in result) {
         setCurrentMeal(previousMeal);
         setCurrentComplexity(previousComplexity);
-        setCurrentVotes(previousVotes);
       } else if (result.newMeal) {
         setCurrentMeal(result.newMeal);
       }
@@ -114,7 +91,6 @@ export function MealCard({
       console.error("Kunde inte byta måltid", error);
       setCurrentMeal(previousMeal);
       setCurrentComplexity(previousComplexity);
-      setCurrentVotes(previousVotes);
     } finally {
       setLoading(false);
       void preloadSwapCandidates();
@@ -142,7 +118,7 @@ export function MealCard({
   }
 
   return (
-    <div className="group relative mx-0 w-full aspect-[16/9] overflow-hidden rounded-none bg-black shadow-lg transition-shadow duration-500 md:aspect-[4/5] xl:aspect-[3/4] md:rounded-2xl">
+    <div className="group relative mx-0 w-full snap-start aspect-[16/9] overflow-hidden rounded-none bg-black shadow-lg transition-shadow duration-500 md:w-[320px] md:aspect-[3/4] md:rounded-2xl lg:w-[340px]">
       <img
         src={resolvedImage}
         alt={currentMeal || "Meal"}
@@ -151,7 +127,7 @@ export function MealCard({
         referrerPolicy="no-referrer"
         onError={() => {
           setResolvedImage(
-            `/api/meal-image?meal=${encodeURIComponent(currentMeal || dayLabel)}&style=warm-home-cooked-top-down`
+            `/api/meal-image?meal=${encodeURIComponent(currentMeal || dayLabel)}&style=vertical-food-photography-dark-moody-lighting`
           );
         }}
       />
@@ -163,17 +139,8 @@ export function MealCard({
         </p>
       </div>
 
-      <div className="absolute right-4 top-4">
-        <div className="flex items-center gap-2 rounded-full border border-white/10 bg-black/30 px-3 py-1 text-xs font-medium text-white backdrop-blur-md">
-          <span className={`h-2 w-2 rounded-full ${currentComplexity === "SIMPLE" ? "bg-emerald-400" : currentComplexity === "MEDIUM" ? "bg-amber-400" : "bg-rose-400"}`} />
-          <span>{COMPLEXITY_TIME_LABEL[currentComplexity]}</span>
-          <span className="text-white/70">•</span>
-          <span>👍 {currentVotes.up - currentVotes.down}</span>
-        </div>
-      </div>
-
       <div className="absolute inset-x-0 bottom-0 p-4 pr-20 md:pr-24">
-        <h3 className="mb-1 max-w-[85%] text-xl font-bold leading-tight text-white drop-shadow-sm md:text-2xl">
+        <h3 className="mb-1 max-w-[85%] text-3xl font-bold leading-[0.96] text-white drop-shadow-sm md:text-4xl">
           {currentMeal || "Ingen måltid planerad"}
         </h3>
       </div>
