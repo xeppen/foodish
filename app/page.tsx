@@ -3,6 +3,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { getDemoWeeklyPlan } from "@/lib/demo-plan";
 import { getMeals } from "@/lib/actions/meals";
 import { generateWeeklyPlan, getCurrentWeekPlan, getWeekInfo } from "@/lib/actions/plans";
+import { getCurrentWeekShoppingList } from "@/lib/actions/shopping-list";
 import { listCommonMeals } from "@/lib/common-meals";
 
 export default async function HomePage() {
@@ -34,6 +35,7 @@ export default async function HomePage() {
   }
 
   const meals = await getMeals();
+  const shoppingList = await getCurrentWeekShoppingList();
 
   let plan = await getCurrentWeekPlan();
   if (!plan) {
@@ -52,6 +54,7 @@ export default async function HomePage() {
       commonMeals={commonMeals}
       meals={meals}
       planNotice={planNotice}
+      shoppingList={shoppingList}
     />
   );
 }

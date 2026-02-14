@@ -6,6 +6,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { buildFallbackMealImageUrl, resolveMealImageUrl } from "@/lib/meal-image-url";
 import { generateDishImageUrl } from "@/lib/image-generation/client";
+import { generateIngredientDraftClient, type IngredientDraftItem } from "@/lib/ai/ingredients-client";
 
 type Meal = {
   id: string;
@@ -15,6 +16,15 @@ type Meal = {
   thumbsUpCount: number;
   thumbsDownCount: number;
   imageUrl: string | null;
+  mealIngredients?: Array<{
+    name: string;
+    amount: number | null;
+    unit: string | null;
+    note: string | null;
+    optional: boolean;
+    confidence: number | null;
+    needsReview: boolean;
+  }>;
   createdAt: Date | string;
 };
 
@@ -44,7 +54,9 @@ export function MealList({ meals }: { meals: Meal[] }) {
   const [editImageUrl, setEditImageUrl] = useState("");
   const [editImageUrlExpanded, setEditImageUrlExpanded] = useState(false);
   const [editGenerationLoading, setEditGenerationLoading] = useState(false);
+  const [editIngredientLoading, setEditIngredientLoading] = useState(false);
   const [editGenerationError, setEditGenerationError] = useState<string | null>(null);
+  const [editIngredients, setEditIngredients] = useState<IngredientDraftItem[]>([]);
   const [editPreviewError, setEditPreviewError] = useState(false);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [votes, setVotes] = useState<Record<string, { up: number; down: number }>>(
@@ -64,6 +76,17 @@ export function MealList({ meals }: { meals: Meal[] }) {
     setEditImageUrlExpanded(false);
     setEditGenerationLoading(false);
     setEditGenerationError(null);
+    setEditIngredients(
+      (meal.mealIngredients ?? []).map((ingredient) => ({
+        name: ingredient.name,
+        amount: ingredient.amount,
+        unit: ingredient.unit,
+        note: ingredient.note,
+        optional: ingredient.optional,
+        confidence: ingredient.confidence,
+        needsReview: ingredient.needsReview,
+      }))
+    );
     setEditPreviewError(false);
     setOpenMenuId(null);
   }
@@ -78,7 +101,9 @@ export function MealList({ meals }: { meals: Meal[] }) {
     setEditImageUrl("");
     setEditImageUrlExpanded(false);
     setEditGenerationLoading(false);
+    setEditIngredientLoading(false);
     setEditGenerationError(null);
+    setEditIngredients([]);
     setEditPreviewError(false);
   }
 
@@ -128,6 +153,23 @@ export function MealList({ meals }: { meals: Meal[] }) {
     setPendingVoteId(null);
   }
 
+  async function handleGenerateEditIngredients() {
+    const dishName = editName.trim();
+    if (!dishName || editIngredientLoading) {
+      return;
+    }
+    setEditIngredientLoading(true);
+    setEditGenerationError(null);
+    try {
+      const result = await generateIngredientDraftClient(dishName);
+      setEditIngredients(result.ingredients);
+    } catch (error) {
+      setEditGenerationError(error instanceof Error ? error.message : "Kunde inte generera ingredienser");
+    } finally {
+      setEditIngredientLoading(false);
+    }
+  }
+
   async function handleDelete(id: string) {
     if (!confirm("Är du säker på att du vill ta bort den här måltiden?")) {
       return;
@@ -151,6 +193,12 @@ export function MealList({ meals }: { meals: Meal[] }) {
     }
     if (editImageMode === "url" && editImageUrl.trim()) {
       formData.append("imageUrl", editImageUrl.trim());
+    }
+    const cleanedIngredients = editIngredients
+      .map((ingredient) => ({ ...ingredient, name: ingredient.name.trim() }))
+      .filter((ingredient) => ingredient.name.length > 0);
+    if (cleanedIngredients.length > 0) {
+      formData.append("ingredients", JSON.stringify(cleanedIngredients));
     }
     const result = await updateMeal(id, formData);
     if (!result.error) {
@@ -329,6 +377,73 @@ export function MealList({ meals }: { meals: Meal[] }) {
                       className="mt-2 w-full"
                     />
                   )}
+                </div>
+
+                <div className="rounded-md border border-[var(--cream-dark)] bg-white/70 p-2">
+                  <div className="mb-2 flex items-center justify-between">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--warm-gray)]">Ingredienser</p>
+                    <button
+                      type="button"
+                      onClick={() => void handleGenerateEditIngredients()}
+                      disabled={editIngredientLoading || !editName.trim()}
+                      className="text-xs font-semibold text-[var(--charcoal)] disabled:opacity-60"
+                    >
+                      {editIngredientLoading ? "Genererar..." : "✨ AI-förslag"}
+                    </button>
+                  </div>
+                  <div className="space-y-2">
+                    {editIngredients.map((ingredient, index) => (
+                      <div key={`${ingredient.name}-${index}`} className="grid grid-cols-[1fr_72px_68px] gap-2">
+                        <input
+                          value={ingredient.name}
+                          onChange={(event) =>
+                            setEditIngredients((state) =>
+                              state.map((item, rowIndex) =>
+                                rowIndex === index ? { ...item, name: event.target.value } : item
+                              )
+                            )
+                          }
+                          placeholder="Ingrediens"
+                          className="text-sm"
+                        />
+                        <input
+                          type="number"
+                          step="0.1"
+                          value={ingredient.amount ?? ""}
+                          onChange={(event) =>
+                            setEditIngredients((state) =>
+                              state.map((item, rowIndex) =>
+                                rowIndex === index
+                                  ? { ...item, amount: event.target.value ? Number(event.target.value) : null }
+                                  : item
+                              )
+                            )
+                          }
+                          placeholder="Mängd"
+                          className="text-sm"
+                        />
+                        <input
+                          value={ingredient.unit ?? ""}
+                          onChange={(event) =>
+                            setEditIngredients((state) =>
+                              state.map((item, rowIndex) =>
+                                rowIndex === index ? { ...item, unit: event.target.value || null } : item
+                              )
+                            )
+                          }
+                          placeholder="Enhet"
+                          className="text-sm"
+                        />
+                      </div>
+                    ))}
+                    <button
+                      type="button"
+                      onClick={() => setEditIngredients((state) => [...state, { name: "", amount: null, unit: null }])}
+                      className="text-xs font-semibold text-[var(--warm-gray)] hover:text-[var(--charcoal)]"
+                    >
+                      + Lägg till rad
+                    </button>
+                  </div>
                 </div>
                 <div className="flex justify-end gap-2">
                   <button

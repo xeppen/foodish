@@ -18,6 +18,15 @@ type Meal = {
   thumbsUpCount: number;
   thumbsDownCount: number;
   imageUrl: string | null;
+  mealIngredients?: Array<{
+    name: string;
+    amount: number | null;
+    unit: string | null;
+    note: string | null;
+    optional: boolean;
+    confidence: number | null;
+    needsReview: boolean;
+  }>;
   createdAt: Date | string;
 };
 
