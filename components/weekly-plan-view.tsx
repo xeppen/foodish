@@ -30,8 +30,6 @@ export function WeeklyPlanView({
   onAuthRequired: () => void;
   mealImageByName?: Record<string, string>;
 }) {
-  const normalizeMealName = (value: string | null) => (value ?? "").trim().toLowerCase();
-
   return (
     <div className="w-full md:mx-auto md:max-w-6xl">
       <div className="flex snap-y snap-mandatory flex-col gap-3 px-0 pb-4 md:snap-none md:flex-row md:flex-wrap md:justify-center md:gap-8 md:pb-8">

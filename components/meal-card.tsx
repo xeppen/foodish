@@ -39,6 +39,7 @@ export function MealCard({
   useEffect(() => {
     setCurrentMeal(mealName);
   }, [mealName]);
+
   const preloadSwapCandidates = useCallback(async (): Promise<SwapOption[]> => {
     if (!isAuthenticated) {
       return [];

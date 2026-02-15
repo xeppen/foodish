@@ -1,6 +1,7 @@
 "use client";
 
 import { generateCurrentWeekShoppingList, toggleShoppingListItem } from "@/lib/actions/shopping-list";
+import { setDayServings } from "@/lib/actions/plans";
 import { Loader2, ShoppingBasket, X } from "lucide-react";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
@@ -25,6 +26,17 @@ type Props = {
   onClose: () => void;
   isAuthenticated: boolean;
   initialList: ShoppingListPayload;
+  plan: {
+    monday: string | null;
+    tuesday: string | null;
+    wednesday: string | null;
+    thursday: string | null;
+    friday: string | null;
+    entries?: Array<{
+      day: "MONDAY" | "TUESDAY" | "WEDNESDAY" | "THURSDAY" | "FRIDAY" | "SATURDAY" | "SUNDAY";
+      servings: number | null;
+    }>;
+  };
 };
 
 function formatAmount(value: number | null, unit: string | null) {
@@ -41,10 +53,28 @@ function extractBreakdownLines(value: unknown): string[] {
   return value.filter((line): line is string => typeof line === "string" && line.trim().length > 0);
 }
 
-export function ShoppingListDrawer({ isOpen, onClose, isAuthenticated, initialList }: Props) {
+const DAY_LABELS = {
+  monday: "Måndag",
+  tuesday: "Tisdag",
+  wednesday: "Onsdag",
+  thursday: "Torsdag",
+  friday: "Fredag",
+} as const;
+
+const PLAN_DAYS = ["monday", "tuesday", "wednesday", "thursday", "friday"] as const;
+
+export function ShoppingListDrawer({ isOpen, onClose, isAuthenticated, initialList, plan }: Props) {
   const [loading, setLoading] = useState(false);
   const [pendingItem, setPendingItem] = useState<string | null>(null);
+  const [pendingDay, setPendingDay] = useState<string | null>(null);
   const router = useRouter();
+  const servingsByDay = (plan.entries ?? []).reduce<Record<string, number>>((acc, entry) => {
+    const key = entry.day.toLowerCase();
+    if (typeof entry.servings === "number" && Number.isFinite(entry.servings) && entry.servings > 0) {
+      acc[key] = entry.servings;
+    }
+    return acc;
+  }, {});
 
   async function handleGenerate() {
     setLoading(true);
@@ -67,6 +97,21 @@ export function ShoppingListDrawer({ isOpen, onClose, isAuthenticated, initialLi
       }
     } finally {
       setPendingItem(null);
+    }
+  }
+
+  async function handleUpdateDayServings(day: (typeof PLAN_DAYS)[number], next: number) {
+    const normalized = Math.max(1, Math.min(12, Math.round(next)));
+    setPendingDay(day);
+    try {
+      const setResult = await setDayServings(day, normalized);
+      if (!setResult || "error" in setResult) {
+        return;
+      }
+      await generateCurrentWeekShoppingList();
+      router.refresh();
+    } finally {
+      setPendingDay(null);
     }
   }
 
@@ -100,10 +145,49 @@ export function ShoppingListDrawer({ isOpen, onClose, isAuthenticated, initialLi
           <p className="rounded-xl border border-white/20 bg-white/10 p-3 text-sm">Logga in för att skapa och spara inköpslista.</p>
         ) : (
           <>
+            <div className="mb-4 space-y-2 rounded-xl border border-white/15 bg-white/5 p-3">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-white/70">Portioner per dag</p>
+              {PLAN_DAYS.map((day) => {
+                const mealName = plan[day];
+                if (!mealName) {
+                  return null;
+                }
+                const current = servingsByDay[day] ?? 4;
+                const disabled = pendingDay === day || loading;
+                return (
+                  <div key={day} className="flex items-center justify-between gap-2 rounded-md border border-white/10 bg-black/20 px-2 py-1.5">
+                    <div className="min-w-0">
+                      <p className="text-xs font-semibold text-white/80">{DAY_LABELS[day]}</p>
+                      <p className="truncate text-xs text-white/65">{mealName}</p>
+                    </div>
+                    <div className="inline-flex items-center gap-1">
+                      <button
+                        type="button"
+                        disabled={disabled || current <= 1}
+                        onClick={() => void handleUpdateDayServings(day, current - 1)}
+                        className="h-7 w-7 rounded-md border border-white/20 text-sm font-bold text-white disabled:opacity-40"
+                      >
+                        -
+                      </button>
+                      <span className="min-w-14 text-center text-xs font-semibold text-white">{current} pers</span>
+                      <button
+                        type="button"
+                        disabled={disabled || current >= 12}
+                        onClick={() => void handleUpdateDayServings(day, current + 1)}
+                        className="h-7 w-7 rounded-md border border-white/20 text-sm font-bold text-white disabled:opacity-40"
+                      >
+                        +
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
             <button
               type="button"
               onClick={() => void handleGenerate()}
-              disabled={loading}
+              disabled={loading || pendingDay !== null}
               className="mb-4 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-white px-3 py-2.5 text-sm font-semibold text-black disabled:opacity-70"
             >
               {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShoppingBasket className="h-4 w-4" />}
@@ -116,15 +200,25 @@ export function ShoppingListDrawer({ isOpen, onClose, isAuthenticated, initialLi
               ) : (
                 initialList.items.map((item) => (
                   <li key={item.id} className="group relative rounded-lg border border-white/15 bg-white/10 px-3 py-2">
-                    <button
-                      type="button"
-                      onClick={() => void handleToggle(item)}
-                      disabled={pendingItem === item.id}
-                      className="flex w-full items-center justify-between gap-2 text-left"
-                    >
-                      <span className={`text-sm ${item.isChecked ? "line-through text-white/45" : "text-white"}`}>{item.displayName}</span>
-                      <span className="text-xs text-white/70">{formatAmount(item.amount, item.unit)}</span>
-                    </button>
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className={`truncate text-sm ${item.isChecked ? "line-through text-white/45" : "text-white"}`}>{item.displayName}</p>
+                        <p className="text-xs text-white/70">{formatAmount(item.amount, item.unit)}</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => void handleToggle(item)}
+                        disabled={pendingItem === item.id}
+                        className={`h-7 w-7 shrink-0 rounded-md border text-xs font-bold transition ${
+                          item.isChecked
+                            ? "border-emerald-300 bg-emerald-500/25 text-emerald-100"
+                            : "border-white/25 bg-black/25 text-white/80 hover:bg-black/35"
+                        }`}
+                        aria-label={item.isChecked ? "Markera som inte klar" : "Markera som klar"}
+                      >
+                        {item.isChecked ? "✓" : ""}
+                      </button>
+                    </div>
                     {item.unresolved && <p className="mt-1 text-[11px] text-amber-300">Kontrollera mängd/enhet</p>}
                     {extractBreakdownLines(item.sourceMealNames).length > 0 && (
                       <div className="pointer-events-none absolute left-2 right-2 top-full z-20 mt-1 rounded-md border border-white/20 bg-black/90 p-2 text-[11px] text-white opacity-0 shadow-xl transition-opacity duration-150 group-hover:opacity-100">

@@ -1,4 +1,13 @@
 const ALIAS_MAP: Record<string, string> = {
+  chicken: "kyckling",
+  "chicken breast": "kyckling",
+  "chicken thighs": "kyckling",
+  "kycklingfilé": "kyckling",
+  "kycklingfile": "kyckling",
+  "kyckling lårfilé": "kyckling",
+  "kyckling larfile": "kyckling",
+  "kycklinglårfilé": "kyckling",
+  "kycklinglarfile": "kyckling",
   "gul lök": "lök",
   "rod lok": "lök",
   "röd lök": "lök",

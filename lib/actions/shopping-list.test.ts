@@ -53,10 +53,12 @@ describe("shopping list actions", () => {
       monday: "Meal A",
       entries: [
         {
+          servings: 8,
           meal: {
             id: "m1",
             name: "Meal A",
             ingredients: null,
+            defaultServings: 4,
             mealIngredients: [
               { name: "Potatis", canonicalName: "potatis", amount: 1, unit: "kg" },
               { name: "Salt", canonicalName: "salt", amount: null, unit: null },
@@ -71,6 +73,9 @@ describe("shopping list actions", () => {
 
     expect(result).toMatchObject({ success: true, listId: "sl1" });
     expect(prismaMock.shoppingListItem.createMany).toHaveBeenCalledTimes(1);
+    const payload = prismaMock.shoppingListItem.createMany.mock.calls[0][0];
+    const potatis = payload.data.find((row: any) => row.canonicalName === "potatis");
+    expect(potatis).toMatchObject({ amount: 2000, unit: "g" });
   });
 
   it("toggles checked state for shopping item", async () => {

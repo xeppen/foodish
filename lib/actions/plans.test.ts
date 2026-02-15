@@ -52,6 +52,7 @@ vi.mock("next/cache", () => ({
 import {
   generateWeeklyPlan,
   getSwapOptions,
+  setDayServings,
   swapDayMeal,
   swapDayMealWithChoice,
 } from "@/lib/actions/plans";
@@ -236,5 +237,29 @@ describe("plans actions (phase 6)", () => {
     expect(result.options).toHaveLength(0);
     expect(result.fallbackUsed).toBe(true);
     expect(result.fallbackOptions.length).toBeGreaterThan(0);
+  });
+
+  it("setDayServings updates servings for a specific day", async () => {
+    mockGetCurrentUser.mockResolvedValue({ id: "user_1", name: "Test User" });
+    prismaMock.weeklyPlan.findUnique.mockResolvedValueOnce({
+      id: "p1",
+      monday: "Meal A",
+      tuesday: "Meal B",
+      wednesday: "Meal C",
+      thursday: "Meal D",
+      friday: "Meal E",
+    });
+    prismaMock.meal.findFirst.mockResolvedValueOnce({ id: "mA" });
+    prismaMock.weeklyPlanEntry.upsert.mockResolvedValueOnce({});
+
+    const result = await setDayServings("monday", 6);
+
+    expect(result).toMatchObject({ success: true, servings: 6 });
+    expect(prismaMock.weeklyPlanEntry.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        update: expect.objectContaining({ servings: 6 }),
+        create: expect.objectContaining({ servings: 6 }),
+      })
+    );
   });
 });

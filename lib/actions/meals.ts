@@ -28,6 +28,7 @@ const mealSchema = z.object({
     .max(140, "Måltidsnamnet är för långt"),
   complexity: z.enum(["SIMPLE", "MEDIUM", "COMPLEX"]).optional(),
   preferredDays: z.array(weekdaySchema).max(7).default([]),
+  defaultServings: z.coerce.number().int().min(1).max(12).default(4),
 });
 
 const ingredientDraftSchema = z.object({
@@ -393,10 +394,15 @@ export async function addMeal(formData: FormData) {
   const preferredDaysInput = formData.getAll("preferredDays");
   const image = formData.get("image");
   const imageUrlInput = (formData.get("imageUrl") as string) ?? "";
+  const defaultServingsInput = formData.get("defaultServings");
   const validation = mealSchema.safeParse({
     name,
     complexity: typeof complexity === "string" && complexity.length > 0 ? complexity : undefined,
     preferredDays: preferredDaysInput,
+    defaultServings:
+      typeof defaultServingsInput === "string" && defaultServingsInput.trim().length > 0
+        ? defaultServingsInput
+        : undefined,
   });
 
   if (!validation.success) {
@@ -436,6 +442,7 @@ export async function addMeal(formData: FormData) {
       ingredients: structuredIngredients.map((ingredient) => ingredient.name),
       imagePrompt: enriched.imagePrompt,
       preferredDays: validation.data.preferredDays,
+      defaultServings: validation.data.defaultServings,
       imageUrl: uploadedImageUrl ?? providedImageUrl ?? enriched.imageUrl,
       mealIngredients: {
         create: structuredIngredients,
@@ -466,10 +473,15 @@ export async function updateMeal(id: string, formData: FormData) {
   const preferredDaysInput = formData.getAll("preferredDays");
   const image = formData.get("image");
   const imageUrlInput = (formData.get("imageUrl") as string) ?? "";
+  const defaultServingsInput = formData.get("defaultServings");
   const validation = mealSchema.safeParse({
     name,
     complexity: typeof complexity === "string" && complexity.length > 0 ? complexity : undefined,
     preferredDays: preferredDaysInput,
+    defaultServings:
+      typeof defaultServingsInput === "string" && defaultServingsInput.trim().length > 0
+        ? defaultServingsInput
+        : undefined,
   });
 
   if (!validation.success) {
@@ -511,6 +523,7 @@ export async function updateMeal(id: string, formData: FormData) {
         name: validation.data.name,
         ...(validation.data.complexity ? { complexity: validation.data.complexity } : {}),
         preferredDays: validation.data.preferredDays,
+        defaultServings: validation.data.defaultServings,
         ...(uploadedImageUrl ? { imageUrl: uploadedImageUrl } : {}),
         ...(!uploadedImageUrl && providedImageUrl ? { imageUrl: providedImageUrl } : {}),
         ...(structuredIngredients

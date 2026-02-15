@@ -17,6 +17,10 @@ type WeeklyPlan = {
   wednesday: string | null;
   thursday: string | null;
   friday: string | null;
+  entries?: Array<{
+    day: "MONDAY" | "TUESDAY" | "WEDNESDAY" | "THURSDAY" | "FRIDAY" | "SATURDAY" | "SUNDAY";
+    servings: number | null;
+  }>;
 };
 
 type WeekInfo = {
@@ -203,6 +207,7 @@ export function SingleViewShell({
         onClose={() => setIsShoppingOpen(false)}
         isAuthenticated={isAuthenticated}
         initialList={shoppingList ?? null}
+        plan={plan}
       />
 
       <MealDrawer

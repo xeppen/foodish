@@ -12,6 +12,7 @@ type Meal = {
   id: string;
   name: string;
   complexity: "SIMPLE" | "MEDIUM" | "COMPLEX";
+  defaultServings?: number;
   preferredDays: ("MONDAY" | "TUESDAY" | "WEDNESDAY" | "THURSDAY" | "FRIDAY" | "SATURDAY" | "SUNDAY")[];
   imageUrl: string | null;
   ingredients?: unknown;
@@ -89,6 +90,7 @@ export function MealEditorSheet({
   const router = useRouter();
   const [name, setName] = useState("");
   const [complexity, setComplexity] = useState<Meal["complexity"]>("MEDIUM");
+  const [defaultServings, setDefaultServings] = useState(4);
   const [preferredDays, setPreferredDays] = useState<PreferredDay[]>([]);
   const [ingredients, setIngredients] = useState<IngredientDraftItem[]>([]);
   const [imageMode, setImageMode] = useState<"upload" | "url">("upload");
@@ -110,6 +112,7 @@ export function MealEditorSheet({
     if (mode.type === "create") {
       setName("");
       setComplexity("MEDIUM");
+      setDefaultServings(4);
       setPreferredDays([]);
       setIngredients([]);
       setImageMode("upload");
@@ -118,6 +121,7 @@ export function MealEditorSheet({
     } else {
       setName(mode.meal.name);
       setComplexity(mode.meal.complexity);
+      setDefaultServings(Math.max(1, Math.min(12, Math.round(mode.meal.defaultServings ?? 4))));
       setPreferredDays(mode.meal.preferredDays);
       setIngredients(mapMealIngredients(mode.meal));
       setImageMode(mode.meal.imageUrl ? "url" : "upload");
@@ -207,6 +211,7 @@ export function MealEditorSheet({
       const formData = new FormData();
       formData.append("name", trimmedName);
       formData.append("complexity", complexity);
+      formData.append("defaultServings", String(defaultServings));
       for (const day of preferredDays) {
         formData.append("preferredDays", day);
       }
@@ -300,6 +305,28 @@ export function MealEditorSheet({
                     </button>
                   ))}
                 </div>
+              </div>
+
+              <div>
+                <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--warm-gray)]">Portioner</p>
+                <div className="inline-flex items-center gap-2 rounded-lg border border-[var(--cream-dark)] bg-white px-2 py-1">
+                  <button
+                    type="button"
+                    onClick={() => setDefaultServings((current) => Math.max(1, current - 1))}
+                    className="h-7 w-7 rounded-md border border-[var(--cream-dark)] text-sm font-bold text-[var(--charcoal)]"
+                  >
+                    -
+                  </button>
+                  <span className="min-w-16 text-center text-sm font-semibold text-[var(--charcoal)]">{defaultServings} pers</span>
+                  <button
+                    type="button"
+                    onClick={() => setDefaultServings((current) => Math.min(12, current + 1))}
+                    className="h-7 w-7 rounded-md border border-[var(--cream-dark)] text-sm font-bold text-[var(--charcoal)]"
+                  >
+                    +
+                  </button>
+                </div>
+                <p className="mt-1 text-[11px] text-[var(--warm-gray)]">Ingredienserna gäller för denna mängd.</p>
               </div>
 
               <div>

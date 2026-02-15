@@ -33,18 +33,38 @@ type SwapCandidate = {
 
 async function syncWeeklyPlanEntries(
   weeklyPlanId: string,
-  assignments: Array<{ day: Day; mealId: string }>
+  assignments: Array<{ day: Day; mealId: string; servings?: number | null }>
 ) {
-  await prisma.$transaction([
-    prisma.weeklyPlanEntry.deleteMany({ where: { weeklyPlanId } }),
-    prisma.weeklyPlanEntry.createMany({
-      data: assignments.map((assignment) => ({
-        weeklyPlanId,
-        day: dayToEnum(assignment.day),
-        mealId: assignment.mealId,
-      })),
-    }),
-  ]);
+  const dedupedByDay = new Map<Day, { mealId: string; servings?: number | null }>();
+  for (const assignment of assignments) {
+    dedupedByDay.set(assignment.day, {
+      mealId: assignment.mealId,
+      servings: assignment.servings,
+    });
+  }
+
+  await prisma.$transaction(
+    Array.from(dedupedByDay.entries()).map(([day, assignment]) =>
+      prisma.weeklyPlanEntry.upsert({
+        where: {
+          weeklyPlanId_day: {
+            weeklyPlanId,
+            day: dayToEnum(day),
+          },
+        },
+        update: {
+          mealId: assignment.mealId,
+          servings: clampServings(assignment.servings ?? null),
+        },
+        create: {
+          weeklyPlanId,
+          day: dayToEnum(day),
+          mealId: assignment.mealId,
+          servings: clampServings(assignment.servings ?? null),
+        },
+      })
+    )
+  );
 }
 
 // Get the Monday of the current week (ISO week starts on Monday)
@@ -68,6 +88,15 @@ function formatDate(date: Date): string {
 }
 
 const RECENT_LOOKBACK_DAYS = 14;
+const MIN_SERVINGS = 1;
+const MAX_SERVINGS = 12;
+
+function clampServings(servings: number | null | undefined): number {
+  if (typeof servings !== "number" || !Number.isFinite(servings)) {
+    return 4;
+  }
+  return Math.max(MIN_SERVINGS, Math.min(MAX_SERVINGS, Math.round(servings)));
+}
 
 function subtractDays(date: Date, days: number): Date {
   const d = new Date(date);
@@ -161,6 +190,14 @@ export async function getCurrentWeekPlan() {
           weekStartDate: weekStart,
         },
       },
+      include: {
+        entries: {
+          select: {
+            day: true,
+            servings: true,
+          },
+        },
+      },
     });
 
     return plan;
@@ -190,6 +227,14 @@ export async function generateWeeklyPlan(options?: { force?: boolean; revalidate
         weekStartDate: weekStart,
       },
     },
+    include: {
+      entries: {
+        select: {
+          day: true,
+          servings: true,
+        },
+      },
+    },
   });
 
   if (existingPlan && !options?.force) {
@@ -200,7 +245,14 @@ export async function generateWeeklyPlan(options?: { force?: boolean; revalidate
   const blockedFavoriteIds = await getBlockedFavoriteIds(user.id, weekStart);
   const allMeals = await prisma.meal.findMany({
     where: { userId: user.id },
-    select: { id: true, name: true, thumbsUpCount: true, thumbsDownCount: true, preferredDays: true },
+    select: {
+      id: true,
+      name: true,
+      thumbsUpCount: true,
+      thumbsDownCount: true,
+      preferredDays: true,
+      defaultServings: true,
+    },
   });
 
   const daySignals = await loadMealDaySignals(
@@ -247,6 +299,7 @@ export async function generateWeeklyPlan(options?: { force?: boolean; revalidate
     selectedMeals.map((meal, index) => ({
       day: DAY_ORDER[index],
       mealId: meal.id,
+      servings: meal.defaultServings,
     }))
   );
 
@@ -263,6 +316,23 @@ export async function generateWeeklyPlan(options?: { force?: boolean; revalidate
     selectedMeals.map((meal, index) => recordMealDayShown(user.id, meal.id, DAY_ORDER[index]))
   );
 
+  const planWithEntries = await prisma.weeklyPlan.findUnique({
+    where: {
+      userId_weekStartDate: {
+        userId: user.id,
+        weekStartDate: weekStart,
+      },
+    },
+    include: {
+      entries: {
+        select: {
+          day: true,
+          servings: true,
+        },
+      },
+    },
+  });
+
   const shouldRevalidate = options?.revalidate !== false;
   if (shouldRevalidate) {
     revalidatePath("/");
@@ -270,7 +340,7 @@ export async function generateWeeklyPlan(options?: { force?: boolean; revalidate
   }
   return {
     success: true,
-    plan,
+    plan: planWithEntries ?? plan,
     warning: warningMessage(warnings),
   };
 }
@@ -443,7 +513,7 @@ export async function swapDayMealWithChoice(day: Day, mealId: string) {
 
   const meal = await prisma.meal.findUnique({
     where: { id: mealId },
-    select: { id: true, name: true, userId: true },
+    select: { id: true, name: true, userId: true, defaultServings: true },
   });
 
   if (!meal || meal.userId !== user.id) {
@@ -489,11 +559,13 @@ export async function swapDayMealWithChoice(day: Day, mealId: string) {
     },
     update: {
       mealId: meal.id,
+      servings: clampServings(meal.defaultServings),
     },
     create: {
       weeklyPlanId: plan.id,
       day: dayToEnum(day),
       mealId: meal.id,
+      servings: clampServings(meal.defaultServings),
     },
   });
 
@@ -513,7 +585,12 @@ export async function swapDayMealWithChoice(day: Day, mealId: string) {
 
   revalidatePath("/");
   revalidatePath("/plan");
-  return { success: true, newMeal: meal.name, mealId: meal.id };
+  return {
+    success: true,
+    newMeal: meal.name,
+    mealId: meal.id,
+    servings: clampServings(meal.defaultServings),
+  };
 }
 
 export async function swapDayMeal(day: Day) {
@@ -563,7 +640,7 @@ export async function swapDayMeal(day: Day) {
 
   const allMeals = await prisma.meal.findMany({
     where: { userId: user.id },
-    select: { id: true, name: true },
+    select: { id: true, name: true, defaultServings: true },
   });
   const newMeals = selectMeals(allMeals, 1, mealsToAvoid);
 
@@ -595,11 +672,13 @@ export async function swapDayMeal(day: Day) {
     },
     update: {
       mealId: newMeals[0].id,
+      servings: clampServings(newMeals[0].defaultServings),
     },
     create: {
       weeklyPlanId: plan.id,
       day: dayToEnum(day),
       mealId: newMeals[0].id,
+      servings: clampServings(newMeals[0].defaultServings),
     },
   });
 
@@ -628,5 +707,63 @@ export async function swapDayMeal(day: Day) {
 
   revalidatePath("/");
   revalidatePath("/plan");
-  return { success: true, newMeal };
+  return { success: true, newMeal, servings: clampServings(newMeals[0].defaultServings) };
+}
+
+export async function setDayServings(day: Day, servings: number) {
+  const user = await getCurrentUser();
+  if (!user) {
+    return { error: "Ej behörig" };
+  }
+
+  const weekStart = getWeekStart();
+  const plan = await prisma.weeklyPlan.findUnique({
+    where: {
+      userId_weekStartDate: {
+        userId: user.id,
+        weekStartDate: weekStart,
+      },
+    },
+  });
+
+  if (!plan) {
+    return { error: "Ingen plan hittades för den här veckan" };
+  }
+
+  const normalizedServings = clampServings(servings);
+  const mealName = plan[day];
+  if (!mealName) {
+    return { error: "Ingen måltid hittades för dagen" };
+  }
+
+  const meal = await prisma.meal.findFirst({
+    where: { userId: user.id, name: mealName },
+    select: { id: true },
+  });
+
+  if (!meal) {
+    return { error: "Måltiden hittades inte" };
+  }
+
+  await prisma.weeklyPlanEntry.upsert({
+    where: {
+      weeklyPlanId_day: {
+        weeklyPlanId: plan.id,
+        day: dayToEnum(day),
+      },
+    },
+    update: {
+      servings: normalizedServings,
+      mealId: meal.id,
+    },
+    create: {
+      weeklyPlanId: plan.id,
+      day: dayToEnum(day),
+      mealId: meal.id,
+      servings: normalizedServings,
+    },
+  });
+
+  revalidatePath("/");
+  return { success: true, servings: normalizedServings };
 }

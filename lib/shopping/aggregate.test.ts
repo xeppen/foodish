@@ -19,4 +19,20 @@ describe("aggregateShoppingIngredients", () => {
 
     expect(result[0]).toMatchObject({ unresolved: true, amount: null, unit: null });
   });
+
+  it("merges unresolved duplicate into quantified ingredient when canonical matches", () => {
+    const result = aggregateShoppingIngredients([
+      { mealId: "m1", mealName: "A", name: "Kyckling", amount: 500, unit: "g" },
+      { mealId: "m2", mealName: "B", name: "Chicken", amount: null, unit: null },
+    ]);
+
+    expect(result).toHaveLength(1);
+    expect(result[0]).toMatchObject({
+      canonicalName: "kyckling",
+      amount: 500,
+      unit: "g",
+      unresolved: true,
+    });
+    expect(result[0].sourceMealNames).toEqual(expect.arrayContaining(["A", "B"]));
+  });
 });

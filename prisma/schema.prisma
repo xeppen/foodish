@@ -46,6 +46,7 @@ model Meal {
   imagePrompt     String?
   tags            Json?
   ingredients     Json?
+  defaultServings Int            @default(4)
   preferredDays   Weekday[]       @default([])
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt

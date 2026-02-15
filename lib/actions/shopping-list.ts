@@ -20,6 +20,10 @@ function getWeekStart(date: Date = new Date()): Date {
   return monday;
 }
 
+function roundAmount(amount: number): number {
+  return Math.round(amount * 100) / 100;
+}
+
 export async function getCurrentWeekShoppingList() {
   const user = await getCurrentUser();
   if (!user) {
@@ -86,7 +90,11 @@ export async function generateCurrentWeekShoppingList() {
       entries: {
         include: {
           meal: {
-            include: {
+            select: {
+              id: true,
+              name: true,
+              ingredients: true,
+              defaultServings: true,
               mealIngredients: {
                 orderBy: { position: "asc" },
               },
@@ -101,38 +109,66 @@ export async function generateCurrentWeekShoppingList() {
     return { error: "Ingen veckoplan hittades" };
   }
 
-  let meals = plan.entries.map((entry) => entry.meal);
-  if (meals.length === 0) {
+  type MealWithRows = {
+    id: string;
+    name: string;
+    ingredients: unknown;
+    defaultServings: number;
+    mealIngredients: Array<{
+      name: string;
+      canonicalName: string;
+      amount: number | null;
+      unit: string | null;
+      position?: number;
+      note?: string | null;
+      optional?: boolean;
+      confidence?: number | null;
+      needsReview?: boolean;
+      createdAt?: Date;
+      updatedAt?: Date;
+    }>;
+  };
+
+  let planMeals: Array<{ meal: MealWithRows; servings: number | null }> = plan.entries.map((entry) => ({
+    meal: entry.meal,
+    servings: entry.servings ?? null,
+  }));
+  if (planMeals.length === 0) {
     const mealNames = [plan.monday, plan.tuesday, plan.wednesday, plan.thursday, plan.friday].filter(
       (value): value is string => Boolean(value)
     );
-    meals = await prisma.meal.findMany({
+    const meals = await prisma.meal.findMany({
       where: {
         userId: user.id,
         name: { in: mealNames },
       },
-      include: {
+      select: {
+        id: true,
+        name: true,
+        ingredients: true,
+        defaultServings: true,
         mealIngredients: {
           orderBy: { position: "asc" },
         },
       },
     });
+    planMeals = meals.map((meal) => ({ meal, servings: null }));
   }
 
   const mealsWithIngredients = await Promise.all(
-    meals.map(async (meal) => {
+    planMeals.map(async ({ meal, servings }) => {
       const hasStructured = meal.mealIngredients.length > 0;
       const legacyRaw = Array.isArray(meal.ingredients) ? meal.ingredients : [];
       const hasLegacy = legacyRaw.some((value) => typeof value === "string" && value.trim().length > 0);
 
       if (hasStructured || hasLegacy) {
-        return meal;
+        return { meal, servings };
       }
 
       try {
         const draft = await generateIngredientDraft(meal.name);
         if (!draft.ingredients || draft.ingredients.length === 0) {
-          return meal;
+          return { meal, servings };
         }
 
         const generatedRows = draft.ingredients
@@ -151,7 +187,7 @@ export async function generateCurrentWeekShoppingList() {
           .filter((row) => row.name.length > 0);
 
         if (generatedRows.length === 0) {
-          return meal;
+          return { meal, servings };
         }
 
         await prisma.$transaction(async (tx) => {
@@ -164,28 +200,38 @@ export async function generateCurrentWeekShoppingList() {
         });
 
         return {
-          ...meal,
-          mealIngredients: generatedRows.map((row) => ({
-            ...row,
-            createdAt: new Date(),
-            updatedAt: new Date(),
-          })),
-          ingredients: generatedRows.map((row) => row.name),
+          meal: {
+            ...meal,
+            mealIngredients: generatedRows.map((row) => ({
+              ...row,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            })),
+            ingredients: generatedRows.map((row) => row.name),
+          },
+          servings,
         };
       } catch {
-        return meal;
+        return { meal, servings };
       }
     })
   );
 
-  const ingredientRows = mealsWithIngredients.flatMap((meal) => {
+  const ingredientRows = mealsWithIngredients.flatMap(({ meal, servings }) => {
+    const baseline = meal.defaultServings > 0 ? meal.defaultServings : 4;
+    const targetServings = servings && servings > 0 ? servings : baseline;
+    const servingsFactor = targetServings / baseline;
+
     if (meal.mealIngredients.length > 0) {
       return meal.mealIngredients.map((ingredient) => ({
         mealId: meal.id,
         mealName: meal.name,
         name: ingredient.name,
         canonicalName: ingredient.canonicalName,
-        amount: ingredient.amount,
+        amount:
+          typeof ingredient.amount === "number" && Number.isFinite(ingredient.amount)
+            ? roundAmount(ingredient.amount * servingsFactor)
+            : null,
         unit: ingredient.unit,
       }));
     }

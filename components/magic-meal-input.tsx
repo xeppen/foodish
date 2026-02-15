@@ -37,6 +37,7 @@ export function MagicMealInput() {
   const [loading, setLoading] = useState(false);
   const [generationLoading, setGenerationLoading] = useState(false);
   const [complexity, setComplexity] = useState<EnrichmentResult["complexity"]>("MEDIUM");
+  const [defaultServings, setDefaultServings] = useState(4);
   const [preferredDays, setPreferredDays] = useState<PreferredDay[]>([]);
   const [imageUrl, setImageUrl] = useState("");
   const [imageFile, setImageFile] = useState<File | null>(null);
@@ -107,6 +108,7 @@ export function MagicMealInput() {
       const formData = new FormData();
       formData.append("name", name);
       formData.append("complexity", complexity);
+      formData.append("defaultServings", String(defaultServings));
       for (const day of preferredDays) {
         formData.append("preferredDays", day);
       }
@@ -133,6 +135,7 @@ export function MagicMealInput() {
 
       setValue("");
       setComplexity("MEDIUM");
+      setDefaultServings(4);
       setPreferredDays([]);
       setImageUrl("");
       setImageFile(null);
@@ -206,6 +209,27 @@ export function MagicMealInput() {
                 {option.label}
               </button>
             ))}
+          </div>
+        </div>
+
+        <div className="mt-4">
+          <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--warm-gray)]">Portioner</p>
+          <div className="inline-flex items-center gap-2 rounded-lg border border-[var(--cream-dark)] bg-white px-2 py-1">
+            <button
+              type="button"
+              onClick={() => setDefaultServings((current) => Math.max(1, current - 1))}
+              className="h-7 w-7 rounded-md border border-[var(--cream-dark)] text-sm font-bold text-[var(--charcoal)]"
+            >
+              -
+            </button>
+            <span className="min-w-16 text-center text-sm font-semibold text-[var(--charcoal)]">{defaultServings} pers</span>
+            <button
+              type="button"
+              onClick={() => setDefaultServings((current) => Math.min(12, current + 1))}
+              className="h-7 w-7 rounded-md border border-[var(--cream-dark)] text-sm font-bold text-[var(--charcoal)]"
+            >
+              +
+            </button>
           </div>
         </div>
 

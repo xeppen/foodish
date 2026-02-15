@@ -47,6 +47,12 @@ function formatAmount(amount: number | null, unit: string | null): string {
 
 export function aggregateShoppingIngredients(input: IngredientForAggregation[]): AggregatedShoppingItem[] {
   const bucket = new Map<string, AggregatedShoppingItem>();
+  const unresolvedOnlyRows: Array<{
+    canonical: string;
+    display: string;
+    mealId: string;
+    mealName: string;
+  }> = [];
   const invalidTokens = new Set(["null", "undefined", "none", "n/a", "na", "okänd", "unknown", "-"]);
 
   for (const row of input) {
@@ -60,14 +66,21 @@ export function aggregateShoppingIngredients(input: IngredientForAggregation[]):
     }
     const normalizedUnit = normalizeUnit(row.unit);
     const hasNumericAmount = typeof row.amount === "number" && Number.isFinite(row.amount);
+    if (!hasNumericAmount || !normalizedUnit) {
+      unresolvedOnlyRows.push({
+        canonical,
+        display,
+        mealId: row.mealId,
+        mealName: row.mealName,
+      });
+      continue;
+    }
 
     let keyUnit = normalizedUnit;
     let keyAmount = row.amount ?? null;
-    if (hasNumericAmount && normalizedUnit) {
-      const converted = maybeConvert(row.amount as number, normalizedUnit);
-      keyUnit = converted.unit;
-      keyAmount = converted.amount;
-    }
+    const converted = maybeConvert(row.amount as number, normalizedUnit);
+    keyUnit = converted.unit;
+    keyAmount = converted.amount;
 
     const key = `${canonical}::${keyUnit ?? "none"}`;
     const existing = bucket.get(key);
@@ -76,12 +89,12 @@ export function aggregateShoppingIngredients(input: IngredientForAggregation[]):
       bucket.set(key, {
         canonicalName: canonical,
         displayName: display,
-        amount: hasNumericAmount ? (keyAmount as number) : null,
+        amount: keyAmount as number,
         unit: keyUnit,
-        unresolved: !hasNumericAmount || !keyUnit,
+        unresolved: false,
         sourceMealIds: [row.mealId],
         sourceMealNames: [row.mealName],
-        sourceMealBreakdown: [`${row.mealName}: ${formatAmount(hasNumericAmount ? (keyAmount as number) : null, keyUnit)}`],
+        sourceMealBreakdown: [`${row.mealName}: ${formatAmount(keyAmount as number, keyUnit)}`],
       });
       continue;
     }
@@ -92,15 +105,57 @@ export function aggregateShoppingIngredients(input: IngredientForAggregation[]):
     if (!existing.sourceMealNames.includes(row.mealName)) {
       existing.sourceMealNames.push(row.mealName);
     }
-    const sourceLine = `${row.mealName}: ${formatAmount(hasNumericAmount ? (keyAmount as number) : null, keyUnit)}`;
+    const sourceLine = `${row.mealName}: ${formatAmount(keyAmount as number, keyUnit)}`;
     if (!existing.sourceMealBreakdown.includes(sourceLine)) {
       existing.sourceMealBreakdown.push(sourceLine);
     }
 
-    if (hasNumericAmount && existing.amount !== null) {
+    if (existing.amount !== null) {
       existing.amount = existing.amount + (keyAmount as number);
-    } else {
-      existing.unresolved = true;
+    }
+  }
+
+  for (const row of unresolvedOnlyRows) {
+    const preferred = Array.from(bucket.values()).find((item) => item.canonicalName === row.canonical);
+    if (preferred) {
+      preferred.unresolved = true;
+      if (!preferred.sourceMealIds.includes(row.mealId)) {
+        preferred.sourceMealIds.push(row.mealId);
+      }
+      if (!preferred.sourceMealNames.includes(row.mealName)) {
+        preferred.sourceMealNames.push(row.mealName);
+      }
+      const sourceLine = `${row.mealName}: ${formatAmount(null, null)}`;
+      if (!preferred.sourceMealBreakdown.includes(sourceLine)) {
+        preferred.sourceMealBreakdown.push(sourceLine);
+      }
+      continue;
+    }
+
+    const key = `${row.canonical}::none`;
+    const existing = bucket.get(key);
+    if (!existing) {
+      bucket.set(key, {
+        canonicalName: row.canonical,
+        displayName: row.display,
+        amount: null,
+        unit: null,
+        unresolved: true,
+        sourceMealIds: [row.mealId],
+        sourceMealNames: [row.mealName],
+        sourceMealBreakdown: [`${row.mealName}: ${formatAmount(null, null)}`],
+      });
+      continue;
+    }
+    if (!existing.sourceMealIds.includes(row.mealId)) {
+      existing.sourceMealIds.push(row.mealId);
+    }
+    if (!existing.sourceMealNames.includes(row.mealName)) {
+      existing.sourceMealNames.push(row.mealName);
+    }
+    const sourceLine = `${row.mealName}: ${formatAmount(null, null)}`;
+    if (!existing.sourceMealBreakdown.includes(sourceLine)) {
+      existing.sourceMealBreakdown.push(sourceLine);
     }
   }
 

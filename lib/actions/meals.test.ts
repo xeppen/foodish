@@ -84,6 +84,7 @@ describe("meals actions", () => {
           imagePrompt: expect.any(String),
           imageUrl: expect.stringContaining("/api/meal-image?meal="),
           preferredDays: [],
+          defaultServings: 4,
         }),
       })
     );
@@ -106,6 +107,7 @@ describe("meals actions", () => {
         name: "Kycklinggryta",
         complexity: "SIMPLE",
         preferredDays: [],
+        defaultServings: 4,
       },
     });
   });
@@ -190,6 +192,7 @@ describe("meals actions", () => {
         name: "Pasta",
         complexity: "MEDIUM",
         preferredDays: ["MONDAY", "THURSDAY"],
+        defaultServings: 4,
       },
     });
   });
