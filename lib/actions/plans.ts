@@ -3,6 +3,7 @@
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
+import { regenerateShoppingListForUser } from "@/lib/actions/shopping-list";
 import { selectMeals, selectMealsByDay, type SelectionWarning } from "@/lib/planning/selection";
 import {
   dayToEnum,
@@ -315,6 +316,15 @@ export async function generateWeeklyPlan(options?: { force?: boolean; revalidate
   await Promise.all(
     selectedMeals.map((meal, index) => recordMealDayShown(user.id, meal.id, DAY_ORDER[index]))
   );
+  try {
+    await regenerateShoppingListForUser(user.id, weekStart, { revalidate: false });
+  } catch (error) {
+    console.error("Failed to regenerate shopping list after weekly plan generation", {
+      userId: user.id,
+      weekStart: weekStart.toISOString(),
+      error,
+    });
+  }
 
   const planWithEntries = await prisma.weeklyPlan.findUnique({
     where: {
@@ -582,6 +592,16 @@ export async function swapDayMealWithChoice(day: Day, mealId: string) {
   if (previousMeal?.id) {
     await recordMealSwappedAway(user.id, previousMeal.id, day);
   }
+  try {
+    await regenerateShoppingListForUser(user.id, weekStart, { revalidate: false });
+  } catch (error) {
+    console.error("Failed to regenerate shopping list after day swap", {
+      userId: user.id,
+      day,
+      weekStart: weekStart.toISOString(),
+      error,
+    });
+  }
 
   revalidatePath("/");
   revalidatePath("/plan");
@@ -704,6 +724,16 @@ export async function swapDayMeal(day: Day) {
   if (previousMeal?.id) {
     await recordMealSwappedAway(user.id, previousMeal.id, day);
   }
+  try {
+    await regenerateShoppingListForUser(user.id, weekStart, { revalidate: false });
+  } catch (error) {
+    console.error("Failed to regenerate shopping list after quick swap", {
+      userId: user.id,
+      day,
+      weekStart: weekStart.toISOString(),
+      error,
+    });
+  }
 
   revalidatePath("/");
   revalidatePath("/plan");
@@ -763,6 +793,16 @@ export async function setDayServings(day: Day, servings: number) {
       servings: normalizedServings,
     },
   });
+  try {
+    await regenerateShoppingListForUser(user.id, weekStart, { revalidate: false });
+  } catch (error) {
+    console.error("Failed to regenerate shopping list after servings update", {
+      userId: user.id,
+      day,
+      weekStart: weekStart.toISOString(),
+      error,
+    });
+  }
 
   revalidatePath("/");
   return { success: true, servings: normalizedServings };

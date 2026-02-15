@@ -79,10 +79,18 @@ export async function generateCurrentWeekShoppingList() {
   }
 
   const weekStart = getWeekStart();
+  return regenerateShoppingListForUser(user.id, weekStart);
+}
+
+export async function regenerateShoppingListForUser(
+  userId: string,
+  weekStart: Date,
+  options?: { revalidate?: boolean }
+) {
   const plan = await prisma.weeklyPlan.findUnique({
     where: {
       userId_weekStartDate: {
-        userId: user.id,
+        userId,
         weekStartDate: weekStart,
       },
     },
@@ -139,7 +147,7 @@ export async function generateCurrentWeekShoppingList() {
     );
     const meals = await prisma.meal.findMany({
       where: {
-        userId: user.id,
+        userId,
         name: { in: mealNames },
       },
       select: {
@@ -254,12 +262,12 @@ export async function generateCurrentWeekShoppingList() {
   const shoppingList = await prisma.shoppingList.upsert({
     where: {
       userId_weekStartDate: {
-        userId: user.id,
+        userId,
         weekStartDate: weekStart,
       },
     },
     create: {
-      userId: user.id,
+      userId,
       weekStartDate: weekStart,
       weeklyPlanId: plan.id,
       status: "READY",
@@ -292,6 +300,8 @@ export async function generateCurrentWeekShoppingList() {
       : []),
   ]);
 
-  revalidatePath("/");
+  if (options?.revalidate !== false) {
+    revalidatePath("/");
+  }
   return { success: true, listId: shoppingList.id, itemCount: aggregated.length };
 }

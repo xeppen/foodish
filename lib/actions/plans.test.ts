@@ -3,10 +3,12 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const {
   mockGetCurrentUser,
   mockRevalidatePath,
+  mockRegenerateShoppingListForUser,
   prismaMock,
 } = vi.hoisted(() => ({
   mockGetCurrentUser: vi.fn(),
   mockRevalidatePath: vi.fn(),
+  mockRegenerateShoppingListForUser: vi.fn(),
   prismaMock: {
     weeklyPlan: {
       findUnique: vi.fn(),
@@ -49,6 +51,10 @@ vi.mock("next/cache", () => ({
   revalidatePath: mockRevalidatePath,
 }));
 
+vi.mock("@/lib/actions/shopping-list", () => ({
+  regenerateShoppingListForUser: mockRegenerateShoppingListForUser,
+}));
+
 import {
   generateWeeklyPlan,
   getSwapOptions,
@@ -60,6 +66,7 @@ import {
 describe("plans actions (phase 6)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockRegenerateShoppingListForUser.mockResolvedValue({ success: true, listId: "sl_1", itemCount: 5 });
     prismaMock.$transaction.mockImplementation(async (ops: unknown) => {
       if (typeof ops === "function") {
         return ops(prismaMock);
