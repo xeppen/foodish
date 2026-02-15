@@ -335,7 +335,7 @@ export function MagicMealInput() {
 
           <div className="space-y-2">
             {ingredients.map((ingredient, index) => (
-              <div key={`${ingredient.name}-${index}`} className="grid grid-cols-[1fr_72px_68px] gap-2">
+              <div key={index} className="grid grid-cols-[1fr_72px_68px] gap-2">
                 <input
                   value={ingredient.name}
                   onChange={(event) =>

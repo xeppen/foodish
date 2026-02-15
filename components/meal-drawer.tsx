@@ -6,7 +6,7 @@ import { MealList } from "@/components/meal-list";
 import { EmptyState } from "@/components/empty-state";
 import { LoginButton } from "@/components/login-button";
 import { SignOutButton } from "@/components/sign-out-button";
-import { addMeal, resetMealLearning } from "@/lib/actions/meals";
+import { bulkGenerateMealIngredients, resetMealLearning } from "@/lib/actions/meals";
 import { useRouter } from "next/navigation";
 import { MealEditorSheet } from "@/components/meal-editor-sheet";
 
@@ -18,6 +18,7 @@ type Meal = {
   thumbsUpCount: number;
   thumbsDownCount: number;
   imageUrl: string | null;
+  ingredients?: unknown;
   mealIngredients?: Array<{
     name: string;
     amount: number | null;
@@ -34,6 +35,7 @@ type MealDrawerProps = {
   isOpen: boolean;
   isAuthenticated: boolean;
   meals: Meal[];
+  commonMealImageByName?: Record<string, string>;
   onClose: () => void;
   onAuthRequired: () => void;
 };
@@ -42,15 +44,16 @@ export function MealDrawer({
   isOpen,
   isAuthenticated,
   meals,
+  commonMealImageByName,
   onClose,
   onAuthRequired,
 }: MealDrawerProps) {
   const [isResetting, setIsResetting] = useState(false);
-  const [quickName, setQuickName] = useState("");
-  const [quickSaving, setQuickSaving] = useState(false);
-  const [quickError, setQuickError] = useState<string | null>(null);
+  const [isBulkGenerating, setIsBulkGenerating] = useState(false);
+  const [bulkMessage, setBulkMessage] = useState<string | null>(null);
   const [editorMode, setEditorMode] = useState<{ type: "create" } | { type: "edit"; meal: Meal } | null>(null);
   const router = useRouter();
+  const mealsMissingIngredientsCount = meals.filter((meal) => (meal.mealIngredients?.length ?? 0) === 0).length;
 
   useEffect(() => {
     if (!isOpen) {
@@ -80,26 +83,35 @@ export function MealDrawer({
     }
   }
 
-  async function handleQuickAdd() {
-    const name = quickName.trim();
-    if (!name || quickSaving) {
+  async function handleBulkGenerateIngredients() {
+    if (mealsMissingIngredientsCount === 0) {
+      setBulkMessage("Alla måltider har redan ingredienser.");
       return;
     }
 
-    setQuickSaving(true);
-    setQuickError(null);
+    if (
+      !confirm(
+        `Generera ingrediensförslag för ${mealsMissingIngredientsCount} måltider som saknar ingredienser? Detta kan ta en stund.`
+      )
+    ) {
+      return;
+    }
+
+    setIsBulkGenerating(true);
+    setBulkMessage(null);
     try {
-      const formData = new FormData();
-      formData.append("name", name);
-      const result = await addMeal(formData);
+      const result = await bulkGenerateMealIngredients({ overwrite: false });
       if (result.error) {
-        setQuickError(result.error);
+        setBulkMessage(result.error);
         return;
       }
-      setQuickName("");
+
+      setBulkMessage(
+        `Klart: ${result.updated} uppdaterade, ${result.skipped} hoppades över, ${result.failed} misslyckades.`
+      );
       router.refresh();
     } finally {
-      setQuickSaving(false);
+      setIsBulkGenerating(false);
     }
   }
 
@@ -120,7 +132,7 @@ export function MealDrawer({
       />
 
       <aside
-        className={`relative absolute bottom-0 left-0 right-0 h-[100dvh] border border-white/30 bg-white/95 shadow-2xl transition-transform duration-300 ease-out sm:bottom-0 sm:left-auto sm:right-0 sm:top-0 sm:h-full sm:w-[42vw] sm:max-w-[560px] sm:rounded-none sm:rounded-l-3xl ${
+        className={`absolute bottom-0 left-0 right-0 h-[100dvh] border border-white/30 bg-white/95 shadow-2xl transition-transform duration-300 ease-out sm:inset-y-0 sm:left-auto sm:right-0 sm:h-full sm:w-[42vw] sm:max-w-[560px] sm:rounded-none sm:rounded-l-3xl ${
           isOpen ? "translate-y-0 sm:translate-x-0" : "translate-y-full sm:translate-x-full"
         }`}
         role="dialog"
@@ -150,38 +162,27 @@ export function MealDrawer({
             {isAuthenticated ? (
               <div className="space-y-6">
                 <section className="rounded-2xl border border-[var(--cream-dark)] bg-[var(--cream)]/70 p-4">
-                  <label
-                    htmlFor="quick-meal-input"
-                    className="mb-2 block text-xs font-semibold uppercase tracking-[0.12em] text-[var(--warm-gray)]"
-                  >
-                    Lägg till snabbt
-                  </label>
-                  <div className="flex gap-2">
-                    <input
-                      id="quick-meal-input"
-                      type="text"
-                      value={quickName}
-                      onChange={(event) => setQuickName(event.target.value)}
-                      placeholder="Skriv en rätt, t.ex. Korv stroganoff"
-                      className="min-w-0 flex-1"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => void handleQuickAdd()}
-                      disabled={quickSaving || !quickName.trim()}
-                      className="rounded-md bg-[var(--terracotta)] px-3 py-2 text-xs font-semibold text-white disabled:opacity-60"
-                    >
-                      {quickSaving ? "Sparar..." : "Lägg till"}
-                    </button>
-                  </div>
-                  {quickError && <p className="mt-2 text-xs text-red-600">{quickError}</p>}
+                  <p className="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-[var(--warm-gray)]">
+                    Ny måltid
+                  </p>
                   <button
                     type="button"
                     onClick={() => setEditorMode({ type: "create" })}
-                    className="mt-3 text-xs font-semibold text-[var(--warm-gray)] hover:text-[var(--charcoal)]"
+                    className="w-full rounded-md bg-[var(--terracotta)] px-3 py-2 text-xs font-semibold text-white"
                   >
                     Skapa med detaljer
                   </button>
+                  <button
+                    type="button"
+                    onClick={() => void handleBulkGenerateIngredients()}
+                    disabled={isBulkGenerating || mealsMissingIngredientsCount === 0}
+                    className="mt-2 block text-xs font-semibold text-[var(--charcoal)] underline-offset-2 hover:underline disabled:opacity-60"
+                  >
+                    {isBulkGenerating
+                      ? `Genererar (${mealsMissingIngredientsCount} kvar)...`
+                      : `Autofyll ingredienser (${mealsMissingIngredientsCount} kvar)`}
+                  </button>
+                  {bulkMessage && <p className="mt-2 text-xs text-[var(--warm-gray)]">{bulkMessage}</p>}
                 </section>
 
                 <section>
@@ -191,7 +192,11 @@ export function MealDrawer({
                       description="Lägg till din första måltid för att skapa personliga veckoplaner."
                     />
                   ) : (
-                    <MealList meals={meals} onEditMeal={(meal) => setEditorMode({ type: "edit", meal })} />
+                    <MealList
+                      meals={meals}
+                      commonMealImageByName={commonMealImageByName}
+                      onEditMeal={(meal) => setEditorMode({ type: "edit", meal })}
+                    />
                   )}
                 </section>
               </div>

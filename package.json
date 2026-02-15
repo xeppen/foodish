@@ -3,8 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "pnpm clean:next-dev && next dev",
     "clean:next": "node -e \"require('fs').rmSync('.next',{recursive:true,force:true})\"",
+    "clean:next-dev": "node -e \"require('fs').rmSync('.next-dev',{recursive:true,force:true})\"",
     "build": "prisma generate && next build",
     "start": "next start",
     "lint": "next lint",

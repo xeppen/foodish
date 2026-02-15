@@ -14,6 +14,7 @@ type Meal = {
   thumbsUpCount: number;
   thumbsDownCount: number;
   imageUrl: string | null;
+  ingredients?: unknown;
   mealIngredients?: Array<{
     name: string;
     amount: number | null;
@@ -44,9 +45,11 @@ const DAY_OPTIONS: Array<{ value: Meal["preferredDays"][number]; short: string }
 
 export function MealList({
   meals,
+  commonMealImageByName,
   onEditMeal,
 }: {
   meals: Meal[];
+  commonMealImageByName?: Record<string, string>;
   onEditMeal: (meal: Meal) => void;
 }) {
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
@@ -94,7 +97,8 @@ export function MealList({
     <ul className="divide-y divide-[var(--cream-dark)] rounded-xl border border-[var(--cream-dark)] bg-white">
       {meals.map((meal) => {
         const mealVotes = votes[meal.id] ?? { up: meal.thumbsUpCount, down: meal.thumbsDownCount };
-        const imageSrc = resolveMealImageUrl(meal.imageUrl, meal.name);
+        const commonImageUrl = commonMealImageByName?.[meal.name.trim().toLowerCase()] ?? null;
+        const imageSrc = resolveMealImageUrl(meal.imageUrl ?? commonImageUrl, meal.name);
 
         return (
           <li key={meal.id} className="relative px-2 py-2">

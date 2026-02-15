@@ -5,6 +5,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 import { listCommonMeals } from "@/lib/common-meals";
 import { resetUserMealDaySignals } from "@/lib/planning/day-signals";
+import { generateIngredientDraft } from "@/lib/ai/ingredients";
 import { normalizeIngredientName } from "@/lib/shopping/normalize";
 import { Prisma } from "@prisma/client";
 import { UTApi } from "uploadthing/server";
@@ -260,6 +261,39 @@ function parseIngredientsFromFormData(formData: FormData): MealIngredientInput[]
     position: index,
     canonicalName: normalizeIngredientName(ingredient.name),
   }));
+}
+
+function toMealIngredientInputs(
+  rows: Array<{
+    name: string;
+    amount?: number | null;
+    unit?: string | null;
+    note?: string | null;
+    optional?: boolean;
+    confidence?: number | null;
+    needsReview?: boolean;
+  }>
+): MealIngredientInput[] {
+  const invalidTokens = new Set(["null", "undefined", "none", "n/a", "na", "okänd", "unknown", "-"]);
+  return rows
+    .map((row, index): MealIngredientInput => ({
+      position: index,
+      name: row.name.trim(),
+      canonicalName: normalizeIngredientName(row.name),
+      amount: row.amount ?? null,
+      unit: row.unit ?? null,
+      note: row.note ?? null,
+      optional: row.optional ?? false,
+      confidence: row.confidence ?? null,
+      needsReview: row.needsReview ?? false,
+    }))
+    .filter((row) => row.name.length > 0)
+    .filter((row) => !invalidTokens.has(row.name.toLowerCase()))
+    .filter((row) => !invalidTokens.has(row.canonicalName.toLowerCase()));
+}
+
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 export async function initializeStarterMeals() {
@@ -569,4 +603,83 @@ export async function resetMealLearning() {
   revalidatePath("/");
   revalidatePath("/meals");
   return { success: true };
+}
+
+export async function bulkGenerateMealIngredients(options?: { overwrite?: boolean }) {
+  const user = await getCurrentUser();
+  if (!user) {
+    return { error: "Ej behörig" };
+  }
+
+  const overwrite = options?.overwrite === true;
+  const meals = await prisma.meal.findMany({
+    where: { userId: user.id },
+    include: {
+      mealIngredients: {
+        select: { id: true },
+      },
+    },
+    orderBy: { createdAt: "asc" },
+  });
+
+  let updated = 0;
+  let skipped = 0;
+  let failed = 0;
+  const errors: Array<{ mealId: string; mealName: string; reason: string }> = [];
+
+  for (const meal of meals) {
+    const hasIngredients = meal.mealIngredients.length > 0;
+    if (hasIngredients && !overwrite) {
+      skipped += 1;
+      continue;
+    }
+
+    try {
+      const draft = await generateIngredientDraft(meal.name);
+      const structured = toMealIngredientInputs(draft.ingredients);
+      if (structured.length === 0) {
+        failed += 1;
+        errors.push({ mealId: meal.id, mealName: meal.name, reason: "Tomt AI-svar" });
+        continue;
+      }
+
+      await prisma.$transaction(async (tx) => {
+        await tx.meal.update({
+          where: { id: meal.id },
+          data: {
+            ingredients: structured.map((ingredient) => ingredient.name),
+          },
+        });
+        await tx.mealIngredient.deleteMany({ where: { mealId: meal.id } });
+        await tx.mealIngredient.createMany({
+          data: structured.map((ingredient) => ({
+            mealId: meal.id,
+            ...ingredient,
+          })),
+        });
+      });
+      updated += 1;
+      // Small spacing between provider calls lowers bursty rate-limit failures in bulk runs.
+      await sleep(250);
+    } catch (error) {
+      failed += 1;
+      errors.push({
+        mealId: meal.id,
+        mealName: meal.name,
+        reason: error instanceof Error ? error.message : "Okänt fel",
+      });
+      await sleep(350);
+    }
+  }
+
+  revalidatePath("/");
+  revalidatePath("/meals");
+  return {
+    success: true,
+    updated,
+    skipped,
+    failed,
+    total: meals.length,
+    errors: errors.slice(0, 20),
+  };
 }

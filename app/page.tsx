@@ -36,9 +36,13 @@ export default async function HomePage() {
 
   const meals = await getMeals();
   const shoppingList = await getCurrentWeekShoppingList();
+  const forceRegenerateOnLoad =
+    process.env.FORCE_REGENERATE_WEEKLY_PLAN_ON_LOAD === "1" ||
+    process.env.FORCE_REGENERATE_WEEKLY_PLAN_ON_LOAD === "true" ||
+    process.env.NODE_ENV !== "production";
 
-  let plan = await getCurrentWeekPlan();
-  if (!plan) {
+  let plan = forceRegenerateOnLoad ? null : await getCurrentWeekPlan();
+  if (!plan || forceRegenerateOnLoad) {
     const result = await generateWeeklyPlan({ force: true, revalidate: false });
     if (result.success && result.plan) {
       plan = result.plan;

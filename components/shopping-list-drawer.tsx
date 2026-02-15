@@ -12,6 +12,7 @@ type ShoppingItem = {
   unit: string | null;
   isChecked: boolean;
   unresolved: boolean;
+  sourceMealNames?: unknown;
 };
 
 type ShoppingListPayload = {
@@ -31,6 +32,13 @@ function formatAmount(value: number | null, unit: string | null) {
     return "";
   }
   return `${value % 1 === 0 ? value.toFixed(0) : value} ${unit ?? ""}`.trim();
+}
+
+function extractBreakdownLines(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value.filter((line): line is string => typeof line === "string" && line.trim().length > 0);
 }
 
 export function ShoppingListDrawer({ isOpen, onClose, isAuthenticated, initialList }: Props) {
@@ -107,7 +115,7 @@ export function ShoppingListDrawer({ isOpen, onClose, isAuthenticated, initialLi
                 <li className="rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-sm text-white/70">Ingen lista ännu.</li>
               ) : (
                 initialList.items.map((item) => (
-                  <li key={item.id} className="rounded-lg border border-white/15 bg-white/10 px-3 py-2">
+                  <li key={item.id} className="group relative rounded-lg border border-white/15 bg-white/10 px-3 py-2">
                     <button
                       type="button"
                       onClick={() => void handleToggle(item)}
@@ -118,6 +126,16 @@ export function ShoppingListDrawer({ isOpen, onClose, isAuthenticated, initialLi
                       <span className="text-xs text-white/70">{formatAmount(item.amount, item.unit)}</span>
                     </button>
                     {item.unresolved && <p className="mt-1 text-[11px] text-amber-300">Kontrollera mängd/enhet</p>}
+                    {extractBreakdownLines(item.sourceMealNames).length > 0 && (
+                      <div className="pointer-events-none absolute left-2 right-2 top-full z-20 mt-1 rounded-md border border-white/20 bg-black/90 p-2 text-[11px] text-white opacity-0 shadow-xl transition-opacity duration-150 group-hover:opacity-100">
+                        <p className="mb-1 font-semibold text-white/80">Från måltider:</p>
+                        <ul className="space-y-0.5">
+                          {extractBreakdownLines(item.sourceMealNames).map((line) => (
+                            <li key={line}>{line}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
                   </li>
                 ))
               )}

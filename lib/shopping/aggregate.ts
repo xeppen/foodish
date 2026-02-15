@@ -17,6 +17,7 @@ export type AggregatedShoppingItem = {
   unresolved: boolean;
   sourceMealIds: string[];
   sourceMealNames: string[];
+  sourceMealBreakdown: string[];
 };
 
 const MASS_TO_GRAMS: Record<string, number> = { g: 1, kg: 1000 };
@@ -36,12 +37,27 @@ function roundAmount(amount: number): number {
   return Math.round(amount * 100) / 100;
 }
 
+function formatAmount(amount: number | null, unit: string | null): string {
+  if (amount == null) {
+    return "valfri mängd";
+  }
+  const normalized = amount % 1 === 0 ? amount.toFixed(0) : String(roundAmount(amount));
+  return `${normalized}${unit ? ` ${unit}` : ""}`.trim();
+}
+
 export function aggregateShoppingIngredients(input: IngredientForAggregation[]): AggregatedShoppingItem[] {
   const bucket = new Map<string, AggregatedShoppingItem>();
+  const invalidTokens = new Set(["null", "undefined", "none", "n/a", "na", "okänd", "unknown", "-"]);
 
   for (const row of input) {
     const canonical = normalizeIngredientName(row.canonicalName?.trim() || row.name);
     const display = row.name.trim();
+    if (!display) {
+      continue;
+    }
+    if (invalidTokens.has(display.toLowerCase()) || invalidTokens.has(canonical.toLowerCase())) {
+      continue;
+    }
     const normalizedUnit = normalizeUnit(row.unit);
     const hasNumericAmount = typeof row.amount === "number" && Number.isFinite(row.amount);
 
@@ -65,6 +81,7 @@ export function aggregateShoppingIngredients(input: IngredientForAggregation[]):
         unresolved: !hasNumericAmount || !keyUnit,
         sourceMealIds: [row.mealId],
         sourceMealNames: [row.mealName],
+        sourceMealBreakdown: [`${row.mealName}: ${formatAmount(hasNumericAmount ? (keyAmount as number) : null, keyUnit)}`],
       });
       continue;
     }
@@ -74,6 +91,10 @@ export function aggregateShoppingIngredients(input: IngredientForAggregation[]):
     }
     if (!existing.sourceMealNames.includes(row.mealName)) {
       existing.sourceMealNames.push(row.mealName);
+    }
+    const sourceLine = `${row.mealName}: ${formatAmount(hasNumericAmount ? (keyAmount as number) : null, keyUnit)}`;
+    if (!existing.sourceMealBreakdown.includes(sourceLine)) {
+      existing.sourceMealBreakdown.push(sourceLine);
     }
 
     if (hasNumericAmount && existing.amount !== null) {

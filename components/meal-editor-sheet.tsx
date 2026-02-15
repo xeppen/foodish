@@ -4,7 +4,7 @@ import { addMeal, updateMeal } from "@/lib/actions/meals";
 import { generateIngredientDraftClient, type IngredientDraftItem } from "@/lib/ai/ingredients-client";
 import { generateDishImageUrl } from "@/lib/image-generation/client";
 import { resolveMealImageUrl } from "@/lib/meal-image-url";
-import { Loader2, X } from "lucide-react";
+import { Loader2, Trash2, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
@@ -14,6 +14,7 @@ type Meal = {
   complexity: "SIMPLE" | "MEDIUM" | "COMPLEX";
   preferredDays: ("MONDAY" | "TUESDAY" | "WEDNESDAY" | "THURSDAY" | "FRIDAY" | "SATURDAY" | "SUNDAY")[];
   imageUrl: string | null;
+  ingredients?: unknown;
   mealIngredients?: Array<{
     name: string;
     amount: number | null;
@@ -32,9 +33,6 @@ type EditorMode =
       meal: Meal;
     };
 
-const TABS = ["grund", "ingredients", "image"] as const;
-type TabKey = (typeof TABS)[number];
-
 const DAY_OPTIONS = [
   { value: "MONDAY", short: "M", label: "Måndag" },
   { value: "TUESDAY", short: "T", label: "Tisdag" },
@@ -48,8 +46,25 @@ const DAY_OPTIONS = [
 type PreferredDay = (typeof DAY_OPTIONS)[number]["value"];
 
 function mapMealIngredients(meal?: Meal): IngredientDraftItem[] {
-  if (!meal?.mealIngredients || meal.mealIngredients.length === 0) {
+  if (!meal) {
     return [];
+  }
+
+  if (!meal?.mealIngredients || meal.mealIngredients.length === 0) {
+    const legacy = Array.isArray(meal?.ingredients)
+      ? meal.ingredients
+          .filter((value): value is string => typeof value === "string" && value.trim().length > 0)
+          .map((name) => ({
+            name: name.trim(),
+            amount: null,
+            unit: null,
+            note: null,
+            optional: false,
+            confidence: null,
+            needsReview: true,
+          }))
+      : [];
+    return legacy;
   }
   return meal.mealIngredients.map((ingredient) => ({
     name: ingredient.name,
@@ -72,7 +87,6 @@ export function MealEditorSheet({
   onClose: () => void;
 }) {
   const router = useRouter();
-  const [tab, setTab] = useState<TabKey>("grund");
   const [name, setName] = useState("");
   const [complexity, setComplexity] = useState<Meal["complexity"]>("MEDIUM");
   const [preferredDays, setPreferredDays] = useState<PreferredDay[]>([]);
@@ -111,7 +125,6 @@ export function MealEditorSheet({
       setImageUrl(mode.meal.imageUrl ?? "");
     }
 
-    setTab("grund");
     setImageUrlExpanded(false);
     setError(null);
     setPreviewError(false);
@@ -251,40 +264,12 @@ export function MealEditorSheet({
             </button>
           </div>
 
-          <div className="mt-3 grid grid-cols-3 gap-1 rounded-lg bg-[var(--cream)]/70 p-1">
-            <button
-              type="button"
-              onClick={() => setTab("grund")}
-              className={`rounded-md px-2 py-1.5 text-xs font-semibold ${
-                tab === "grund" ? "bg-white text-[var(--charcoal)] shadow" : "text-[var(--warm-gray)]"
-              }`}
-            >
-              Grund
-            </button>
-            <button
-              type="button"
-              onClick={() => setTab("ingredients")}
-              className={`rounded-md px-2 py-1.5 text-xs font-semibold ${
-                tab === "ingredients" ? "bg-white text-[var(--charcoal)] shadow" : "text-[var(--warm-gray)]"
-              }`}
-            >
-              Ingredienser
-            </button>
-            <button
-              type="button"
-              onClick={() => setTab("image")}
-              className={`rounded-md px-2 py-1.5 text-xs font-semibold ${
-                tab === "image" ? "bg-white text-[var(--charcoal)] shadow" : "text-[var(--warm-gray)]"
-              }`}
-            >
-              Bild
-            </button>
-          </div>
         </header>
 
         <div className="flex-1 overflow-y-auto px-5 py-4 pb-24">
-          {tab === "grund" && (
-            <div className="space-y-4">
+          <div className="space-y-5">
+            <section className="space-y-3">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--warm-gray)]">Grund</p>
               <input
                 type="text"
                 value={name}
@@ -357,11 +342,9 @@ export function MealEditorSheet({
                   </button>
                 </div>
               </div>
-            </div>
-          )}
+            </section>
 
-          {tab === "ingredients" && (
-            <div className="space-y-3">
+            <section className="space-y-3">
               <div className="flex items-center justify-between">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--warm-gray)]">Ingredienser</p>
                 <button
@@ -382,7 +365,7 @@ export function MealEditorSheet({
 
               <div className="space-y-2">
                 {ingredients.map((ingredient, index) => (
-                  <div key={`${ingredient.name}-${index}`} className="grid grid-cols-[1fr_72px_68px] gap-2">
+                  <div key={index} className="grid grid-cols-[1fr_72px_68px_auto] gap-2">
                     <input
                       value={ingredient.name}
                       onChange={(event) =>
@@ -421,34 +404,57 @@ export function MealEditorSheet({
                       placeholder="Enhet"
                       className="text-sm"
                     />
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setIngredients((state) => state.filter((_, rowIndex) => rowIndex !== index))
+                      }
+                      className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-[var(--cream-dark)] text-[var(--warm-gray)] hover:bg-[var(--cream)] hover:text-[var(--charcoal)]"
+                      aria-label={`Ta bort ingrediensrad ${index + 1}`}
+                      title="Ta bort rad"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
                     {(ingredient.needsReview || !ingredient.amount || !ingredient.unit) && (
-                      <p className="col-span-3 pl-1 text-[11px] text-amber-600">Behöver review</p>
+                      <p className="col-span-4 pl-1 text-[11px] text-amber-600">Behöver review</p>
                     )}
                   </div>
                 ))}
               </div>
 
-              <button
-                type="button"
-                onClick={() => setIngredients((state) => [...state, { name: "", amount: null, unit: null }])}
-                className="text-xs font-semibold text-[var(--warm-gray)] hover:text-[var(--charcoal)]"
-              >
-                + Lägg till rad
-              </button>
-            </div>
-          )}
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => setIngredients((state) => [...state, { name: "", amount: null, unit: null }])}
+                  className="text-xs font-semibold text-[var(--warm-gray)] hover:text-[var(--charcoal)]"
+                >
+                  + Lägg till rad
+                </button>
+                {ingredients.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setIngredients([])}
+                    className="text-xs font-semibold text-rose-600 hover:text-rose-700"
+                  >
+                    Rensa alla
+                  </button>
+                )}
+              </div>
+            </section>
 
-          {tab === "image" && (
-            <div className="space-y-3">
-              <button
-                type="button"
-                onClick={() => void handleGenerateImage()}
-                disabled={imageLoading || !name.trim()}
-                className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-[var(--charcoal)] px-3 py-2 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {imageLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
-                {imageLoading ? "Genererar bild..." : "✨ Generera ny"}
-              </button>
+            <section className="space-y-3">
+              <div className="flex items-center justify-between">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--warm-gray)]">Bild</p>
+                <button
+                  type="button"
+                  onClick={() => void handleGenerateImage()}
+                  disabled={imageLoading || !name.trim()}
+                  className="inline-flex items-center justify-center gap-2 rounded-md bg-[var(--charcoal)] px-3 py-1.5 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {imageLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+                  {imageLoading ? "Genererar..." : "✨ Generera ny"}
+                </button>
+              </div>
 
               {(imageMode === "url" && imageUrl.trim()) || imageFile ? (
                 <div className="overflow-hidden rounded-lg border border-[var(--cream-dark)] bg-black/5">
@@ -508,8 +514,8 @@ export function MealEditorSheet({
                   className="w-full"
                 />
               )}
-            </div>
-          )}
+            </section>
+          </div>
 
           {error && <p className="mt-3 text-xs text-red-600">{error}</p>}
         </div>

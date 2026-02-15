@@ -2,6 +2,7 @@
 
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { generateIngredientDraft } from "@/lib/ai/ingredients";
 import { aggregateShoppingIngredients } from "@/lib/shopping/aggregate";
 import { normalizeIngredientName } from "@/lib/shopping/normalize";
 import { revalidatePath } from "next/cache";
@@ -118,7 +119,66 @@ export async function generateCurrentWeekShoppingList() {
     });
   }
 
-  const ingredientRows = meals.flatMap((meal) => {
+  const mealsWithIngredients = await Promise.all(
+    meals.map(async (meal) => {
+      const hasStructured = meal.mealIngredients.length > 0;
+      const legacyRaw = Array.isArray(meal.ingredients) ? meal.ingredients : [];
+      const hasLegacy = legacyRaw.some((value) => typeof value === "string" && value.trim().length > 0);
+
+      if (hasStructured || hasLegacy) {
+        return meal;
+      }
+
+      try {
+        const draft = await generateIngredientDraft(meal.name);
+        if (!draft.ingredients || draft.ingredients.length === 0) {
+          return meal;
+        }
+
+        const generatedRows = draft.ingredients
+          .map((row, index) => ({
+            mealId: meal.id,
+            position: index,
+            name: row.name.trim(),
+            canonicalName: normalizeIngredientName(row.name),
+            amount: row.amount ?? null,
+            unit: row.unit ?? null,
+            note: row.note ?? null,
+            optional: row.optional ?? false,
+            confidence: row.confidence ?? null,
+            needsReview: row.needsReview ?? true,
+          }))
+          .filter((row) => row.name.length > 0);
+
+        if (generatedRows.length === 0) {
+          return meal;
+        }
+
+        await prisma.$transaction(async (tx) => {
+          await tx.mealIngredient.deleteMany({ where: { mealId: meal.id } });
+          await tx.mealIngredient.createMany({ data: generatedRows });
+          await tx.meal.update({
+            where: { id: meal.id },
+            data: { ingredients: generatedRows.map((row) => row.name) },
+          });
+        });
+
+        return {
+          ...meal,
+          mealIngredients: generatedRows.map((row) => ({
+            ...row,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          })),
+          ingredients: generatedRows.map((row) => row.name),
+        };
+      } catch {
+        return meal;
+      }
+    })
+  );
+
+  const ingredientRows = mealsWithIngredients.flatMap((meal) => {
     if (meal.mealIngredients.length > 0) {
       return meal.mealIngredients.map((ingredient) => ({
         mealId: meal.id,
@@ -178,7 +238,7 @@ export async function generateCurrentWeekShoppingList() {
               unit: item.unit,
               unresolved: item.unresolved,
               sourceMealIds: item.sourceMealIds,
-              sourceMealNames: item.sourceMealNames,
+              sourceMealNames: item.sourceMealBreakdown,
               sortOrder: index,
             })),
           }),

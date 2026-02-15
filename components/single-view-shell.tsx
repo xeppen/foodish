@@ -76,6 +76,7 @@ type SingleViewShellProps = {
       unit: string | null;
       isChecked: boolean;
       unresolved: boolean;
+      sourceMealNames?: unknown;
     }>;
   } | null;
 };
@@ -93,22 +94,25 @@ export function SingleViewShell({
   const [isShoppingOpen, setIsShoppingOpen] = useState(false);
   const [authPrompt, setAuthPrompt] = useState<string | null>(null);
   const { openSignIn } = useClerk();
+  const commonImageByName = useMemo(
+    () =>
+      (commonMeals ?? []).reduce<Record<string, string>>((acc, meal) => {
+        const key = meal.name.trim().toLowerCase();
+        if (meal.imageUrl?.trim()) {
+          acc[key] = meal.imageUrl.trim();
+        }
+        return acc;
+      }, {}),
+    [commonMeals]
+  );
   const mealImageByName = useMemo(() => {
-    const commonImageByName = (commonMeals ?? []).reduce<Record<string, string>>((acc, meal) => {
-      const key = meal.name.trim().toLowerCase();
-      if (meal.imageUrl?.trim()) {
-        acc[key] = meal.imageUrl.trim();
-      }
-      return acc;
-    }, {});
-
     return meals.reduce<Record<string, string>>((acc, meal) => {
       const key = meal.name.trim().toLowerCase();
       const preferredImage = meal.imageUrl?.trim() || commonImageByName[key] || null;
       acc[key] = resolveMealImageUrl(preferredImage, meal.name);
       return acc;
     }, {});
-  }, [commonMeals, meals]);
+  }, [commonImageByName, meals]);
   const shoppingCount = shoppingList?.items.length ?? 0;
 
   const promptLogin = useCallback(() => {
@@ -124,7 +128,7 @@ export function SingleViewShell({
   }
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-black md:h-screen md:overflow-hidden">
+    <div className="relative min-h-screen bg-black">
       <div className="fixed inset-0 z-0">
         <Image
           src="/hero-dinner.png"
@@ -151,7 +155,7 @@ export function SingleViewShell({
         </div>
       </header>
 
-      <main className="relative z-10 mx-auto flex min-h-screen w-full max-w-7xl items-start px-0 pb-10 pt-12 sm:px-6 lg:px-8 md:h-[calc(100vh-96px)] md:min-h-0 md:overflow-hidden">
+      <main className="relative z-10 mx-auto flex min-h-screen w-full max-w-7xl items-start px-0 pb-10 pt-12 sm:px-6 lg:px-8">
         <section className="w-full">
           <div className="mb-6 px-4 text-center sm:mb-10 sm:px-0">
             <h1 className="text-5xl font-bold text-white drop-shadow-lg sm:text-6xl">Veckans middagsplan</h1>
@@ -205,6 +209,7 @@ export function SingleViewShell({
         isOpen={isDrawerOpen}
         isAuthenticated={isAuthenticated}
         meals={meals}
+        commonMealImageByName={commonImageByName}
         onClose={() => setIsDrawerOpen(false)}
         onAuthRequired={promptLogin}
       />

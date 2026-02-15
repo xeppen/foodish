@@ -47,6 +47,9 @@ export async function POST(request: Request) {
     });
   } catch (error) {
     console.error("Ingredient draft failed", error);
-    return NextResponse.json({ error: "Kunde inte generera ingredienser just nu." }, { status: 500 });
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Kunde inte generera ingredienser just nu." },
+      { status: 500 }
+    );
   }
 }

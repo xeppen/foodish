@@ -1,8 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { mockGetCurrentUser, mockRevalidatePath, prismaMock } = vi.hoisted(() => ({
+const { mockGetCurrentUser, mockRevalidatePath, mockGenerateIngredientDraft, prismaMock } = vi.hoisted(() => ({
   mockGetCurrentUser: vi.fn(),
   mockRevalidatePath: vi.fn(),
+  mockGenerateIngredientDraft: vi.fn(),
   prismaMock: {
     meal: {
       count: vi.fn(),
@@ -36,12 +37,22 @@ vi.mock("next/cache", () => ({
   revalidatePath: mockRevalidatePath,
 }));
 
-import { addMeal, resetMealLearning, updateMeal, voteMeal } from "@/lib/actions/meals";
+vi.mock("@/lib/ai/ingredients", () => ({
+  generateIngredientDraft: mockGenerateIngredientDraft,
+}));
+
+import { addMeal, bulkGenerateMealIngredients, resetMealLearning, updateMeal, voteMeal } from "@/lib/actions/meals";
 
 describe("meals actions", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockGetCurrentUser.mockResolvedValue({ id: "user_1", name: "Test User" });
+    mockGenerateIngredientDraft.mockResolvedValue({
+      dishName: "Default",
+      ingredients: [{ name: "Lök", amount: 1, unit: "st", optional: false, confidence: 0.8, needsReview: false }],
+      model: "test",
+      cached: false,
+    });
     prismaMock.$transaction.mockImplementation(async (arg: unknown) => {
       if (typeof arg === "function") {
         return arg(prismaMock);
@@ -192,5 +203,21 @@ describe("meals actions", () => {
     expect(prismaMock.mealDaySignal.deleteMany).toHaveBeenCalledWith({
       where: { userId: "user_1" },
     });
+  });
+
+  it("bulkGenerateMealIngredients fills meals missing ingredient rows", async () => {
+    prismaMock.meal.findMany.mockResolvedValue([
+      { id: "m1", name: "Tacos", mealIngredients: [] },
+      { id: "m2", name: "Pasta", mealIngredients: [{ id: "i1" }] },
+    ]);
+    prismaMock.meal.update.mockResolvedValue({ id: "m1" });
+    prismaMock.mealIngredient.deleteMany.mockResolvedValue({ count: 0 });
+    prismaMock.mealIngredient.createMany.mockResolvedValue({ count: 1 });
+
+    const result = await bulkGenerateMealIngredients({ overwrite: false });
+
+    expect(result).toMatchObject({ success: true, updated: 1, skipped: 1, failed: 0, total: 2 });
+    expect(mockGenerateIngredientDraft).toHaveBeenCalledWith("Tacos");
+    expect(prismaMock.mealIngredient.createMany).toHaveBeenCalledTimes(1);
   });
 });

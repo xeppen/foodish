@@ -21,6 +21,70 @@ export const ingredientDraftSchema = z.object({
 export type IngredientDraft = z.infer<typeof ingredientDraftSchema>;
 
 const draftCache = new Map<string, IngredientDraft>();
+const draftDebugEnabled =
+  process.env.INGREDIENT_DRAFT_DEBUG === "1" ||
+  process.env.INGREDIENT_DRAFT_DEBUG === "true" ||
+  process.env.NODE_ENV !== "production";
+const draftCacheDisabled =
+  process.env.INGREDIENT_DRAFT_DISABLE_CACHE === "1" ||
+  process.env.INGREDIENT_DRAFT_DISABLE_CACHE === "true";
+const draftTimeoutMs = Math.max(1000, Number(process.env.INGREDIENT_DRAFT_TIMEOUT_MS ?? 15000));
+const draftRetryCount = Math.max(0, Number(process.env.INGREDIENT_DRAFT_RETRY_COUNT ?? 2));
+const strictAiMode =
+  process.env.NODE_ENV !== "test" &&
+  (process.env.INGREDIENT_DRAFT_STRICT_AI === undefined ||
+    process.env.INGREDIENT_DRAFT_STRICT_AI === "1" ||
+    process.env.INGREDIENT_DRAFT_STRICT_AI === "true");
+
+function logDraft(message: string, payload?: unknown) {
+  if (!draftDebugEnabled) {
+    return;
+  }
+  if (payload === undefined) {
+    console.log(`[ingredient-draft] ${message}`);
+    return;
+  }
+  console.log(`[ingredient-draft] ${message}`, payload);
+}
+
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function localizeIngredientName(name: string): string {
+  const value = name.trim().toLowerCase();
+  const map: Record<string, string> = {
+    chicken: "Kyckling",
+    rice: "Ris",
+    pasta: "Pasta",
+    sausage: "Korv",
+    onion: "Lök",
+    garlic: "Vitlök",
+    oil: "Olja",
+    salt: "Salt",
+    pepper: "Peppar",
+    tomato: "Tomat",
+    tomatoes: "Tomat",
+    "minced beef": "Köttfärs",
+    "ground beef": "Köttfärs",
+    "beef mince": "Köttfärs",
+    cream: "Grädde",
+    milk: "Mjölk",
+    butter: "Smör",
+    potato: "Potatis",
+    potatoes: "Potatis",
+    cheese: "Ost",
+    tortillas: "Tortillabröd",
+    tortilla: "Tortillabröd",
+  };
+
+  const localized = map[value];
+  if (localized) {
+    return localized;
+  }
+
+  return name.trim().charAt(0).toUpperCase() + name.trim().slice(1);
+}
 
 function heuristicDraft(dishName: string): IngredientDraft {
   const value = dishName.toLowerCase();
@@ -67,7 +131,7 @@ function normalizeDraft(dishName: string, draft: IngredientDraft): IngredientDra
     dishName,
     ingredients: draft.ingredients.map((item) => ({
       ...item,
-      name: item.name.trim(),
+      name: localizeIngredientName(item.name),
       amount: item.amount ?? null,
       unit: normalizeUnit(item.unit ?? null),
       note: item.note?.trim() || null,
@@ -84,94 +148,178 @@ function normalizeDraft(dishName: string, draft: IngredientDraft): IngredientDra
 }
 
 async function fromOpenAI(dishName: string): Promise<IngredientDraft | null> {
+  if (process.env.NODE_ENV === "test") {
+    return null;
+  }
+
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
+    logDraft("OPENAI_API_KEY missing, using heuristic fallback");
     return null;
   }
 
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 1_500);
-  let response: Response;
-  try {
-    response = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
+  for (let attempt = 0; attempt <= draftRetryCount; attempt += 1) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), draftTimeoutMs);
+    let response: Response;
+    try {
+      logDraft("calling OpenAI", {
+        dishName,
         model: process.env.INGREDIENT_DRAFT_MODEL || "gpt-4o-mini",
-        temperature: 0.2,
-        response_format: { type: "json_object" },
-        messages: [
-          {
-            role: "system",
-            content:
-              "You generate concise shopping ingredient drafts for Swedish home-cooked meals. Return strict JSON with key ingredients array. Include amount and unit when likely. Use null if unknown. Add confidence between 0 and 1.",
-          },
-          {
-            role: "user",
-            content: `Dish: ${dishName}. Return JSON: {\"ingredients\":[{\"name\":string,\"amount\":number|null,\"unit\":string|null,\"note\":string|null,\"optional\":boolean,\"confidence\":number}]}`,
-          },
-        ],
-      }),
-      signal: controller.signal,
+        timeoutMs: draftTimeoutMs,
+        attempt: attempt + 1,
+        maxAttempts: draftRetryCount + 1,
+      });
+      response = await fetch("https://api.openai.com/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model: process.env.INGREDIENT_DRAFT_MODEL || "gpt-4o-mini",
+          temperature: 0.2,
+          response_format: { type: "json_object" },
+          messages: [
+            {
+              role: "system",
+              content:
+                "You generate shopping ingredient drafts for Swedish home-cooked meals. Return ONLY Swedish ingredient names and Swedish units. Allowed units: g, kg, ml, dl, cl, l, st, msk, tsk, krm, klyfta, skiva, förp, pkt. Use null when unknown. Return strict JSON with key ingredients array and confidence 0..1.",
+            },
+            {
+              role: "user",
+              content: `Rätt: ${dishName}. Returnera JSON: {\"ingredients\":[{\"name\":string,\"amount\":number|null,\"unit\":string|null,\"note\":string|null,\"optional\":boolean,\"confidence\":number}]}. Ingrediensnamn och note ska vara på svenska.`,
+            },
+          ],
+        }),
+        signal: controller.signal,
+      });
+    } catch (error) {
+      clearTimeout(timeout);
+      logDraft("OpenAI request failed", {
+        dishName,
+        attempt: attempt + 1,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      if (attempt < draftRetryCount) {
+        await sleep(600 * (attempt + 1));
+        continue;
+      }
+      return null;
+    } finally {
+      clearTimeout(timeout);
+    }
+
+    if (!response.ok) {
+      const body = await response.text().catch(() => "");
+      logDraft("OpenAI non-OK response", {
+        dishName,
+        attempt: attempt + 1,
+        status: response.status,
+        body,
+      });
+      if (attempt < draftRetryCount && (response.status === 429 || response.status >= 500)) {
+        await sleep(800 * (attempt + 1));
+        continue;
+      }
+      return null;
+    }
+
+    const payload = (await response.json()) as {
+      choices?: Array<{ message?: { content?: string } }>;
+    };
+    const raw = payload.choices?.[0]?.message?.content;
+    if (!raw) {
+      logDraft("OpenAI response had no content", { dishName, payload });
+      if (attempt < draftRetryCount) {
+        await sleep(400 * (attempt + 1));
+        continue;
+      }
+      return null;
+    }
+    logDraft("OpenAI raw response content", { dishName, raw });
+
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(raw);
+    } catch (error) {
+      logDraft("OpenAI response JSON parse failed", {
+        dishName,
+        error: error instanceof Error ? error.message : String(error),
+        raw,
+      });
+      if (attempt < draftRetryCount) {
+        await sleep(400 * (attempt + 1));
+        continue;
+      }
+      return null;
+    }
+
+    const validation = ingredientDraftSchema.safeParse({
+      dishName,
+      ingredients: (parsed as { ingredients?: unknown })?.ingredients,
+      model: process.env.INGREDIENT_DRAFT_MODEL || "gpt-4o-mini",
     });
-  } catch {
-    clearTimeout(timeout);
-    return null;
-  } finally {
-    clearTimeout(timeout);
+    if (!validation.success) {
+      logDraft("OpenAI response failed schema validation", {
+        dishName,
+        attempt: attempt + 1,
+        issues: validation.error.issues,
+        parsed,
+      });
+      if (attempt < draftRetryCount) {
+        await sleep(400 * (attempt + 1));
+        continue;
+      }
+      return null;
+    }
+
+    logDraft("OpenAI draft accepted", {
+      dishName,
+      ingredientCount: validation.data.ingredients.length,
+      attempt: attempt + 1,
+    });
+    return {
+      ...validation.data,
+      cached: false,
+    };
   }
 
-  if (!response.ok) {
-    return null;
-  }
-
-  const payload = (await response.json()) as {
-    choices?: Array<{ message?: { content?: string } }>;
-  };
-  const raw = payload.choices?.[0]?.message?.content;
-  if (!raw) {
-    return null;
-  }
-
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(raw);
-  } catch {
-    return null;
-  }
-
-  const validation = ingredientDraftSchema.safeParse({
-    dishName,
-    ingredients: (parsed as { ingredients?: unknown })?.ingredients,
-    model: process.env.INGREDIENT_DRAFT_MODEL || "gpt-4o-mini",
-  });
-  if (!validation.success) {
-    return null;
-  }
-
-  return {
-    ...validation.data,
-    cached: false,
-  };
+  return null;
 }
 
 export async function generateIngredientDraft(dishNameInput: string): Promise<IngredientDraft> {
   const dishName = dishNameInput.trim();
   const cacheKey = dishName.toLowerCase();
+  const hasOpenAiKey = Boolean(process.env.OPENAI_API_KEY);
 
-  const cached = draftCache.get(cacheKey);
-  if (cached) {
-    return {
-      ...cached,
-      cached: true,
-    };
+  if (!draftCacheDisabled) {
+    const cached = draftCache.get(cacheKey);
+    if (cached) {
+      logDraft("cache hit", { dishName, model: cached.model });
+      return {
+        ...cached,
+        cached: true,
+      };
+    }
   }
 
   const ai = await fromOpenAI(dishName);
+  if (!ai && hasOpenAiKey && strictAiMode) {
+    logDraft("AI strict mode enabled: refusing heuristic fallback", { dishName });
+    throw new Error("AI kunde inte generera ingredienser just nu. Försök igen.");
+  }
+
+  const usedFallback = ai == null;
   const draft = normalizeDraft(dishName, ai ?? heuristicDraft(dishName));
-  draftCache.set(cacheKey, draft);
+  if (!draftCacheDisabled) {
+    draftCache.set(cacheKey, draft);
+  }
+  logDraft("draft generated", {
+    dishName,
+    source: usedFallback ? "heuristic-fallback" : "openai",
+    model: draft.model,
+    ingredientCount: draft.ingredients.length,
+  });
   return draft;
 }
