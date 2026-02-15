@@ -2,13 +2,13 @@
 
 import { useEffect, useState } from "react";
 import { X } from "lucide-react";
-import { MagicMealInput } from "@/components/magic-meal-input";
 import { MealList } from "@/components/meal-list";
 import { EmptyState } from "@/components/empty-state";
 import { LoginButton } from "@/components/login-button";
 import { SignOutButton } from "@/components/sign-out-button";
-import { resetMealLearning } from "@/lib/actions/meals";
+import { bulkGenerateMealIngredients, resetMealLearning } from "@/lib/actions/meals";
 import { useRouter } from "next/navigation";
+import { MealEditorSheet } from "@/components/meal-editor-sheet";
 
 type Meal = {
   id: string;
@@ -18,6 +18,16 @@ type Meal = {
   thumbsUpCount: number;
   thumbsDownCount: number;
   imageUrl: string | null;
+  ingredients?: unknown;
+  mealIngredients?: Array<{
+    name: string;
+    amount: number | null;
+    unit: string | null;
+    note: string | null;
+    optional: boolean;
+    confidence: number | null;
+    needsReview: boolean;
+  }>;
   createdAt: Date | string;
 };
 
@@ -25,6 +35,7 @@ type MealDrawerProps = {
   isOpen: boolean;
   isAuthenticated: boolean;
   meals: Meal[];
+  commonMealImageByName?: Record<string, string>;
   onClose: () => void;
   onAuthRequired: () => void;
 };
@@ -33,11 +44,16 @@ export function MealDrawer({
   isOpen,
   isAuthenticated,
   meals,
+  commonMealImageByName,
   onClose,
   onAuthRequired,
 }: MealDrawerProps) {
   const [isResetting, setIsResetting] = useState(false);
+  const [isBulkGenerating, setIsBulkGenerating] = useState(false);
+  const [bulkMessage, setBulkMessage] = useState<string | null>(null);
+  const [editorMode, setEditorMode] = useState<{ type: "create" } | { type: "edit"; meal: Meal } | null>(null);
   const router = useRouter();
+  const mealsMissingIngredientsCount = meals.filter((meal) => (meal.mealIngredients?.length ?? 0) === 0).length;
 
   useEffect(() => {
     if (!isOpen) {
@@ -67,6 +83,38 @@ export function MealDrawer({
     }
   }
 
+  async function handleBulkGenerateIngredients() {
+    if (mealsMissingIngredientsCount === 0) {
+      setBulkMessage("Alla måltider har redan ingredienser.");
+      return;
+    }
+
+    if (
+      !confirm(
+        `Generera ingrediensförslag för ${mealsMissingIngredientsCount} måltider som saknar ingredienser? Detta kan ta en stund.`
+      )
+    ) {
+      return;
+    }
+
+    setIsBulkGenerating(true);
+    setBulkMessage(null);
+    try {
+      const result = await bulkGenerateMealIngredients({ overwrite: false });
+      if (result.error) {
+        setBulkMessage(result.error);
+        return;
+      }
+
+      setBulkMessage(
+        `Klart: ${result.updated} uppdaterade, ${result.skipped} hoppades över, ${result.failed} misslyckades.`
+      );
+      router.refresh();
+    } finally {
+      setIsBulkGenerating(false);
+    }
+  }
+
   return (
     <div
       className={`fixed inset-0 z-[60] transition-all duration-300 ${
@@ -84,7 +132,7 @@ export function MealDrawer({
       />
 
       <aside
-        className={`absolute bottom-0 left-0 right-0 h-[100dvh] border border-white/30 bg-white/95 shadow-2xl transition-transform duration-300 ease-out sm:bottom-0 sm:left-auto sm:right-0 sm:top-0 sm:h-full sm:w-[33vw] sm:max-w-md sm:rounded-none sm:rounded-l-3xl ${
+        className={`absolute bottom-0 left-0 right-0 h-[100dvh] border border-white/30 bg-white/95 shadow-2xl transition-transform duration-300 ease-out sm:inset-y-0 sm:left-auto sm:right-0 sm:h-full sm:w-[42vw] sm:max-w-[560px] sm:rounded-none sm:rounded-l-3xl ${
           isOpen ? "translate-y-0 sm:translate-x-0" : "translate-y-full sm:translate-x-full"
         }`}
         role="dialog"
@@ -110,11 +158,31 @@ export function MealDrawer({
             </button>
           </header>
 
-          <div className="flex-1 overflow-y-auto px-5 py-5">
+          <div className="relative flex-1 overflow-y-auto px-5 py-5">
             {isAuthenticated ? (
               <div className="space-y-6">
-                <section className="rounded-2xl bg-[var(--cream)]/70 p-4">
-                  <MagicMealInput />
+                <section className="rounded-2xl border border-[var(--cream-dark)] bg-[var(--cream)]/70 p-4">
+                  <p className="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-[var(--warm-gray)]">
+                    Ny måltid
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setEditorMode({ type: "create" })}
+                    className="w-full rounded-md bg-[var(--terracotta)] px-3 py-2 text-xs font-semibold text-white"
+                  >
+                    Skapa med detaljer
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void handleBulkGenerateIngredients()}
+                    disabled={isBulkGenerating || mealsMissingIngredientsCount === 0}
+                    className="mt-2 block text-xs font-semibold text-[var(--charcoal)] underline-offset-2 hover:underline disabled:opacity-60"
+                  >
+                    {isBulkGenerating
+                      ? `Genererar (${mealsMissingIngredientsCount} kvar)...`
+                      : `Autofyll ingredienser (${mealsMissingIngredientsCount} kvar)`}
+                  </button>
+                  {bulkMessage && <p className="mt-2 text-xs text-[var(--warm-gray)]">{bulkMessage}</p>}
                 </section>
 
                 <section>
@@ -124,7 +192,11 @@ export function MealDrawer({
                       description="Lägg till din första måltid för att skapa personliga veckoplaner."
                     />
                   ) : (
-                    <MealList meals={meals} />
+                    <MealList
+                      meals={meals}
+                      commonMealImageByName={commonMealImageByName}
+                      onEditMeal={(meal) => setEditorMode({ type: "edit", meal })}
+                    />
                   )}
                 </section>
               </div>
@@ -162,6 +234,14 @@ export function MealDrawer({
             )}
           </footer>
         </div>
+
+        {editorMode && (
+          <MealEditorSheet
+            mode={editorMode}
+            isOpen={Boolean(editorMode)}
+            onClose={() => setEditorMode(null)}
+          />
+        )}
       </aside>
     </div>
   );

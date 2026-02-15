@@ -31,6 +31,22 @@ type SwapCandidate = {
   isRecent: boolean;
 };
 
+async function syncWeeklyPlanEntries(
+  weeklyPlanId: string,
+  assignments: Array<{ day: Day; mealId: string }>
+) {
+  await prisma.$transaction([
+    prisma.weeklyPlanEntry.deleteMany({ where: { weeklyPlanId } }),
+    prisma.weeklyPlanEntry.createMany({
+      data: assignments.map((assignment) => ({
+        weeklyPlanId,
+        day: dayToEnum(assignment.day),
+        mealId: assignment.mealId,
+      })),
+    }),
+  ]);
+}
+
 // Get the Monday of the current week (ISO week starts on Monday)
 function getMonday(date: Date): Date {
   const d = new Date(date);
@@ -225,6 +241,14 @@ export async function generateWeeklyPlan(options?: { force?: boolean; revalidate
       friday: selectedMeals[4].name,
     },
   });
+
+  await syncWeeklyPlanEntries(
+    plan.id,
+    selectedMeals.map((meal, index) => ({
+      day: DAY_ORDER[index],
+      mealId: meal.id,
+    }))
+  );
 
   await prisma.usageHistory.createMany({
     data: selectedMeals.map((meal, index) => ({
@@ -456,6 +480,23 @@ export async function swapDayMealWithChoice(day: Day, mealId: string) {
     data: { [day]: meal.name },
   });
 
+  await prisma.weeklyPlanEntry.upsert({
+    where: {
+      weeklyPlanId_day: {
+        weeklyPlanId: plan.id,
+        day: dayToEnum(day),
+      },
+    },
+    update: {
+      mealId: meal.id,
+    },
+    create: {
+      weeklyPlanId: plan.id,
+      day: dayToEnum(day),
+      mealId: meal.id,
+    },
+  });
+
   await prisma.usageHistory.create({
     data: {
       mealId: meal.id,
@@ -542,6 +583,23 @@ export async function swapDayMeal(day: Day) {
     },
     data: {
       [day]: newMeal,
+    },
+  });
+
+  await prisma.weeklyPlanEntry.upsert({
+    where: {
+      weeklyPlanId_day: {
+        weeklyPlanId: plan.id,
+        day: dayToEnum(day),
+      },
+    },
+    update: {
+      mealId: newMeals[0].id,
+    },
+    create: {
+      weeklyPlanId: plan.id,
+      day: dayToEnum(day),
+      mealId: newMeals[0].id,
     },
   });
 

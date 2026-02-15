@@ -6,11 +6,12 @@ import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { generateDishImageUrl } from "@/lib/image-generation/client";
 import { resolveMealImageUrl } from "@/lib/meal-image-url";
+import { generateIngredientDraftClient, type IngredientDraftItem } from "@/lib/ai/ingredients-client";
 
 type EnrichmentResult = {
   tags: string[];
   complexity: "SIMPLE" | "MEDIUM" | "COMPLEX";
-  ingredients: string[];
+  ingredients: IngredientDraftItem[];
 };
 
 const COMPLEXITY_LABEL: Record<EnrichmentResult["complexity"], string> = {
@@ -44,6 +45,8 @@ export function MagicMealInput() {
   const [previewError, setPreviewError] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<EnrichmentResult | null>(null);
+  const [ingredients, setIngredients] = useState<IngredientDraftItem[]>([]);
+  const [ingredientLoading, setIngredientLoading] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -112,6 +115,15 @@ export function MagicMealInput() {
       } else if (imageUrl.trim()) {
         formData.append("imageUrl", imageUrl.trim());
       }
+      const cleanedIngredients = ingredients
+        .map((ingredient) => ({
+          ...ingredient,
+          name: ingredient.name.trim(),
+        }))
+        .filter((ingredient) => ingredient.name.length > 0);
+      if (cleanedIngredients.length > 0) {
+        formData.append("ingredients", JSON.stringify(cleanedIngredients));
+      }
       const response = await addMeal(formData);
 
       if (response.error) {
@@ -126,12 +138,31 @@ export function MagicMealInput() {
       setImageFile(null);
       setShowUrlInput(false);
       setPreviewError(false);
+      setIngredients([]);
       setResult((response.enrichment as EnrichmentResult) ?? null);
       router.refresh();
     } catch {
       setError("Kunde inte skapa måltiden. Försök igen.");
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleGenerateIngredients() {
+    const dishName = value.trim();
+    if (!dishName || ingredientLoading) {
+      return;
+    }
+
+    setIngredientLoading(true);
+    setError(null);
+    try {
+      const draft = await generateIngredientDraftClient(dishName);
+      setIngredients(draft.ingredients);
+    } catch (draftError) {
+      setError(draftError instanceof Error ? draftError.message : "Kunde inte generera ingredienser.");
+    } finally {
+      setIngredientLoading(false);
     }
   }
 
@@ -289,6 +320,74 @@ export function MagicMealInput() {
           )}
         </div>
 
+        <div className="mt-4 rounded-md border border-[var(--cream-dark)] bg-white/70 p-2">
+          <div className="mb-2 flex items-center justify-between">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--warm-gray)]">Ingredienser</p>
+            <button
+              type="button"
+              onClick={() => void handleGenerateIngredients()}
+              disabled={ingredientLoading || !value.trim()}
+              className="text-xs font-semibold text-[var(--charcoal)] disabled:opacity-60"
+            >
+              {ingredientLoading ? "Genererar..." : "✨ AI-förslag"}
+            </button>
+          </div>
+
+          <div className="space-y-2">
+            {ingredients.map((ingredient, index) => (
+              <div key={index} className="grid grid-cols-[1fr_72px_68px] gap-2">
+                <input
+                  value={ingredient.name}
+                  onChange={(event) =>
+                    setIngredients((state) =>
+                      state.map((item, rowIndex) =>
+                        rowIndex === index ? { ...item, name: event.target.value } : item
+                      )
+                    )
+                  }
+                  placeholder="Ingrediens"
+                  className="text-sm"
+                />
+                <input
+                  type="number"
+                  step="0.1"
+                  value={ingredient.amount ?? ""}
+                  onChange={(event) =>
+                    setIngredients((state) =>
+                      state.map((item, rowIndex) =>
+                        rowIndex === index
+                          ? { ...item, amount: event.target.value ? Number(event.target.value) : null }
+                          : item
+                      )
+                    )
+                  }
+                  placeholder="Mängd"
+                  className="text-sm"
+                />
+                <input
+                  value={ingredient.unit ?? ""}
+                  onChange={(event) =>
+                    setIngredients((state) =>
+                      state.map((item, rowIndex) =>
+                        rowIndex === index ? { ...item, unit: event.target.value || null } : item
+                      )
+                    )
+                  }
+                  placeholder="Enhet"
+                  className="text-sm"
+                />
+              </div>
+            ))}
+            <button
+              type="button"
+              onClick={() => setIngredients((state) => [...state, { name: "", amount: null, unit: null }])}
+              className="text-xs font-semibold text-[var(--warm-gray)] hover:text-[var(--charcoal)]"
+            >
+              + Lägg till rad
+            </button>
+          </div>
+        </div>
+
         <button
           type="submit"
           disabled={loading || !value.trim()}
@@ -305,7 +404,9 @@ export function MagicMealInput() {
           <p className="mb-1 font-semibold">AI-forslag</p>
           <p className="mb-1">Komplexitet: {COMPLEXITY_LABEL[result.complexity]}</p>
           <p className="mb-1">Taggar: {result.tags.join(" ")}</p>
-          <p>Ingredienser: {result.ingredients.join(", ")}</p>
+          <p>
+            Ingredienser: {result.ingredients.map((ingredient) => ingredient.name).join(", ")}
+          </p>
         </div>
       )}
     </div>

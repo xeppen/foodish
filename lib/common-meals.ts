@@ -32,26 +32,44 @@ export const DEFAULT_COMMON_MEALS: SeedCommonMeal[] = [
   { name: "Hemmagjord pizza" },
 ];
 
+function buildFallbackCommonMeals() {
+  const now = new Date();
+  return DEFAULT_COMMON_MEALS.map((meal, index) => ({
+    id: `fallback-common-${index}`,
+    name: meal.name,
+    complexity: meal.complexity ?? "MEDIUM",
+    imageUrl: meal.imageUrl ?? null,
+    sortOrder: index,
+    createdAt: now,
+    updatedAt: now,
+  }));
+}
+
 export async function listCommonMeals() {
-  let meals = await prisma.commonMeal.findMany({
-    orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
-  });
-
-  if (meals.length === 0) {
-    await prisma.commonMeal.createMany({
-      data: DEFAULT_COMMON_MEALS.map((meal, index) => ({
-        name: meal.name,
-        complexity: meal.complexity ?? "MEDIUM",
-        imageUrl: meal.imageUrl ?? null,
-        sortOrder: index,
-      })),
-      skipDuplicates: true,
-    });
-
-    meals = await prisma.commonMeal.findMany({
+  try {
+    let meals = await prisma.commonMeal.findMany({
       orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
     });
-  }
 
-  return meals;
+    if (meals.length === 0) {
+      await prisma.commonMeal.createMany({
+        data: DEFAULT_COMMON_MEALS.map((meal, index) => ({
+          name: meal.name,
+          complexity: meal.complexity ?? "MEDIUM",
+          imageUrl: meal.imageUrl ?? null,
+          sortOrder: index,
+        })),
+        skipDuplicates: true,
+      });
+
+      meals = await prisma.commonMeal.findMany({
+        orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+      });
+    }
+
+    return meals;
+  } catch (error) {
+    console.error("listCommonMeals fallback: database unavailable", error);
+    return buildFallbackCommonMeals();
+  }
 }

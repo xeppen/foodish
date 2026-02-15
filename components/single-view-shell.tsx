@@ -2,12 +2,13 @@
 
 import Image from "next/image";
 import { useCallback, useMemo, useState } from "react";
-import { List, ShoppingBasket, X } from "lucide-react";
+import { List, ShoppingBasket } from "lucide-react";
 import { useClerk } from "@clerk/nextjs";
 import { WeeklyPlanView } from "@/components/weekly-plan-view";
 import { MealDrawer } from "@/components/meal-drawer";
 import { LoginButton } from "@/components/login-button";
 import { resolveMealImageUrl } from "@/lib/meal-image-url";
+import { ShoppingListDrawer } from "@/components/shopping-list-drawer";
 
 type WeeklyPlan = {
   id: string;
@@ -37,6 +38,15 @@ type Meal = {
   thumbsDownCount: number;
   imageUrl: string | null;
   ingredients?: unknown;
+  mealIngredients?: Array<{
+    name: string;
+    amount: number | null;
+    unit: string | null;
+    note: string | null;
+    optional: boolean;
+    confidence: number | null;
+    needsReview: boolean;
+  }>;
   createdAt: Date | string;
 };
 
@@ -57,6 +67,18 @@ type SingleViewShellProps = {
   meals: Meal[];
   commonMeals?: CommonMeal[];
   planNotice?: string;
+  shoppingList?: {
+    id: string;
+    items: Array<{
+      id: string;
+      displayName: string;
+      amount: number | null;
+      unit: string | null;
+      isChecked: boolean;
+      unresolved: boolean;
+      sourceMealNames?: unknown;
+    }>;
+  } | null;
 };
 
 export function SingleViewShell({
@@ -66,49 +88,32 @@ export function SingleViewShell({
   meals,
   commonMeals,
   planNotice,
+  shoppingList,
 }: SingleViewShellProps) {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [isShoppingOpen, setIsShoppingOpen] = useState(false);
   const [authPrompt, setAuthPrompt] = useState<string | null>(null);
   const { openSignIn } = useClerk();
+  const commonImageByName = useMemo(
+    () =>
+      (commonMeals ?? []).reduce<Record<string, string>>((acc, meal) => {
+        const key = meal.name.trim().toLowerCase();
+        if (meal.imageUrl?.trim()) {
+          acc[key] = meal.imageUrl.trim();
+        }
+        return acc;
+      }, {}),
+    [commonMeals]
+  );
   const mealImageByName = useMemo(() => {
-    const commonImageByName = (commonMeals ?? []).reduce<Record<string, string>>((acc, meal) => {
-      const key = meal.name.trim().toLowerCase();
-      if (meal.imageUrl?.trim()) {
-        acc[key] = meal.imageUrl.trim();
-      }
-      return acc;
-    }, {});
-
     return meals.reduce<Record<string, string>>((acc, meal) => {
       const key = meal.name.trim().toLowerCase();
       const preferredImage = meal.imageUrl?.trim() || commonImageByName[key] || null;
       acc[key] = resolveMealImageUrl(preferredImage, meal.name);
       return acc;
     }, {});
-  }, [commonMeals, meals]);
-  const shoppingItems = useMemo(() => {
-    const dayMeals = [plan.monday, plan.tuesday, plan.wednesday, plan.thursday, plan.friday]
-      .filter((value): value is string => Boolean(value?.trim()))
-      .map((value) => value.trim().toLowerCase());
-
-    const ingredients = new Set<string>();
-    for (const planned of dayMeals) {
-      const match = meals.find((meal) => meal.name.trim().toLowerCase() === planned);
-      const rawIngredients = match?.ingredients;
-      const ingredientList = Array.isArray(rawIngredients) ? rawIngredients : [];
-      for (const ingredient of ingredientList) {
-        if (typeof ingredient === "string" && ingredient.trim()) {
-          ingredients.add(ingredient.trim());
-        }
-      }
-    }
-
-    if (ingredients.size > 0) {
-      return Array.from(ingredients);
-    }
-    return dayMeals.map((mealName) => mealName.charAt(0).toUpperCase() + mealName.slice(1));
-  }, [meals, plan.friday, plan.monday, plan.thursday, plan.tuesday, plan.wednesday]);
+  }, [commonImageByName, meals]);
+  const shoppingCount = shoppingList?.items.length ?? 0;
 
   const promptLogin = useCallback(() => {
     setAuthPrompt("Login to curate your own meals");
@@ -123,7 +128,7 @@ export function SingleViewShell({
   }
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-black md:h-screen md:overflow-hidden">
+    <div className="relative min-h-screen bg-black">
       <div className="fixed inset-0 z-0">
         <Image
           src="/hero-dinner.png"
@@ -150,7 +155,7 @@ export function SingleViewShell({
         </div>
       </header>
 
-      <main className="relative z-10 mx-auto flex min-h-screen w-full max-w-7xl items-start px-0 pb-10 pt-12 sm:px-6 lg:px-8 md:h-[calc(100vh-96px)] md:min-h-0 md:overflow-hidden">
+      <main className="relative z-10 mx-auto flex min-h-screen w-full max-w-7xl items-start px-0 pb-10 pt-12 sm:px-6 lg:px-8">
         <section className="w-full">
           <div className="mb-6 px-4 text-center sm:mb-10 sm:px-0">
             <h1 className="text-5xl font-bold text-white drop-shadow-lg sm:text-6xl">Veckans middagsplan</h1>
@@ -190,41 +195,21 @@ export function SingleViewShell({
         <ShoppingBasket className="h-4 w-4" />
         <span>Inköp</span>
         <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-[var(--terracotta)] px-1.5 text-[11px] font-bold text-white">
-          {shoppingItems.length}
+          {shoppingCount}
         </span>
       </button>
-
-      {isShoppingOpen && (
-        <div className="fixed bottom-20 right-5 z-30 w-[min(90vw,360px)] rounded-2xl border border-white/20 bg-black/70 p-4 text-white shadow-2xl backdrop-blur-xl">
-          <div className="mb-3 flex items-center justify-between">
-            <p className="text-sm font-bold uppercase tracking-[0.12em] text-white/90">Shopping List</p>
-            <button
-              type="button"
-              onClick={() => setIsShoppingOpen(false)}
-              className="rounded-full border border-white/20 p-1 text-white/70 hover:text-white"
-              aria-label="Stäng inköpslista"
-            >
-              <X className="h-3.5 w-3.5" />
-            </button>
-          </div>
-          <ul className="max-h-60 space-y-1 overflow-y-auto pr-1 text-sm">
-            {shoppingItems.length === 0 ? (
-              <li className="text-white/70">Lägg till måltider för att skapa inköpslista.</li>
-            ) : (
-              shoppingItems.map((item) => (
-                <li key={item} className="rounded-md bg-white/10 px-2 py-1">
-                  {item}
-                </li>
-              ))
-            )}
-          </ul>
-        </div>
-      )}
+      <ShoppingListDrawer
+        isOpen={isShoppingOpen}
+        onClose={() => setIsShoppingOpen(false)}
+        isAuthenticated={isAuthenticated}
+        initialList={shoppingList ?? null}
+      />
 
       <MealDrawer
         isOpen={isDrawerOpen}
         isAuthenticated={isAuthenticated}
         meals={meals}
+        commonMealImageByName={commonImageByName}
         onClose={() => setIsDrawerOpen(false)}
         onAuthRequired={promptLogin}
       />

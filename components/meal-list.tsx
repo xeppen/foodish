@@ -1,11 +1,10 @@
 "use client";
 
-import { deleteMeal, updateMeal, voteMeal } from "@/lib/actions/meals";
+import { deleteMeal, voteMeal } from "@/lib/actions/meals";
 import { MoreHorizontal } from "lucide-react";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { buildFallbackMealImageUrl, resolveMealImageUrl } from "@/lib/meal-image-url";
-import { generateDishImageUrl } from "@/lib/image-generation/client";
 
 type Meal = {
   id: string;
@@ -15,6 +14,16 @@ type Meal = {
   thumbsUpCount: number;
   thumbsDownCount: number;
   imageUrl: string | null;
+  ingredients?: unknown;
+  mealIngredients?: Array<{
+    name: string;
+    amount: number | null;
+    unit: string | null;
+    note: string | null;
+    optional: boolean;
+    confidence: number | null;
+    needsReview: boolean;
+  }>;
   createdAt: Date | string;
 };
 
@@ -24,86 +33,31 @@ const DOT_COLOR: Record<Meal["complexity"], string> = {
   COMPLEX: "bg-red-500",
 };
 
-const DAY_OPTIONS: Array<{ value: Meal["preferredDays"][number]; label: string; short: string }> = [
-  { value: "MONDAY", label: "Måndag", short: "M" },
-  { value: "TUESDAY", label: "Tisdag", short: "T" },
-  { value: "WEDNESDAY", label: "Onsdag", short: "O" },
-  { value: "THURSDAY", label: "Torsdag", short: "T" },
-  { value: "FRIDAY", label: "Fredag", short: "F" },
-  { value: "SATURDAY", label: "Lördag", short: "L" },
-  { value: "SUNDAY", label: "Söndag", short: "S" },
+const DAY_OPTIONS: Array<{ value: Meal["preferredDays"][number]; short: string }> = [
+  { value: "MONDAY", short: "M" },
+  { value: "TUESDAY", short: "T" },
+  { value: "WEDNESDAY", short: "O" },
+  { value: "THURSDAY", short: "T" },
+  { value: "FRIDAY", short: "F" },
+  { value: "SATURDAY", short: "L" },
+  { value: "SUNDAY", short: "S" },
 ];
 
-export function MealList({ meals }: { meals: Meal[] }) {
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editName, setEditName] = useState("");
-  const [editComplexity, setEditComplexity] = useState<Meal["complexity"]>("MEDIUM");
-  const [editPreferredDays, setEditPreferredDays] = useState<Meal["preferredDays"]>([]);
-  const [editImageMode, setEditImageMode] = useState<"upload" | "url">("upload");
-  const [editImageFile, setEditImageFile] = useState<File | null>(null);
-  const [editImageUrl, setEditImageUrl] = useState("");
-  const [editImageUrlExpanded, setEditImageUrlExpanded] = useState(false);
-  const [editGenerationLoading, setEditGenerationLoading] = useState(false);
-  const [editGenerationError, setEditGenerationError] = useState<string | null>(null);
-  const [editPreviewError, setEditPreviewError] = useState(false);
+export function MealList({
+  meals,
+  commonMealImageByName,
+  onEditMeal,
+}: {
+  meals: Meal[];
+  commonMealImageByName?: Record<string, string>;
+  onEditMeal: (meal: Meal) => void;
+}) {
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [votes, setVotes] = useState<Record<string, { up: number; down: number }>>(
     Object.fromEntries(meals.map((meal) => [meal.id, { up: meal.thumbsUpCount, down: meal.thumbsDownCount }]))
   );
   const [pendingVoteId, setPendingVoteId] = useState<string | null>(null);
   const router = useRouter();
-
-  function startEdit(meal: Meal) {
-    setEditingId(meal.id);
-    setEditName(meal.name);
-    setEditComplexity(meal.complexity);
-    setEditPreferredDays(meal.preferredDays ?? []);
-    setEditImageFile(null);
-    setEditImageMode(meal.imageUrl ? "url" : "upload");
-    setEditImageUrl(meal.imageUrl ?? "");
-    setEditImageUrlExpanded(false);
-    setEditGenerationLoading(false);
-    setEditGenerationError(null);
-    setEditPreviewError(false);
-    setOpenMenuId(null);
-  }
-
-  function cancelEdit() {
-    setEditingId(null);
-    setEditName("");
-    setEditComplexity("MEDIUM");
-    setEditPreferredDays([]);
-    setEditImageMode("upload");
-    setEditImageFile(null);
-    setEditImageUrl("");
-    setEditImageUrlExpanded(false);
-    setEditGenerationLoading(false);
-    setEditGenerationError(null);
-    setEditPreviewError(false);
-  }
-
-  async function handleGenerateEditImage() {
-    const dishName = editName.trim();
-    if (!dishName) {
-      setEditGenerationError("Skriv ett måltidsnamn först.");
-      return;
-    }
-
-    setEditGenerationError(null);
-    setEditGenerationLoading(true);
-
-    try {
-      const result = await generateDishImageUrl(dishName);
-      setEditImageMode("url");
-      setEditImageFile(null);
-      setEditImageUrl(result.imageUrl);
-      setEditPreviewError(false);
-    } catch (error) {
-      setEditGenerationError(error instanceof Error ? error.message : "Kunde inte generera bild");
-    } finally {
-      setEditGenerationLoading(false);
-    }
-  }
 
   async function handleVote(id: string, direction: "up" | "down") {
     const current = votes[id] ?? { up: 0, down: 0 };
@@ -139,216 +93,16 @@ export function MealList({ meals }: { meals: Meal[] }) {
     }
   }
 
-  async function handleEditSave(id: string) {
-    const formData = new FormData();
-    formData.append("name", editName.trim());
-    formData.append("complexity", editComplexity);
-    for (const day of editPreferredDays) {
-      formData.append("preferredDays", day);
-    }
-    if (editImageMode === "upload" && editImageFile) {
-      formData.append("image", editImageFile);
-    }
-    if (editImageMode === "url" && editImageUrl.trim()) {
-      formData.append("imageUrl", editImageUrl.trim());
-    }
-    const result = await updateMeal(id, formData);
-    if (!result.error) {
-      cancelEdit();
-      router.refresh();
-    }
-  }
-
-  function applyDayPreset(preset: "weekday" | "friday" | "weekend") {
-    if (preset === "weekday") {
-      setEditPreferredDays(["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY"]);
-      return;
-    }
-    if (preset === "friday") {
-      setEditPreferredDays(["FRIDAY"]);
-      return;
-    }
-    setEditPreferredDays(["SATURDAY", "SUNDAY"]);
-  }
-
   return (
     <ul className="divide-y divide-[var(--cream-dark)] rounded-xl border border-[var(--cream-dark)] bg-white">
       {meals.map((meal) => {
         const mealVotes = votes[meal.id] ?? { up: meal.thumbsUpCount, down: meal.thumbsDownCount };
-        const imageSrc = resolveMealImageUrl(meal.imageUrl, meal.name);
+        const commonImageUrl = commonMealImageByName?.[meal.name.trim().toLowerCase()] ?? null;
+        const imageSrc = resolveMealImageUrl(meal.imageUrl ?? commonImageUrl, meal.name);
 
         return (
           <li key={meal.id} className="relative px-2 py-2">
-            {editingId === meal.id ? (
-              <div className="space-y-5 rounded-xl border border-[var(--cream-dark)] bg-[var(--cream)]/60 p-3">
-                <input
-                  type="text"
-                  value={editName}
-                  onChange={(e) => setEditName(e.target.value)}
-                  className="w-full border-none bg-transparent p-0 text-xl font-bold text-[var(--charcoal)] focus:ring-0"
-                  autoFocus
-                />
-
-                <div>
-                  <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--warm-gray)]">
-                    Komplexitet
-                  </p>
-                  <div className="grid grid-cols-3 gap-1 rounded-lg bg-white/75 p-1">
-                    {[
-                      { value: "SIMPLE", label: "🟢 Enkel" },
-                      { value: "MEDIUM", label: "🟡 Medium" },
-                      { value: "COMPLEX", label: "🔴 Avancerad" },
-                    ].map((option) => (
-                      <button
-                        key={option.value}
-                        type="button"
-                        onClick={() => setEditComplexity(option.value as Meal["complexity"])}
-                        className={`rounded-md px-2 py-1.5 text-xs font-semibold transition ${
-                          editComplexity === option.value
-                            ? "bg-[var(--charcoal)] text-white shadow-sm"
-                            : "text-[var(--warm-gray)] hover:text-[var(--charcoal)]"
-                        }`}
-                      >
-                        {option.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div>
-                  <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--warm-gray)]">
-                    Passar bäst...
-                  </p>
-                  <div className="mb-2 flex flex-wrap gap-2">
-                    {DAY_OPTIONS.map((dayOption) => {
-                      const selected = editPreferredDays.includes(dayOption.value);
-                      return (
-                        <button
-                          key={dayOption.value}
-                          aria-label={dayOption.label}
-                          type="button"
-                          onClick={() =>
-                            setEditPreferredDays((current) =>
-                              current.includes(dayOption.value)
-                                ? current.filter((day) => day !== dayOption.value)
-                                : [...current, dayOption.value]
-                            )
-                          }
-                          className={`flex h-8 w-8 items-center justify-center rounded-full border text-xs font-bold transition ${
-                            selected
-                              ? "border-[var(--terracotta)] bg-[var(--terracotta)] text-white"
-                              : "border-[var(--cream-dark)] bg-white text-[var(--warm-gray)]"
-                          }`}
-                        >
-                          {dayOption.short}
-                        </button>
-                      );
-                    })}
-                  </div>
-                  <div className="flex items-center gap-3 text-[11px] font-semibold text-[var(--warm-gray)]">
-                    <button type="button" onClick={() => applyDayPreset("friday")} className="hover:text-[var(--charcoal)]">
-                      Fredagsmys
-                    </button>
-                    <button type="button" onClick={() => applyDayPreset("weekday")} className="hover:text-[var(--charcoal)]">
-                      Vardag
-                    </button>
-                    <button type="button" onClick={() => applyDayPreset("weekend")} className="hover:text-[var(--charcoal)]">
-                      Helg
-                    </button>
-                  </div>
-                </div>
-
-                <div className="rounded-md border border-[var(--cream-dark)] bg-white/70 p-2">
-                  <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--warm-gray)]">Bild</p>
-
-                  <button
-                    type="button"
-                    onClick={() => void handleGenerateEditImage()}
-                    disabled={editGenerationLoading || !editName.trim()}
-                    className="mb-2 w-full rounded-md bg-[var(--charcoal)] px-3 py-2 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    {editGenerationLoading ? "Genererar bild..." : "✨ Generera ny"}
-                  </button>
-                  {editGenerationError && <p className="mb-2 text-xs text-red-600">{editGenerationError}</p>}
-
-                  {(editImageMode === "url" && editImageUrl.trim()) || editImageFile ? (
-                    <div className="overflow-hidden rounded-lg border border-[var(--cream-dark)] bg-black/5">
-                      {!editPreviewError ? (
-                        <img
-                          src={resolveMealImageUrl(editImageUrl || meal.imageUrl || "", editName || "Meal")}
-                          alt={editName || "Meal preview"}
-                          className="h-32 w-full object-cover"
-                          loading="lazy"
-                          referrerPolicy="no-referrer"
-                          onError={() => setEditPreviewError(true)}
-                        />
-                      ) : (
-                        <p className="px-2 py-3 text-xs text-rose-600">Kunde inte ladda förhandsvisning av bilden.</p>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="rounded-lg border border-dashed border-[var(--cream-dark)] px-3 py-4 text-center text-xs text-[var(--warm-gray)]">
-                      Ingen bild vald ännu.
-                    </div>
-                  )}
-
-                  <div className="mt-2 flex items-center justify-between">
-                    <button
-                      type="button"
-                      onClick={() => setEditImageUrlExpanded((current) => !current)}
-                      className="text-xs font-semibold text-[var(--warm-gray)] hover:text-[var(--charcoal)]"
-                    >
-                      {editImageUrlExpanded ? "Dölj URL" : "Ändra URL manuellt"}
-                    </button>
-                    <label className="cursor-pointer text-xs font-semibold text-[var(--warm-gray)] hover:text-[var(--charcoal)]">
-                      Ladda upp
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={(e) => {
-                          setEditImageMode("upload");
-                          setEditImageFile(e.target.files?.[0] ?? null);
-                          setEditPreviewError(false);
-                        }}
-                        className="hidden"
-                      />
-                    </label>
-                  </div>
-
-                  {editImageUrlExpanded && (
-                    <input
-                      type="url"
-                      value={editImageUrl}
-                      onChange={(e) => {
-                        setEditImageMode("url");
-                        setEditImageFile(null);
-                        setEditImageUrl(e.target.value);
-                        setEditPreviewError(false);
-                      }}
-                      placeholder="https://example.com/meal.jpg"
-                      className="mt-2 w-full"
-                    />
-                  )}
-                </div>
-                <div className="flex justify-end gap-2">
-                  <button
-                    type="button"
-                    onClick={cancelEdit}
-                    className="rounded-md border border-[var(--cream-dark)] px-2 py-1 text-xs font-semibold text-[var(--warm-gray)]"
-                  >
-                    Avbryt
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => void handleEditSave(meal.id)}
-                    className="rounded-md bg-[var(--terracotta)] px-2 py-1 text-xs font-semibold text-white"
-                  >
-                    Spara
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div className="grid grid-cols-[auto_1fr_auto_auto] items-center gap-2">
+            <div className="grid grid-cols-[auto_1fr_auto_auto] items-center gap-2">
               <div className="relative h-10 w-10 overflow-hidden rounded-md">
                 <img
                   src={imageSrc}
@@ -383,7 +137,7 @@ export function MealList({ meals }: { meals: Meal[] }) {
               <div className="flex items-center gap-1">
                 <button
                   type="button"
-                  onClick={() => handleVote(meal.id, "up")}
+                  onClick={() => void handleVote(meal.id, "up")}
                   disabled={pendingVoteId === meal.id}
                   className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-700"
                 >
@@ -391,7 +145,7 @@ export function MealList({ meals }: { meals: Meal[] }) {
                 </button>
                 <button
                   type="button"
-                  onClick={() => handleVote(meal.id, "down")}
+                  onClick={() => void handleVote(meal.id, "down")}
                   disabled={pendingVoteId === meal.id}
                   className="rounded-full border border-rose-200 bg-rose-50 px-2 py-1 text-xs font-semibold text-rose-700"
                 >
@@ -414,11 +168,12 @@ export function MealList({ meals }: { meals: Meal[] }) {
                     <button
                       type="button"
                       onClick={() => {
-                        startEdit(meal);
+                        onEditMeal(meal);
+                        setOpenMenuId(null);
                       }}
                       className="block w-full px-3 py-2 text-left text-xs font-semibold text-[var(--charcoal)] hover:bg-[var(--cream)]"
                     >
-                      Edit
+                      Redigera
                     </button>
                     <button
                       type="button"
@@ -426,15 +181,14 @@ export function MealList({ meals }: { meals: Meal[] }) {
                         setOpenMenuId(null);
                         void handleDelete(meal.id);
                       }}
-                      className="block w-full px-3 py-2 text-left text-xs font-semibold text-rose-600 hover:bg-rose-50"
+                      className="block w-full px-3 py-2 text-left text-xs font-semibold text-red-600 hover:bg-red-50"
                     >
-                      Delete
+                      Ta bort
                     </button>
                   </div>
                 )}
               </div>
-              </div>
-            )}
+            </div>
           </li>
         );
       })}

@@ -51,6 +51,8 @@ model Meal {
   updatedAt       DateTime       @updatedAt
   usageHistory    UsageHistory[]
   daySignals      MealDaySignal[]
+  mealIngredients MealIngredient[]
+  planEntries     WeeklyPlanEntry[]
 
   @@index([userId])
   @@index([userId, complexity])
@@ -79,9 +81,81 @@ model WeeklyPlan {
   friday        String?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
+  entries       WeeklyPlanEntry[]
+  shoppingList  ShoppingList?
 
   @@unique([userId, weekStartDate])
   @@index([userId])
+}
+
+model WeeklyPlanEntry {
+  id           String    @id @default(cuid())
+  weeklyPlan   WeeklyPlan @relation(fields: [weeklyPlanId], references: [id], onDelete: Cascade)
+  weeklyPlanId String
+  meal         Meal      @relation(fields: [mealId], references: [id], onDelete: Cascade)
+  mealId       String
+  day          Weekday
+  servings     Int?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@unique([weeklyPlanId, day])
+  @@index([mealId])
+}
+
+model MealIngredient {
+  id            String   @id @default(cuid())
+  meal          Meal     @relation(fields: [mealId], references: [id], onDelete: Cascade)
+  mealId        String
+  position      Int
+  name          String
+  canonicalName String
+  amount        Float?
+  unit          String?
+  note          String?
+  optional      Boolean  @default(false)
+  confidence    Float?
+  needsReview   Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([mealId, position])
+  @@index([canonicalName])
+}
+
+model ShoppingList {
+  id            String             @id @default(cuid())
+  userId        String
+  weekStartDate DateTime
+  weeklyPlan    WeeklyPlan?        @relation(fields: [weeklyPlanId], references: [id], onDelete: SetNull)
+  weeklyPlanId  String?            @unique
+  status        String             @default("READY")
+  items         ShoppingListItem[]
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+
+  @@unique([userId, weekStartDate])
+  @@index([userId])
+}
+
+model ShoppingListItem {
+  id             String       @id @default(cuid())
+  shoppingList   ShoppingList @relation(fields: [shoppingListId], references: [id], onDelete: Cascade)
+  shoppingListId String
+  canonicalName  String
+  displayName    String
+  amount         Float?
+  unit           String?
+  isChecked      Boolean      @default(false)
+  sourceMealIds  Json?
+  sourceMealNames Json?
+  unresolved     Boolean      @default(false)
+  sortOrder      Int          @default(0)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@index([shoppingListId, sortOrder])
+  @@index([canonicalName])
 }
 
 model UsageHistory {
