@@ -2,13 +2,13 @@
 
 import { useEffect, useState } from "react";
 import { X } from "lucide-react";
-import { MagicMealInput } from "@/components/magic-meal-input";
 import { MealList } from "@/components/meal-list";
 import { EmptyState } from "@/components/empty-state";
 import { LoginButton } from "@/components/login-button";
 import { SignOutButton } from "@/components/sign-out-button";
-import { resetMealLearning } from "@/lib/actions/meals";
+import { addMeal, resetMealLearning } from "@/lib/actions/meals";
 import { useRouter } from "next/navigation";
+import { MealEditorSheet } from "@/components/meal-editor-sheet";
 
 type Meal = {
   id: string;
@@ -46,6 +46,10 @@ export function MealDrawer({
   onAuthRequired,
 }: MealDrawerProps) {
   const [isResetting, setIsResetting] = useState(false);
+  const [quickName, setQuickName] = useState("");
+  const [quickSaving, setQuickSaving] = useState(false);
+  const [quickError, setQuickError] = useState<string | null>(null);
+  const [editorMode, setEditorMode] = useState<{ type: "create" } | { type: "edit"; meal: Meal } | null>(null);
   const router = useRouter();
 
   useEffect(() => {
@@ -76,6 +80,29 @@ export function MealDrawer({
     }
   }
 
+  async function handleQuickAdd() {
+    const name = quickName.trim();
+    if (!name || quickSaving) {
+      return;
+    }
+
+    setQuickSaving(true);
+    setQuickError(null);
+    try {
+      const formData = new FormData();
+      formData.append("name", name);
+      const result = await addMeal(formData);
+      if (result.error) {
+        setQuickError(result.error);
+        return;
+      }
+      setQuickName("");
+      router.refresh();
+    } finally {
+      setQuickSaving(false);
+    }
+  }
+
   return (
     <div
       className={`fixed inset-0 z-[60] transition-all duration-300 ${
@@ -93,7 +120,7 @@ export function MealDrawer({
       />
 
       <aside
-        className={`absolute bottom-0 left-0 right-0 h-[100dvh] border border-white/30 bg-white/95 shadow-2xl transition-transform duration-300 ease-out sm:bottom-0 sm:left-auto sm:right-0 sm:top-0 sm:h-full sm:w-[33vw] sm:max-w-md sm:rounded-none sm:rounded-l-3xl ${
+        className={`relative absolute bottom-0 left-0 right-0 h-[100dvh] border border-white/30 bg-white/95 shadow-2xl transition-transform duration-300 ease-out sm:bottom-0 sm:left-auto sm:right-0 sm:top-0 sm:h-full sm:w-[42vw] sm:max-w-[560px] sm:rounded-none sm:rounded-l-3xl ${
           isOpen ? "translate-y-0 sm:translate-x-0" : "translate-y-full sm:translate-x-full"
         }`}
         role="dialog"
@@ -119,11 +146,42 @@ export function MealDrawer({
             </button>
           </header>
 
-          <div className="flex-1 overflow-y-auto px-5 py-5">
+          <div className="relative flex-1 overflow-y-auto px-5 py-5">
             {isAuthenticated ? (
               <div className="space-y-6">
-                <section className="rounded-2xl bg-[var(--cream)]/70 p-4">
-                  <MagicMealInput />
+                <section className="rounded-2xl border border-[var(--cream-dark)] bg-[var(--cream)]/70 p-4">
+                  <label
+                    htmlFor="quick-meal-input"
+                    className="mb-2 block text-xs font-semibold uppercase tracking-[0.12em] text-[var(--warm-gray)]"
+                  >
+                    Lägg till snabbt
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      id="quick-meal-input"
+                      type="text"
+                      value={quickName}
+                      onChange={(event) => setQuickName(event.target.value)}
+                      placeholder="Skriv en rätt, t.ex. Korv stroganoff"
+                      className="min-w-0 flex-1"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => void handleQuickAdd()}
+                      disabled={quickSaving || !quickName.trim()}
+                      className="rounded-md bg-[var(--terracotta)] px-3 py-2 text-xs font-semibold text-white disabled:opacity-60"
+                    >
+                      {quickSaving ? "Sparar..." : "Lägg till"}
+                    </button>
+                  </div>
+                  {quickError && <p className="mt-2 text-xs text-red-600">{quickError}</p>}
+                  <button
+                    type="button"
+                    onClick={() => setEditorMode({ type: "create" })}
+                    className="mt-3 text-xs font-semibold text-[var(--warm-gray)] hover:text-[var(--charcoal)]"
+                  >
+                    Skapa med detaljer
+                  </button>
                 </section>
 
                 <section>
@@ -133,7 +191,7 @@ export function MealDrawer({
                       description="Lägg till din första måltid för att skapa personliga veckoplaner."
                     />
                   ) : (
-                    <MealList meals={meals} />
+                    <MealList meals={meals} onEditMeal={(meal) => setEditorMode({ type: "edit", meal })} />
                   )}
                 </section>
               </div>
@@ -171,6 +229,14 @@ export function MealDrawer({
             )}
           </footer>
         </div>
+
+        {editorMode && (
+          <MealEditorSheet
+            mode={editorMode}
+            isOpen={Boolean(editorMode)}
+            onClose={() => setEditorMode(null)}
+          />
+        )}
       </aside>
     </div>
   );
