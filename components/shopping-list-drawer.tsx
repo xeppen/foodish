@@ -2,8 +2,8 @@
 
 import { generateCurrentWeekShoppingList, toggleShoppingListItem } from "@/lib/actions/shopping-list";
 import { setDayServings } from "@/lib/actions/plans";
-import { Loader2, ShoppingBasket, X } from "lucide-react";
-import { useState } from "react";
+import { ChevronDown, Loader2, ShoppingBasket, X } from "lucide-react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 type ShoppingItem = {
@@ -67,6 +67,7 @@ export function ShoppingListDrawer({ isOpen, onClose, isAuthenticated, initialLi
   const [loading, setLoading] = useState(false);
   const [pendingItem, setPendingItem] = useState<string | null>(null);
   const [pendingDay, setPendingDay] = useState<string | null>(null);
+  const [isPortionsExpanded, setIsPortionsExpanded] = useState(false);
   const router = useRouter();
   const servingsByDay = (plan.entries ?? []).reduce<Record<string, number>>((acc, entry) => {
     const key = entry.day.toLowerCase();
@@ -75,6 +76,24 @@ export function ShoppingListDrawer({ isOpen, onClose, isAuthenticated, initialLi
     }
     return acc;
   }, {});
+
+  useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = originalOverflow;
+    };
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) {
+      setIsPortionsExpanded(false);
+    }
+  }, [isOpen]);
 
   async function handleGenerate() {
     setLoading(true);
@@ -127,7 +146,7 @@ export function ShoppingListDrawer({ isOpen, onClose, isAuthenticated, initialLi
       />
 
       <aside
-        className={`absolute bottom-0 left-0 right-0 h-[80dvh] rounded-t-2xl border border-white/20 bg-black/75 p-4 text-white backdrop-blur-xl transition-transform duration-300 sm:bottom-0 sm:left-auto sm:right-0 sm:top-0 sm:h-full sm:w-[32vw] sm:max-w-md sm:rounded-none sm:rounded-l-2xl ${
+        className={`absolute inset-0 flex h-[100dvh] w-full flex-col bg-black/80 p-4 text-white backdrop-blur-xl transition-transform duration-300 sm:inset-y-0 sm:left-auto sm:right-0 sm:h-full sm:w-[32vw] sm:max-w-md sm:rounded-none sm:rounded-l-2xl sm:border sm:border-white/20 ${
           isOpen ? "translate-y-0 sm:translate-x-0" : "translate-y-full sm:translate-x-full"
         }`}
       >
@@ -145,43 +164,56 @@ export function ShoppingListDrawer({ isOpen, onClose, isAuthenticated, initialLi
           <p className="rounded-xl border border-white/20 bg-white/10 p-3 text-sm">Logga in för att skapa och spara inköpslista.</p>
         ) : (
           <>
-            <div className="mb-4 space-y-2 rounded-xl border border-white/15 bg-white/5 p-3">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-white/70">Portioner per dag</p>
-              {PLAN_DAYS.map((day) => {
-                const mealName = plan[day];
-                if (!mealName) {
-                  return null;
-                }
-                const current = servingsByDay[day] ?? 4;
-                const disabled = pendingDay === day || loading;
-                return (
-                  <div key={day} className="flex items-center justify-between gap-2 rounded-md border border-white/10 bg-black/20 px-2 py-1.5">
-                    <div className="min-w-0">
-                      <p className="text-xs font-semibold text-white/80">{DAY_LABELS[day]}</p>
-                      <p className="truncate text-xs text-white/65">{mealName}</p>
-                    </div>
-                    <div className="inline-flex items-center gap-1">
-                      <button
-                        type="button"
-                        disabled={disabled || current <= 1}
-                        onClick={() => void handleUpdateDayServings(day, current - 1)}
-                        className="h-7 w-7 rounded-md border border-white/20 text-sm font-bold text-white disabled:opacity-40"
-                      >
-                        -
-                      </button>
-                      <span className="min-w-14 text-center text-xs font-semibold text-white">{current} pers</span>
-                      <button
-                        type="button"
-                        disabled={disabled || current >= 12}
-                        onClick={() => void handleUpdateDayServings(day, current + 1)}
-                        className="h-7 w-7 rounded-md border border-white/20 text-sm font-bold text-white disabled:opacity-40"
-                      >
-                        +
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
+            <div className="mb-4 rounded-xl border border-white/15 bg-white/5 p-3">
+              <button
+                type="button"
+                onClick={() => setIsPortionsExpanded((current) => !current)}
+                className="flex w-full items-center justify-between"
+              >
+                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-white/70">Portioner per dag</p>
+                <ChevronDown
+                  className={`h-4 w-4 text-white/70 transition-transform duration-200 ${isPortionsExpanded ? "rotate-180" : ""}`}
+                />
+              </button>
+              {isPortionsExpanded && (
+                <div className="mt-3 space-y-2">
+                  {PLAN_DAYS.map((day) => {
+                    const mealName = plan[day];
+                    if (!mealName) {
+                      return null;
+                    }
+                    const current = servingsByDay[day] ?? 4;
+                    const disabled = pendingDay === day || loading;
+                    return (
+                      <div key={day} className="flex items-center justify-between gap-2 rounded-md border border-white/10 bg-black/20 px-2 py-1.5">
+                        <div className="min-w-0">
+                          <p className="text-xs font-semibold text-white/80">{DAY_LABELS[day]}</p>
+                          <p className="truncate text-xs text-white/65">{mealName}</p>
+                        </div>
+                        <div className="inline-flex items-center gap-1">
+                          <button
+                            type="button"
+                            disabled={disabled || current <= 1}
+                            onClick={() => void handleUpdateDayServings(day, current - 1)}
+                            className="h-7 w-7 rounded-md border border-white/20 text-sm font-bold text-white disabled:opacity-40"
+                          >
+                            -
+                          </button>
+                          <span className="min-w-14 text-center text-xs font-semibold text-white">{current} pers</span>
+                          <button
+                            type="button"
+                            disabled={disabled || current >= 12}
+                            onClick={() => void handleUpdateDayServings(day, current + 1)}
+                            className="h-7 w-7 rounded-md border border-white/20 text-sm font-bold text-white disabled:opacity-40"
+                          >
+                            +
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
 
             <button
@@ -194,7 +226,8 @@ export function ShoppingListDrawer({ isOpen, onClose, isAuthenticated, initialLi
               {initialList ? "Regenerera lista" : "Generera inköpslista"}
             </button>
 
-            <ul className="space-y-2 overflow-y-auto pr-1">
+            <div className="min-h-0 flex-1 overflow-y-auto pr-1">
+              <ul className="space-y-2">
               {!initialList || initialList.items.length === 0 ? (
                 <li className="rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-sm text-white/70">Ingen lista ännu.</li>
               ) : (
@@ -233,7 +266,8 @@ export function ShoppingListDrawer({ isOpen, onClose, isAuthenticated, initialLi
                   </li>
                 ))
               )}
-            </ul>
+              </ul>
+            </div>
           </>
         )}
       </aside>
