@@ -33,6 +33,8 @@ import { initializeStarterMeals } from "@/lib/actions/meals";
 import { generateWeeklyPlan } from "@/lib/actions/plans";
 import { generateCurrentWeekShoppingList, getCurrentWeekShoppingList } from "@/lib/actions/shopping-list";
 
+const describeIfDatabase = process.env.DATABASE_URL ? describe : describe.skip;
+
 function getWeekStart(date: Date = new Date()): Date {
   const d = new Date(date);
   const day = d.getDay();
@@ -50,7 +52,7 @@ async function cleanupTestData(userId: string) {
   await prisma.meal.deleteMany({ where: { userId } });
 }
 
-describe("plan -> shopping list integration (live DB)", () => {
+describeIfDatabase("plan -> shopping list integration (live DB)", () => {
   beforeEach(async () => {
     mockGetCurrentUser.mockResolvedValue({ id: TEST_USER_ID, name: "Integration User" });
     await cleanupTestData(TEST_USER_ID);
@@ -139,7 +141,7 @@ describe("plan -> shopping list integration (live DB)", () => {
   });
 });
 
-describe("starter-pack user integration (live DB)", () => {
+describeIfDatabase("starter-pack user integration (live DB)", () => {
   beforeEach(async () => {
     mockGetCurrentUser.mockResolvedValue({ id: TEST_DEFAULT_USER_ID, name: "Default Integration User" });
     await cleanupTestData(TEST_DEFAULT_USER_ID);
