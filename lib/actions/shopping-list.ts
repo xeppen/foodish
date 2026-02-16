@@ -87,6 +87,29 @@ export async function regenerateShoppingListForUser(
   weekStart: Date,
   options?: { revalidate?: boolean }
 ) {
+  const existingList = await prisma.shoppingList.findUnique({
+    where: {
+      userId_weekStartDate: {
+        userId,
+        weekStartDate: weekStart,
+      },
+    },
+    include: {
+      items: {
+        select: {
+          canonicalName: true,
+          isChecked: true,
+        },
+      },
+    },
+  });
+  const checkedByCanonical = new Map<string, boolean>();
+  for (const item of existingList?.items ?? []) {
+    if (item.isChecked) {
+      checkedByCanonical.set(item.canonicalName, true);
+    }
+  }
+
   const plan = await prisma.weeklyPlan.findUnique({
     where: {
       userId_weekStartDate: {
@@ -291,6 +314,7 @@ export async function regenerateShoppingListForUser(
               amount: item.amount,
               unit: item.unit,
               unresolved: item.unresolved,
+              isChecked: checkedByCanonical.get(item.canonicalName) ?? false,
               sourceMealIds: item.sourceMealIds,
               sourceMealNames: item.sourceMealBreakdown,
               sortOrder: index,

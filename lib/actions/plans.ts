@@ -169,9 +169,6 @@ function warningMessage(warnings: SelectionWarning[]): string | undefined {
   if (warnings.includes("relaxed_favorite_streak")) {
     return "Vi inkluderade en favorit igen för att kunna fylla veckan.";
   }
-  if (warnings.includes("included_recent_meal")) {
-    return "Vi inkluderade en nyligen använd rätt för att kunna fylla veckan.";
-  }
   return undefined;
 }
 

@@ -125,25 +125,76 @@ function heuristicDraft(dishName: string): IngredientDraft {
   };
 }
 
+type AmountUnitSuggestion = {
+  amount: number;
+  unit: string;
+  confidence: number;
+};
+
+function suggestAmountUnit(name: string): AmountUnitSuggestion | null {
+  const value = name.trim().toLowerCase();
+  if (!value) {
+    return null;
+  }
+
+  const grams = (amount: number): AmountUnitSuggestion => ({ amount, unit: "g", confidence: 0.58 });
+  const liters = (amount: number): AmountUnitSuggestion => ({ amount, unit: "dl", confidence: 0.58 });
+  const pieces = (amount: number): AmountUnitSuggestion => ({ amount, unit: "st", confidence: 0.58 });
+
+  if (value.includes("kyckling")) return grams(600);
+  if (value.includes("köttfärs")) return grams(500);
+  if (value.includes("nötfärs")) return grams(500);
+  if (value.includes("fläskfärs")) return grams(500);
+  if (value.includes("korv")) return grams(500);
+  if (value.includes("pasta")) return grams(400);
+  if (value.includes("ris")) return liters(4);
+  if (value.includes("potatis")) return grams(900);
+  if (value.includes("tomat")) return pieces(2);
+  if (value.includes("lök")) return pieces(1);
+  if (value.includes("vitlök")) return { amount: 2, unit: "klyfta", confidence: 0.56 };
+  if (value.includes("grädde")) return liters(3);
+  if (value.includes("mjölk")) return liters(3);
+  if (value.includes("ost")) return grams(150);
+  if (value.includes("smör")) return grams(25);
+  if (value.includes("olja")) return { amount: 1, unit: "msk", confidence: 0.62 };
+  if (value.includes("salt")) return { amount: 1, unit: "tsk", confidence: 0.5 };
+  if (value.includes("peppar")) return { amount: 0.5, unit: "tsk", confidence: 0.5 };
+  if (value.includes("buljong")) return { amount: 1, unit: "tärning", confidence: 0.52 };
+  if (value.includes("tortilla")) return pieces(8);
+  if (value.includes("bröd")) return pieces(8);
+  return null;
+}
+
 function normalizeDraft(dishName: string, draft: IngredientDraft): IngredientDraft {
   return {
     ...draft,
     dishName,
-    ingredients: draft.ingredients.map((item) => ({
-      ...item,
-      name: localizeIngredientName(item.name),
-      amount: item.amount ?? null,
-      unit: normalizeUnit(item.unit ?? null),
-      note: item.note?.trim() || null,
-      optional: item.optional ?? false,
-      confidence: item.confidence ?? null,
-      needsReview:
-        item.needsReview ??
-        (item.confidence == null ||
-          item.confidence < 0.7 ||
-          item.amount == null ||
-          normalizeUnit(item.unit ?? null) == null),
-    })),
+    ingredients: draft.ingredients.map((item) => {
+      const localizedName = localizeIngredientName(item.name);
+      const normalizedUnit = normalizeUnit(item.unit ?? null);
+      const suggestion = item.amount == null || normalizedUnit == null ? suggestAmountUnit(localizedName) : null;
+      const amount = item.amount ?? suggestion?.amount ?? null;
+      const unit = normalizedUnit ?? normalizeUnit(suggestion?.unit ?? null);
+      const confidence =
+        item.confidence == null
+          ? suggestion?.confidence ?? null
+          : suggestion
+            ? Math.max(item.confidence, suggestion.confidence)
+            : item.confidence;
+
+      return {
+        ...item,
+        name: localizedName,
+        amount,
+        unit,
+        note: item.note?.trim() || null,
+        optional: item.optional ?? false,
+        confidence,
+        needsReview:
+          item.needsReview ??
+          (confidence == null || confidence < 0.7 || amount == null || unit == null),
+      };
+    }),
   };
 }
 

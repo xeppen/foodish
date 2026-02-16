@@ -13,4 +13,24 @@ describe("generateIngredientDraft", () => {
     );
     expect(result.ingredients.some((row) => row.needsReview)).toBe(true);
   });
+
+  it("suggests amount and unit for common ingredients when missing", async () => {
+    const result = await generateIngredientDraft("Pasta med kyckling");
+
+    const chicken = result.ingredients.find((row) => row.name.toLowerCase().includes("kyckling"));
+    const pasta = result.ingredients.find((row) => row.name.toLowerCase().includes("pasta"));
+
+    expect(chicken).toEqual(
+      expect.objectContaining({
+        amount: expect.any(Number),
+        unit: expect.any(String),
+      })
+    );
+    expect(pasta).toEqual(
+      expect.objectContaining({
+        amount: expect.any(Number),
+        unit: expect.any(String),
+      })
+    );
+  });
 });

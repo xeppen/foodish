@@ -7,6 +7,7 @@ import { listCommonMeals } from "@/lib/common-meals";
 import { resetUserMealDaySignals } from "@/lib/planning/day-signals";
 import { generateIngredientDraft } from "@/lib/ai/ingredients";
 import { normalizeIngredientName } from "@/lib/shopping/normalize";
+import { regenerateShoppingListForUser } from "@/lib/actions/shopping-list";
 import { Prisma } from "@prisma/client";
 import { UTApi } from "uploadthing/server";
 import { z } from "zod";
@@ -297,6 +298,27 @@ function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function getMonday(date: Date): Date {
+  const d = new Date(date);
+  const day = d.getDay();
+  const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+  return new Date(d.setDate(diff));
+}
+
+function getWeekStart(date: Date = new Date()): Date {
+  const monday = getMonday(date);
+  monday.setHours(0, 0, 0, 0);
+  return monday;
+}
+
+function hasShoppingListClient(): boolean {
+  const client = prisma as unknown as {
+    shoppingList?: unknown;
+    shoppingListItem?: unknown;
+  };
+  return Boolean(client.shoppingList && client.shoppingListItem);
+}
+
 export async function initializeStarterMeals() {
   const user = await getCurrentUser();
   if (!user) {
@@ -450,6 +472,17 @@ export async function addMeal(formData: FormData) {
     },
   });
 
+  if (hasShoppingListClient()) {
+    try {
+      await regenerateShoppingListForUser(user.id, getWeekStart(), { revalidate: false });
+    } catch (error) {
+      console.error("Failed to regenerate shopping list after meal create", {
+        userId: user.id,
+        error,
+      });
+    }
+  }
+
   revalidatePath("/");
   revalidatePath("/meals");
   return {
@@ -546,6 +579,18 @@ export async function updateMeal(id: string, formData: FormData) {
       }
     }
   });
+
+  if (hasShoppingListClient()) {
+    try {
+      await regenerateShoppingListForUser(user.id, getWeekStart(), { revalidate: false });
+    } catch (error) {
+      console.error("Failed to regenerate shopping list after meal update", {
+        userId: user.id,
+        mealId: id,
+        error,
+      });
+    }
+  }
 
   revalidatePath("/");
   revalidatePath("/meals");

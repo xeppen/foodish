@@ -80,6 +80,7 @@ type SingleViewShellProps = {
       unit: string | null;
       isChecked: boolean;
       unresolved: boolean;
+      sourceMealIds?: unknown;
       sourceMealNames?: unknown;
     }>;
   } | null;
@@ -97,6 +98,8 @@ export function SingleViewShell({
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [isShoppingOpen, setIsShoppingOpen] = useState(false);
   const [authPrompt, setAuthPrompt] = useState<string | null>(null);
+  const [requestedMealEditorId, setRequestedMealEditorId] = useState<string | null>(null);
+  const [returnToShoppingAfterEdit, setReturnToShoppingAfterEdit] = useState(false);
   const { openSignIn } = useClerk();
   const commonImageByName = useMemo(
     () =>
@@ -118,6 +121,14 @@ export function SingleViewShell({
     }, {});
   }, [commonImageByName, meals]);
   const shoppingCount = shoppingList?.items.length ?? 0;
+  const mealNameById = useMemo(
+    () =>
+      meals.reduce<Record<string, string>>((acc, meal) => {
+        acc[meal.id] = meal.name;
+        return acc;
+      }, {}),
+    [meals]
+  );
 
   const promptLogin = useCallback(() => {
     setAuthPrompt("Login to curate your own meals");
@@ -129,6 +140,26 @@ export function SingleViewShell({
   function openManager() {
     setAuthPrompt(null);
     setIsDrawerOpen(true);
+  }
+
+  function handleRequestEditMealFromShopping(mealId: string) {
+    setRequestedMealEditorId(mealId);
+    setReturnToShoppingAfterEdit(true);
+    setIsShoppingOpen(false);
+    setIsDrawerOpen(true);
+  }
+
+  function handleMealEditorRequestConsumed() {
+    setRequestedMealEditorId(null);
+  }
+
+  function handleMealSaved() {
+    if (!returnToShoppingAfterEdit) {
+      return;
+    }
+    setIsDrawerOpen(false);
+    setIsShoppingOpen(true);
+    setReturnToShoppingAfterEdit(false);
   }
 
   return (
@@ -208,6 +239,8 @@ export function SingleViewShell({
         isAuthenticated={isAuthenticated}
         initialList={shoppingList ?? null}
         plan={plan}
+        mealNameById={mealNameById}
+        onRequestEditMeal={handleRequestEditMealFromShopping}
       />
 
       <MealDrawer
@@ -217,6 +250,9 @@ export function SingleViewShell({
         commonMealImageByName={commonImageByName}
         onClose={() => setIsDrawerOpen(false)}
         onAuthRequired={promptLogin}
+        openMealEditorForId={requestedMealEditorId}
+        onMealEditorRequestConsumed={handleMealEditorRequestConsumed}
+        onMealSaved={handleMealSaved}
       />
     </div>
   );

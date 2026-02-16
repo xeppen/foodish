@@ -38,6 +38,9 @@ type MealDrawerProps = {
   commonMealImageByName?: Record<string, string>;
   onClose: () => void;
   onAuthRequired: () => void;
+  openMealEditorForId?: string | null;
+  onMealEditorRequestConsumed?: () => void;
+  onMealSaved?: () => void;
 };
 
 export function MealDrawer({
@@ -47,6 +50,9 @@ export function MealDrawer({
   commonMealImageByName,
   onClose,
   onAuthRequired,
+  openMealEditorForId,
+  onMealEditorRequestConsumed,
+  onMealSaved,
 }: MealDrawerProps) {
   const [isResetting, setIsResetting] = useState(false);
   const [isBulkGenerating, setIsBulkGenerating] = useState(false);
@@ -66,6 +72,17 @@ export function MealDrawer({
       document.body.style.overflow = originalOverflow;
     };
   }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen || !openMealEditorForId) {
+      return;
+    }
+    const meal = meals.find((candidate) => candidate.id === openMealEditorForId);
+    if (meal) {
+      setEditorMode({ type: "edit", meal });
+    }
+    onMealEditorRequestConsumed?.();
+  }, [isOpen, meals, onMealEditorRequestConsumed, openMealEditorForId]);
 
   async function handleResetLearning() {
     if (!confirm("Detta nollställer lärda dagspreferenser. Fortsätta?")) {
@@ -240,6 +257,7 @@ export function MealDrawer({
             mode={editorMode}
             isOpen={Boolean(editorMode)}
             onClose={() => setEditorMode(null)}
+            onSaved={onMealSaved}
           />
         )}
       </aside>

@@ -82,10 +82,12 @@ export function MealEditorSheet({
   mode,
   isOpen,
   onClose,
+  onSaved,
 }: {
   mode: EditorMode;
   isOpen: boolean;
   onClose: () => void;
+  onSaved?: () => void;
 }) {
   const router = useRouter();
   const [name, setName] = useState("");
@@ -238,6 +240,7 @@ export function MealEditorSheet({
         return;
       }
 
+      onSaved?.();
       onClose();
       router.refresh();
     } catch {
