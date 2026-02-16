@@ -45,7 +45,8 @@ export default async function HomePage() {
   if (!plan || forceRegenerateOnLoad) {
     const result = await generateWeeklyPlan({ force: true, revalidate: false });
     if (result.success && result.plan) {
-      plan = result.plan;
+      // Load via getCurrentWeekPlan so the shape matches the view's expected `entries` include.
+      plan = await getCurrentWeekPlan();
       planNotice = result.warning;
     }
   }

@@ -41,7 +41,9 @@ export async function uploadGeneratedDishImage(canonicalName: string, image: Gen
   const ext = getFileExtension(image.mimeType);
   const safeName = canonicalName.replace(/\s+/g, "-").toLowerCase();
   const fileName = `dish-${safeName}-${Date.now()}.${ext}`;
-  const file = new File([image.data], fileName, { type: image.mimeType });
+  const fileBytes = new Uint8Array(image.data.byteLength);
+  fileBytes.set(image.data);
+  const file = new File([fileBytes], fileName, { type: image.mimeType });
 
   const utapi = new UTApi({ token });
   const result = (await utapi.uploadFiles(file, { contentDisposition: "inline" })) as unknown as UploadThingResult;

@@ -3,6 +3,7 @@ export type CandidateMeal = {
   name: string;
   thumbsUpCount?: number;
   thumbsDownCount?: number;
+  defaultServings?: number | null;
 };
 
 export type PlannerDay = "monday" | "tuesday" | "wednesday" | "thursday" | "friday";
