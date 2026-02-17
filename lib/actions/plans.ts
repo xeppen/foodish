@@ -403,6 +403,14 @@ async function getSwapCandidatesForDay(userId: string, day: Day, weekStart: Date
         weekStartDate: weekStart,
       },
     },
+    include: {
+      entries: {
+        select: {
+          day: true,
+          mealId: true,
+        },
+      },
+    },
   });
 
   if (!plan) {
@@ -416,7 +424,10 @@ async function getSwapCandidatesForDay(userId: string, day: Day, weekStart: Date
     )
   );
 
+  const entries = plan.entries ?? [];
   const currentMealForDay = plan[day];
+  const currentMealIdForDay = entries.find((entry) => entry.day === dayToEnum(day))?.mealId ?? null;
+  const occupiedMealIds = new Set(entries.filter((entry) => entry.mealId !== currentMealIdForDay).map((entry) => entry.mealId));
   if (currentMealForDay) {
     currentPlanMeals.delete(currentMealForDay);
   }
@@ -427,6 +438,7 @@ async function getSwapCandidatesForDay(userId: string, day: Day, weekStart: Date
   });
 
   return allMeals
+    .filter((meal) => !occupiedMealIds.has(meal.id))
     .filter((meal) => !currentPlanMeals.has(meal.name))
     .filter((meal) => meal.name !== currentMealForDay)
     .map((meal) => ({
@@ -512,6 +524,14 @@ export async function swapDayMealWithChoice(day: Day, mealId: string) {
         weekStartDate: weekStart,
       },
     },
+    include: {
+      entries: {
+        select: {
+          day: true,
+          mealId: true,
+        },
+      },
+    },
   });
 
   if (!plan) {
@@ -533,8 +553,11 @@ export async function swapDayMealWithChoice(day: Day, mealId: string) {
     )
   );
   occupiedMeals.delete(plan[day] ?? "");
+  const entries = plan.entries ?? [];
+  const currentMealIdForDay = entries.find((entry) => entry.day === dayToEnum(day))?.mealId ?? null;
+  const occupiedMealIds = new Set(entries.filter((entry) => entry.mealId !== currentMealIdForDay).map((entry) => entry.mealId));
 
-  if (occupiedMeals.has(meal.name)) {
+  if (occupiedMeals.has(meal.name) || occupiedMealIds.has(meal.id)) {
     return { error: "Måltiden finns redan i veckoplanen" };
   }
 
@@ -626,6 +649,13 @@ export async function swapDayMeal(day: Day) {
         weekStartDate: weekStart,
       },
     },
+    include: {
+      entries: {
+        select: {
+          mealId: true,
+        },
+      },
+    },
   });
 
   if (!plan) {
@@ -643,14 +673,18 @@ export async function swapDayMeal(day: Day) {
 
   const recentMealIds = await getRecentMealIds(user.id, weekStart);
 
-  const currentMeals = await prisma.meal.findMany({
-    where: {
-      userId: user.id,
-      name: { in: Array.from(currentPlanMeals) },
-    },
-    select: { id: true, name: true },
-  });
-  const currentMealIds = new Set(currentMeals.map((m) => m.id));
+  const entries = plan.entries ?? [];
+  let currentMealIds = new Set(entries.map((entry) => entry.mealId));
+  if (currentMealIds.size === 0) {
+    const currentMeals = await prisma.meal.findMany({
+      where: {
+        userId: user.id,
+        name: { in: Array.from(currentPlanMeals) },
+      },
+      select: { id: true, name: true },
+    });
+    currentMealIds = new Set(currentMeals.map((m) => m.id));
+  }
 
   // Combine both sets to avoid
   const mealsToAvoid = new Set([...recentMealIds, ...currentMealIds]);

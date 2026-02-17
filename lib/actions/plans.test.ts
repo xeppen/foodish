@@ -218,6 +218,34 @@ describe("plans actions (phase 6)", () => {
     expect(prismaMock.usageHistory.create).toHaveBeenCalledTimes(1);
   });
 
+  it("swapDayMealWithChoice rejects selecting a meal already assigned on another day by id", async () => {
+    mockGetCurrentUser.mockResolvedValue({ id: "user_1", name: "Test User" });
+    prismaMock.weeklyPlan.findUnique.mockResolvedValueOnce({
+      id: "p1",
+      monday: "Old Meal A Name",
+      tuesday: "Meal B",
+      wednesday: "Meal C",
+      thursday: "Meal D",
+      friday: "Meal E",
+      entries: [
+        { day: "MONDAY", mealId: "mA" },
+        { day: "TUESDAY", mealId: "mB" },
+      ],
+    });
+    prismaMock.meal.findUnique.mockResolvedValueOnce({
+      id: "mA",
+      name: "Meal A (Renamed)",
+      userId: "user_1",
+      defaultServings: 4,
+    });
+
+    const result = await swapDayMealWithChoice("tuesday", "mA");
+
+    expect(result).toEqual({ error: "Måltiden finns redan i veckoplanen" });
+    expect(prismaMock.weeklyPlan.update).not.toHaveBeenCalled();
+    expect(prismaMock.usageHistory.create).not.toHaveBeenCalled();
+  });
+
   it("getSwapOptions returns fallback options when filters have zero matches", async () => {
     mockGetCurrentUser.mockResolvedValue({ id: "user_1", name: "Test User" });
     prismaMock.weeklyPlan.findUnique.mockResolvedValueOnce({
@@ -244,6 +272,31 @@ describe("plans actions (phase 6)", () => {
     expect(result.options).toHaveLength(0);
     expect(result.fallbackUsed).toBe(true);
     expect(result.fallbackOptions.length).toBeGreaterThan(0);
+  });
+
+  it("getSwapOptions excludes meals already assigned in entries even if plan names are stale", async () => {
+    mockGetCurrentUser.mockResolvedValue({ id: "user_1", name: "Test User" });
+    prismaMock.weeklyPlan.findUnique.mockResolvedValueOnce({
+      id: "p1",
+      monday: "Old Meal A Name",
+      tuesday: "Meal B",
+      wednesday: "Meal C",
+      thursday: "Meal D",
+      friday: "Meal E",
+      entries: [
+        { day: "MONDAY", mealId: "mA" },
+        { day: "TUESDAY", mealId: "mB" },
+      ],
+    });
+    prismaMock.usageHistory.findMany.mockResolvedValueOnce([]);
+    prismaMock.meal.findMany.mockResolvedValueOnce([
+      { id: "mA", name: "Meal A (Renamed)", complexity: "SIMPLE", thumbsUpCount: 0, thumbsDownCount: 0 },
+      { id: "mF", name: "Meal F", complexity: "MEDIUM", thumbsUpCount: 0, thumbsDownCount: 0 },
+    ]);
+
+    const result = await getSwapOptions("wednesday", { limit: 8 });
+
+    expect(result.options.map((option) => option.id)).toEqual(["mF"]);
   });
 
   it("setDayServings updates servings for a specific day", async () => {
