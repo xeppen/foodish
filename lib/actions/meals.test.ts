@@ -1,29 +1,31 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { mockGetCurrentUser, mockRevalidatePath, mockGenerateIngredientDraft, prismaMock } = vi.hoisted(() => ({
-  mockGetCurrentUser: vi.fn(),
-  mockRevalidatePath: vi.fn(),
-  mockGenerateIngredientDraft: vi.fn(),
-  prismaMock: {
-    meal: {
-      count: vi.fn(),
-      createMany: vi.fn(),
-      findMany: vi.fn(),
-      create: vi.fn(),
-      findUnique: vi.fn(),
-      update: vi.fn(),
-      delete: vi.fn(),
+const { mockGetCurrentUser, mockRevalidatePath, mockGenerateIngredientDraft, prismaMock } = vi.hoisted(
+  () => ({
+    mockGetCurrentUser: vi.fn(),
+    mockRevalidatePath: vi.fn(),
+    mockGenerateIngredientDraft: vi.fn(),
+    prismaMock: {
+      meal: {
+        count: vi.fn(),
+        createMany: vi.fn(),
+        findMany: vi.fn(),
+        create: vi.fn(),
+        findUnique: vi.fn(),
+        update: vi.fn(),
+        delete: vi.fn(),
+      },
+      mealIngredient: {
+        deleteMany: vi.fn(),
+        createMany: vi.fn(),
+      },
+      mealDaySignal: {
+        deleteMany: vi.fn(),
+      },
+      $transaction: vi.fn(),
     },
-    mealIngredient: {
-      deleteMany: vi.fn(),
-      createMany: vi.fn(),
-    },
-    mealDaySignal: {
-      deleteMany: vi.fn(),
-    },
-    $transaction: vi.fn(),
-  },
-}));
+  })
+);
 
 vi.mock("@/lib/auth", () => ({
   getCurrentUser: mockGetCurrentUser,
@@ -42,6 +44,7 @@ vi.mock("@/lib/ai/ingredients", () => ({
 }));
 
 import { addMeal, bulkGenerateMealIngredients, resetMealLearning, updateMeal, voteMeal } from "@/lib/actions/meals";
+import { deleteMeal } from "@/lib/actions/meals";
 
 describe("meals actions", () => {
   beforeEach(() => {
@@ -222,5 +225,104 @@ describe("meals actions", () => {
     expect(result).toMatchObject({ success: true, updated: 1, skipped: 1, failed: 0, total: 2 });
     expect(mockGenerateIngredientDraft).toHaveBeenCalledWith("Tacos");
     expect(prismaMock.mealIngredient.createMany).toHaveBeenCalledTimes(1);
+  });
+
+  it("addMeal returns auth error when user is missing", async () => {
+    mockGetCurrentUser.mockResolvedValue(null);
+
+    const formData = new FormData();
+    formData.append("name", "Tacos");
+    const result = await addMeal(formData);
+
+    expect(result).toEqual({ error: "Ej behörig" });
+    expect(prismaMock.meal.create).not.toHaveBeenCalled();
+  });
+
+  it("addMeal rejects malformed ingredients payload", async () => {
+    const formData = new FormData();
+    formData.append("name", "Tacos");
+    formData.append("ingredients", "{invalid}");
+
+    const result = await addMeal(formData);
+
+    expect(result).toEqual({ error: "Ingredienslistan är ogiltig" });
+    expect(prismaMock.meal.create).not.toHaveBeenCalled();
+  });
+
+  it("addMeal rejects image URL with unsupported protocol", async () => {
+    const formData = new FormData();
+    formData.append("name", "Tacos");
+    formData.append("imageUrl", "ftp://images.example.com/tacos.jpg");
+
+    const result = await addMeal(formData);
+
+    expect(result).toEqual({ error: "Bild-URL måste börja med http:// eller https://" });
+    expect(prismaMock.meal.create).not.toHaveBeenCalled();
+  });
+
+  it("updateMeal returns not found for meal owned by another user", async () => {
+    prismaMock.meal.findUnique.mockResolvedValue({ id: "m1", userId: "other_user" });
+    const formData = new FormData();
+    formData.append("name", "Pasta");
+
+    const result = await updateMeal("m1", formData);
+
+    expect(result).toEqual({ error: "Måltiden hittades inte" });
+    expect(prismaMock.meal.update).not.toHaveBeenCalled();
+  });
+
+  it("deleteMeal removes owned meal", async () => {
+    prismaMock.meal.findUnique.mockResolvedValue({ id: "m1", userId: "user_1" });
+    prismaMock.meal.delete.mockResolvedValue({ id: "m1" });
+
+    const result = await deleteMeal("m1");
+
+    expect(result).toEqual({ success: true });
+    expect(prismaMock.meal.delete).toHaveBeenCalledWith({ where: { id: "m1" } });
+  });
+
+  it("deleteMeal returns not found when meal is missing", async () => {
+    prismaMock.meal.findUnique.mockResolvedValue(null);
+
+    const result = await deleteMeal("m1");
+
+    expect(result).toEqual({ error: "Måltiden hittades inte" });
+    expect(prismaMock.meal.delete).not.toHaveBeenCalled();
+  });
+
+  it("voteMeal increments thumbs-down count", async () => {
+    prismaMock.meal.findUnique.mockResolvedValue({ id: "m1", userId: "user_1" });
+    prismaMock.meal.update.mockResolvedValue({
+      id: "m1",
+      thumbsUpCount: 1,
+      thumbsDownCount: 2,
+    });
+
+    const result = await voteMeal("m1", "down");
+
+    expect(result).toMatchObject({ success: true });
+    expect(prismaMock.meal.update).toHaveBeenCalledWith({
+      where: { id: "m1" },
+      data: { thumbsDownCount: { increment: 1 } },
+      select: {
+        id: true,
+        thumbsUpCount: true,
+        thumbsDownCount: true,
+      },
+    });
+  });
+
+  it("bulkGenerateMealIngredients reports failures for empty AI drafts", async () => {
+    prismaMock.meal.findMany.mockResolvedValue([{ id: "m1", name: "Soup", mealIngredients: [] }]);
+    mockGenerateIngredientDraft.mockResolvedValue({
+      dishName: "Soup",
+      ingredients: [],
+      model: "test",
+      cached: false,
+    });
+
+    const result = await bulkGenerateMealIngredients({ overwrite: true });
+
+    expect(result).toMatchObject({ success: true, updated: 0, skipped: 0, failed: 1, total: 1 });
   });
 });
