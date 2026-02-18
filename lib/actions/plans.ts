@@ -4,10 +4,9 @@ import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 import { regenerateShoppingListForUser } from "@/lib/actions/shopping-list";
-import { selectMeals, selectMealsByDay, type SelectionWarning } from "@/lib/planning/selection";
+import { selectMeals, selectMealsWithSmartRotation } from "@/lib/planning/selection";
 import {
   dayToEnum,
-  loadMealDaySignals,
   recordMealDayShown,
   recordMealSelectedForDay,
   recordMealSwappedAway,
@@ -89,6 +88,7 @@ function formatDate(date: Date): string {
 }
 
 const RECENT_LOOKBACK_DAYS = 14;
+const ROTATION_LOOKBACK_WEEKS = 4;
 const MIN_SERVINGS = 1;
 const MAX_SERVINGS = 12;
 
@@ -105,12 +105,22 @@ function subtractDays(date: Date, days: number): Date {
   return d;
 }
 
+function addDays(date: Date, days: number): Date {
+  const d = new Date(date);
+  d.setDate(d.getDate() + days);
+  return d;
+}
+
+function assignmentDateForDay(weekStart: Date, day: Day): Date {
+  return addDays(weekStart, DAY_ORDER.indexOf(day));
+}
+
 async function getRecentMealIds(userId: string, weekStart: Date): Promise<Set<string>> {
   const cutoff = subtractDays(weekStart, RECENT_LOOKBACK_DAYS);
-  const recentUsage = await prisma.usageHistory.findMany({
+  const recentUsage = await prisma.mealHistory.findMany({
     where: {
       userId,
-      usedDate: {
+      dateAssigned: {
         gte: cutoff,
         lt: weekStart,
       },
@@ -120,19 +130,16 @@ async function getRecentMealIds(userId: string, weekStart: Date): Promise<Set<st
   return new Set(recentUsage.map((entry) => entry.mealId));
 }
 
-async function getBlockedFavoriteIds(userId: string, weekStart: Date): Promise<Set<string>> {
+async function getSmartRotationHistory(userId: string, weekStart: Date) {
+  const fourWeeksAgo = subtractDays(weekStart, 7 * ROTATION_LOOKBACK_WEEKS);
   const previousWeek = subtractDays(weekStart, 7);
   const twoWeeksAgo = subtractDays(weekStart, 14);
-
-  const recentWeeklyUsage = await prisma.usageHistory.findMany({
+  const historyRows = await prisma.mealHistory.findMany({
     where: {
       userId,
       weekStartDate: {
-        gte: twoWeeksAgo,
+        gte: fourWeeksAgo,
         lt: weekStart,
-      },
-      meal: {
-        thumbsUpCount: { gt: 0 },
       },
     },
     select: {
@@ -141,33 +148,33 @@ async function getBlockedFavoriteIds(userId: string, weekStart: Date): Promise<S
     },
   });
 
-  const weekAKey = formatDate(twoWeeksAgo);
-  const weekBKey = formatDate(previousWeek);
-  const usageByMeal = new Map<string, Set<string>>();
+  const previousWeekKey = formatDate(previousWeek);
+  const twoWeeksAgoKey = formatDate(twoWeeksAgo);
+  const lastWeekMealIds = new Set<string>();
+  const twoWeeksAgoMealIds = new Set<string>();
+  const occurrencesLast4Weeks = new Map<string, number>();
 
-  for (const entry of recentWeeklyUsage) {
+  for (const entry of historyRows) {
     const key = formatDate(entry.weekStartDate);
-    const seen = usageByMeal.get(entry.mealId) ?? new Set<string>();
-    seen.add(key);
-    usageByMeal.set(entry.mealId, seen);
-  }
-
-  const blocked = new Set<string>();
-  for (const [mealId, weekKeys] of usageByMeal.entries()) {
-    if (weekKeys.has(weekAKey) && weekKeys.has(weekBKey)) {
-      blocked.add(mealId);
+    if (key === previousWeekKey) {
+      lastWeekMealIds.add(entry.mealId);
+    } else if (key === twoWeeksAgoKey) {
+      twoWeeksAgoMealIds.add(entry.mealId);
     }
+    occurrencesLast4Weeks.set(entry.mealId, (occurrencesLast4Weeks.get(entry.mealId) ?? 0) + 1);
   }
 
-  return blocked;
+  return {
+    lastWeekMealIds,
+    twoWeeksAgoMealIds,
+    occurrencesLast4Weeks,
+    previousWeekMealIds: lastWeekMealIds,
+  };
 }
 
-function warningMessage(warnings: SelectionWarning[]): string | undefined {
-  if (warnings.includes("repeated_meal_due_to_small_library")) {
-    return "Vi upprepade en rätt eftersom din måltidslista är liten. Lägg till fler måltider för mer variation.";
-  }
-  if (warnings.includes("relaxed_favorite_streak")) {
-    return "Vi inkluderade en favorit igen för att kunna fylla veckan.";
+function warningMessage(repeatedLastWeekCombination: boolean): string | undefined {
+  if (repeatedLastWeekCombination) {
+    return "Vi kunde inte undvika samma veckokombination som förra veckan. Lägg till fler måltider för mer variation.";
   }
   return undefined;
 }
@@ -239,27 +246,24 @@ export async function generateWeeklyPlan(options?: { force?: boolean; revalidate
     return { success: true, plan: existingPlan, warning: undefined };
   }
 
-  const recentMealIds = await getRecentMealIds(user.id, weekStart);
-  const blockedFavoriteIds = await getBlockedFavoriteIds(user.id, weekStart);
   const allMeals = await prisma.meal.findMany({
     where: { userId: user.id },
+    orderBy: [{ createdAt: "asc" }, { id: "asc" }],
     select: {
       id: true,
       name: true,
-      thumbsUpCount: true,
-      thumbsDownCount: true,
-      preferredDays: true,
       defaultServings: true,
     },
   });
 
-  const daySignals = await loadMealDaySignals(
-    user.id,
-    allMeals.map((meal) => meal.id)
+  const rotationHistory = await getSmartRotationHistory(user.id, weekStart);
+  const { selectedMeals, repeatedLastWeekCombination } = selectMealsWithSmartRotation(
+    allMeals,
+    DAY_ORDER.length,
+    rotationHistory
   );
-  const { selectedMeals, warnings } = selectMealsByDay(allMeals, DAY_ORDER, recentMealIds, blockedFavoriteIds, daySignals);
 
-  if (allMeals.length === 0 || selectedMeals.length < 5) {
+  if (allMeals.length < DAY_ORDER.length || selectedMeals.length < DAY_ORDER.length) {
     return {
       error: "Du behöver minst 5 rätter i din lista för att kunna skapa en plan. Lägg till fler rätter.",
     };
@@ -301,13 +305,12 @@ export async function generateWeeklyPlan(options?: { force?: boolean; revalidate
     }))
   );
 
-  await prisma.usageHistory.createMany({
+  await prisma.mealHistory.createMany({
     data: selectedMeals.map((meal, index) => ({
-      mealId: meal.id,
       userId: user.id,
-      usedDate: new Date(),
+      mealId: meal.id,
       weekStartDate: weekStart,
-      day: dayToEnum(DAY_ORDER[index]),
+      dateAssigned: assignmentDateForDay(weekStart, DAY_ORDER[index]),
     })),
   });
   await Promise.all(
@@ -348,7 +351,7 @@ export async function generateWeeklyPlan(options?: { force?: boolean; revalidate
   return {
     success: true,
     plan: planWithEntries ?? plan,
-    warning: warningMessage(warnings),
+    warning: warningMessage(repeatedLastWeekCombination),
   };
 }
 
@@ -599,13 +602,12 @@ export async function swapDayMealWithChoice(day: Day, mealId: string) {
     },
   });
 
-  await prisma.usageHistory.create({
+  await prisma.mealHistory.create({
     data: {
-      mealId: meal.id,
       userId: user.id,
-      usedDate: new Date(),
+      mealId: meal.id,
       weekStartDate: weekStart,
-      day: dayToEnum(day),
+      dateAssigned: assignmentDateForDay(weekStart, day),
     },
   });
   await recordMealSelectedForDay(user.id, meal.id, day);
@@ -742,13 +744,12 @@ export async function swapDayMeal(day: Day) {
         })
       : null;
 
-  await prisma.usageHistory.create({
+  await prisma.mealHistory.create({
     data: {
-      mealId: newMeals[0].id,
       userId: user.id,
-      usedDate: new Date(),
+      mealId: newMeals[0].id,
       weekStartDate: weekStart,
-      day: dayToEnum(day),
+      dateAssigned: assignmentDateForDay(weekStart, day),
     },
   });
   await recordMealSelectedForDay(user.id, newMeals[0].id, day);

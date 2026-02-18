@@ -51,6 +51,7 @@ model Meal {
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
   usageHistory    UsageHistory[]
+  mealHistory     MealHistory[]
   daySignals      MealDaySignal[]
   mealIngredients MealIngredient[]
   planEntries     WeeklyPlanEntry[]
@@ -173,6 +174,19 @@ model UsageHistory {
   @@index([mealId])
 }
 
+model MealHistory {
+  id            String   @id @default(cuid())
+  userId        String
+  meal          Meal     @relation(fields: [mealId], references: [id], onDelete: Cascade)
+  mealId        String
+  weekStartDate DateTime
+  dateAssigned  DateTime @default(now())
+
+  @@index([userId, weekStartDate])
+  @@index([userId, dateAssigned])
+  @@index([mealId])
+}
+
 model MealDaySignal {
   id               String   @id @default(cuid())
   meal             Meal     @relation(fields: [mealId], references: [id], onDelete: Cascade)
@@ -206,4 +220,17 @@ model GeneratedDishImage {
   updatedAt          DateTime         @updatedAt
 
   @@index([status])
+}
+
+model PlanShare {
+  id        String   @id @default(cuid())
+  ownerId   String   // The user who owns the plan (Clerk ID)
+  viewerId  String   // The user who can view the plan (Clerk ID)
+  status    String   @default("ACCEPTED") // For future use (PENDING/ACCEPTED)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([ownerId, viewerId])
+  @@index([ownerId])
+  @@index([viewerId])
 }

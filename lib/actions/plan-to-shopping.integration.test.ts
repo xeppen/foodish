@@ -47,6 +47,7 @@ function getWeekStart(date: Date = new Date()): Date {
 async function cleanupTestData(userId: string) {
   await prisma.shoppingList.deleteMany({ where: { userId } });
   await prisma.weeklyPlan.deleteMany({ where: { userId } });
+  await prisma.mealHistory.deleteMany({ where: { userId } });
   await prisma.usageHistory.deleteMany({ where: { userId } });
   await prisma.mealDaySignal.deleteMany({ where: { userId } });
   await prisma.meal.deleteMany({ where: { userId } });

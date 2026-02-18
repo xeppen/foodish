@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   selectMeals,
   selectMealsByDay,
+  selectMealsWithSmartRotation,
   selectMealsWithConstraints,
   type CandidateMeal,
   type DayAwareCandidateMeal,
@@ -178,5 +179,78 @@ describe("selectMealsByDay", () => {
 
     expect(result.selectedMeals).toHaveLength(5);
     expect(result.selectedMeals[4].id).not.toBe("a");
+  });
+});
+
+describe("selectMealsWithSmartRotation", () => {
+  const rotationMeals: CandidateMeal[] = [
+    { id: "a", name: "A" },
+    { id: "b", name: "B" },
+    { id: "c", name: "C" },
+    { id: "d", name: "D" },
+    { id: "e", name: "E" },
+    { id: "f", name: "F" },
+  ];
+
+  it("applies recency + frequency penalties and keeps picks unique", () => {
+    let seed = 0;
+    const pseudoRandom = () => {
+      seed += 1;
+      return ((seed * 9301 + 49297) % 233280) / 233280;
+    };
+
+    const counts = new Map<string, number>([
+      ["a", 6],
+      ["b", 3],
+      ["c", 1],
+      ["d", 0],
+      ["e", 0],
+      ["f", 0],
+    ]);
+
+    const picks: Record<string, number> = {
+      a: 0,
+      b: 0,
+      c: 0,
+      d: 0,
+      e: 0,
+      f: 0,
+    };
+
+    for (let run = 0; run < 500; run++) {
+      const result = selectMealsWithSmartRotation(
+        rotationMeals,
+        1,
+        {
+          lastWeekMealIds: new Set(["a"]),
+          twoWeeksAgoMealIds: new Set(["b"]),
+          occurrencesLast4Weeks: counts,
+        },
+        pseudoRandom
+      );
+      picks[result.selectedMeals[0].id] += 1;
+    }
+
+    expect(picks.a).toBeLessThan(picks.b);
+    expect(picks.b).toBeLessThan(picks.d + picks.e + picks.f);
+  });
+
+  it("retries to avoid repeating last week's exact combination when alternatives exist", () => {
+    const result = selectMealsWithSmartRotation(
+      rotationMeals,
+      5,
+      {
+        lastWeekMealIds: new Set(["a", "b", "c", "d", "e"]),
+        twoWeeksAgoMealIds: new Set(),
+        occurrencesLast4Weeks: new Map(),
+        previousWeekMealIds: new Set(["a", "b", "c", "d", "e"]),
+      },
+      () => 0
+    );
+
+    const selectedIds = new Set(result.selectedMeals.map((meal) => meal.id));
+    expect(selectedIds.size).toBe(5);
+    expect(selectedIds).not.toEqual(new Set(["a", "b", "c", "d", "e"]));
+    expect(result.repeatedLastWeekCombination).toBe(false);
   });
 });
