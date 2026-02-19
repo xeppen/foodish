@@ -20,8 +20,22 @@ vi.mock("@/lib/ai/ingredients", () => ({
   generateIngredientDraft: vi.fn(async (dishName: string) => ({
     dishName,
     ingredients: [
-      { name: "Lök", amount: 1, unit: "st", optional: false, confidence: 0.9, needsReview: false },
-      { name: "Salt", amount: null, unit: null, optional: false, confidence: 0.6, needsReview: true },
+      {
+        name: "Lök",
+        amount: 1,
+        unit: "st",
+        optional: false,
+        confidence: 0.9,
+        needsReview: false,
+      },
+      {
+        name: "Salt",
+        amount: null,
+        unit: null,
+        optional: false,
+        confidence: 0.6,
+        needsReview: true,
+      },
     ],
     model: "integration-mock",
     cached: false,
@@ -31,7 +45,10 @@ vi.mock("@/lib/ai/ingredients", () => ({
 import { prisma } from "@/lib/prisma";
 import { initializeStarterMeals } from "@/lib/actions/meals";
 import { generateWeeklyPlan } from "@/lib/actions/plans";
-import { generateCurrentWeekShoppingList, getCurrentWeekShoppingList } from "@/lib/actions/shopping-list";
+import {
+  generateCurrentWeekShoppingList,
+  getCurrentWeekShoppingList,
+} from "@/lib/actions/shopping-list";
 
 const describeIfDatabase = process.env.DATABASE_URL ? describe : describe.skip;
 
@@ -55,35 +72,114 @@ async function cleanupTestData(userId: string) {
 
 describeIfDatabase("plan -> shopping list integration (live DB)", () => {
   beforeEach(async () => {
-    mockGetCurrentUser.mockResolvedValue({ id: TEST_USER_ID, name: "Integration User" });
+    mockGetCurrentUser.mockResolvedValue({
+      id: TEST_USER_ID,
+      name: "Integration User",
+    });
     await cleanupTestData(TEST_USER_ID);
 
     await prisma.meal.createMany({
       data: [
-        { name: "Köttbullar med potatis", userId: TEST_USER_ID, complexity: "MEDIUM" },
-        { name: "Fiskpinnar med potatis", userId: TEST_USER_ID, complexity: "SIMPLE" },
-        { name: "Pannkakor med sylt", userId: TEST_USER_ID, complexity: "SIMPLE" },
-        { name: "Kyckling med ris", userId: TEST_USER_ID, complexity: "MEDIUM" },
+        {
+          name: "Köttbullar med potatis",
+          userId: TEST_USER_ID,
+          complexity: "MEDIUM",
+        },
+        {
+          name: "Fiskpinnar med potatis",
+          userId: TEST_USER_ID,
+          complexity: "SIMPLE",
+        },
+        {
+          name: "Pannkakor med sylt",
+          userId: TEST_USER_ID,
+          complexity: "SIMPLE",
+        },
+        {
+          name: "Kyckling med ris",
+          userId: TEST_USER_ID,
+          complexity: "MEDIUM",
+        },
         { name: "Tacos", userId: TEST_USER_ID, complexity: "MEDIUM" },
       ],
     });
 
-    const meals = await prisma.meal.findMany({ where: { userId: TEST_USER_ID } });
-    const byName = Object.fromEntries(meals.map((meal) => [meal.name, meal.id]));
+    const meals = await prisma.meal.findMany({
+      where: { userId: TEST_USER_ID },
+    });
+    const byName = Object.fromEntries(
+      meals.map((meal) => [meal.name, meal.id]),
+    );
 
     await prisma.mealIngredient.createMany({
       data: [
-        { mealId: byName["Köttbullar med potatis"], position: 0, name: "Potatis", canonicalName: "potatis", amount: 1, unit: "kg" },
-        { mealId: byName["Köttbullar med potatis"], position: 1, name: "Köttbullar", canonicalName: "köttbullar", amount: 600, unit: "g" },
+        {
+          mealId: byName["Köttbullar med potatis"],
+          position: 0,
+          name: "Potatis",
+          canonicalName: "potatis",
+          amount: 1,
+          unit: "kg",
+        },
+        {
+          mealId: byName["Köttbullar med potatis"],
+          position: 1,
+          name: "Köttbullar",
+          canonicalName: "köttbullar",
+          amount: 600,
+          unit: "g",
+        },
 
-        { mealId: byName["Fiskpinnar med potatis"], position: 0, name: "Potatis", canonicalName: "potatis", amount: 500, unit: "g" },
-        { mealId: byName["Fiskpinnar med potatis"], position: 1, name: "Fiskpinnar", canonicalName: "fiskpinnar", amount: 400, unit: "g" },
+        {
+          mealId: byName["Fiskpinnar med potatis"],
+          position: 0,
+          name: "Potatis",
+          canonicalName: "potatis",
+          amount: 500,
+          unit: "g",
+        },
+        {
+          mealId: byName["Fiskpinnar med potatis"],
+          position: 1,
+          name: "Fiskpinnar",
+          canonicalName: "fiskpinnar",
+          amount: 400,
+          unit: "g",
+        },
 
-        { mealId: byName["Pannkakor med sylt"], position: 0, name: "Sylt", canonicalName: "sylt", amount: null, unit: null },
-        { mealId: byName["Pannkakor med sylt"], position: 1, name: "Mjöl", canonicalName: "mjöl", amount: 3, unit: "dl" },
+        {
+          mealId: byName["Pannkakor med sylt"],
+          position: 0,
+          name: "Sylt",
+          canonicalName: "sylt",
+          amount: null,
+          unit: null,
+        },
+        {
+          mealId: byName["Pannkakor med sylt"],
+          position: 1,
+          name: "Mjöl",
+          canonicalName: "mjöl",
+          amount: 3,
+          unit: "dl",
+        },
 
-        { mealId: byName["Kyckling med ris"], position: 0, name: "Kyckling", canonicalName: "kyckling", amount: 700, unit: "g" },
-        { mealId: byName["Kyckling med ris"], position: 1, name: "Ris", canonicalName: "ris", amount: 4, unit: "dl" },
+        {
+          mealId: byName["Kyckling med ris"],
+          position: 0,
+          name: "Kyckling",
+          canonicalName: "kyckling",
+          amount: 700,
+          unit: "g",
+        },
+        {
+          mealId: byName["Kyckling med ris"],
+          position: 1,
+          name: "Ris",
+          canonicalName: "ris",
+          amount: 4,
+          unit: "dl",
+        },
       ],
     });
 
@@ -98,7 +194,10 @@ describeIfDatabase("plan -> shopping list integration (live DB)", () => {
   });
 
   it("generates weekly plan and aggregates shopping list with correct totals", async () => {
-    const planResult = await generateWeeklyPlan({ force: true, revalidate: false });
+    const planResult = await generateWeeklyPlan({
+      force: true,
+      revalidate: false,
+    });
     expect(planResult).toMatchObject({ success: true });
 
     const listResult = await generateCurrentWeekShoppingList();
@@ -117,7 +216,9 @@ describeIfDatabase("plan -> shopping list integration (live DB)", () => {
     expect(sylt).toBeDefined();
     expect(sylt?.unresolved).toBe(true);
 
-    const nullItem = list.items.find((item) => item.displayName.toLowerCase() === "null");
+    const nullItem = list.items.find(
+      (item) => item.displayName.toLowerCase() === "null",
+    );
     expect(nullItem).toBeUndefined();
   });
 
@@ -144,7 +245,10 @@ describeIfDatabase("plan -> shopping list integration (live DB)", () => {
 
 describeIfDatabase("starter-pack user integration (live DB)", () => {
   beforeEach(async () => {
-    mockGetCurrentUser.mockResolvedValue({ id: TEST_DEFAULT_USER_ID, name: "Default Integration User" });
+    mockGetCurrentUser.mockResolvedValue({
+      id: TEST_DEFAULT_USER_ID,
+      name: "Default Integration User",
+    });
     await cleanupTestData(TEST_DEFAULT_USER_ID);
   });
 
@@ -156,14 +260,19 @@ describeIfDatabase("starter-pack user integration (live DB)", () => {
     const starterResult = await initializeStarterMeals();
     expect(starterResult).toMatchObject({ success: true });
 
-    const mealCount = await prisma.meal.count({ where: { userId: TEST_DEFAULT_USER_ID } });
+    const mealCount = await prisma.meal.count({
+      where: { userId: TEST_DEFAULT_USER_ID },
+    });
     expect(mealCount).toBeGreaterThanOrEqual(18);
 
-    const planResult = await generateWeeklyPlan({ force: true, revalidate: false });
+    const planResult = await generateWeeklyPlan({
+      force: true,
+      revalidate: false,
+    });
     expect(planResult).toMatchObject({ success: true });
 
     const listResult = await generateCurrentWeekShoppingList();
     expect(listResult).toMatchObject({ success: true });
     expect((listResult as { itemCount?: number }).itemCount).toBeGreaterThan(0);
-  });
+  }, 15000);
 });

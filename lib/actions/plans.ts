@@ -4,7 +4,10 @@ import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 import { regenerateShoppingListForUser } from "@/lib/actions/shopping-list";
-import { selectMeals, selectMealsWithSmartRotation } from "@/lib/planning/selection";
+import {
+  selectMeals,
+  selectMealsWithDayAwareSmartRotation,
+} from "@/lib/planning/selection";
 import {
   dayToEnum,
   recordMealDayShown,
@@ -13,7 +16,13 @@ import {
 } from "@/lib/planning/day-signals";
 
 type Day = "monday" | "tuesday" | "wednesday" | "thursday" | "friday";
-const DAY_ORDER: Day[] = ["monday", "tuesday", "wednesday", "thursday", "friday"];
+const DAY_ORDER: Day[] = [
+  "monday",
+  "tuesday",
+  "wednesday",
+  "thursday",
+  "friday",
+];
 
 type SwapFilterInput = {
   complexity?: "SIMPLE" | "MEDIUM" | "COMPLEX";
@@ -33,9 +42,12 @@ type SwapCandidate = {
 
 async function syncWeeklyPlanEntries(
   weeklyPlanId: string,
-  assignments: Array<{ day: Day; mealId: string; servings?: number | null }>
+  assignments: Array<{ day: Day; mealId: string; servings?: number | null }>,
 ) {
-  const dedupedByDay = new Map<Day, { mealId: string; servings?: number | null }>();
+  const dedupedByDay = new Map<
+    Day,
+    { mealId: string; servings?: number | null }
+  >();
   for (const assignment of assignments) {
     dedupedByDay.set(assignment.day, {
       mealId: assignment.mealId,
@@ -62,8 +74,8 @@ async function syncWeeklyPlanEntries(
           mealId: assignment.mealId,
           servings: clampServings(assignment.servings ?? null),
         },
-      })
-    )
+      }),
+    ),
   );
 }
 
@@ -115,7 +127,10 @@ function assignmentDateForDay(weekStart: Date, day: Day): Date {
   return addDays(weekStart, DAY_ORDER.indexOf(day));
 }
 
-async function getRecentMealIds(userId: string, weekStart: Date): Promise<Set<string>> {
+async function getRecentMealIds(
+  userId: string,
+  weekStart: Date,
+): Promise<Set<string>> {
   const cutoff = subtractDays(weekStart, RECENT_LOOKBACK_DAYS);
   const recentUsage = await prisma.mealHistory.findMany({
     where: {
@@ -161,7 +176,10 @@ async function getSmartRotationHistory(userId: string, weekStart: Date) {
     } else if (key === twoWeeksAgoKey) {
       twoWeeksAgoMealIds.add(entry.mealId);
     }
-    occurrencesLast4Weeks.set(entry.mealId, (occurrencesLast4Weeks.get(entry.mealId) ?? 0) + 1);
+    occurrencesLast4Weeks.set(
+      entry.mealId,
+      (occurrencesLast4Weeks.get(entry.mealId) ?? 0) + 1,
+    );
   }
 
   return {
@@ -172,7 +190,9 @@ async function getSmartRotationHistory(userId: string, weekStart: Date) {
   };
 }
 
-function warningMessage(repeatedLastWeekCombination: boolean): string | undefined {
+function warningMessage(
+  repeatedLastWeekCombination: boolean,
+): string | undefined {
   if (repeatedLastWeekCombination) {
     return "Vi kunde inte undvika samma veckokombination som förra veckan. Lägg till fler måltider för mer variation.";
   }
@@ -216,7 +236,10 @@ export async function getCurrentWeekPlan() {
   }
 }
 
-export async function generateWeeklyPlan(options?: { force?: boolean; revalidate?: boolean }) {
+export async function generateWeeklyPlan(options?: {
+  force?: boolean;
+  revalidate?: boolean;
+}) {
   const user = await getCurrentUser();
   if (!user) {
     return { error: "Ej behörig" };
@@ -253,19 +276,38 @@ export async function generateWeeklyPlan(options?: { force?: boolean; revalidate
       id: true,
       name: true,
       defaultServings: true,
+      thumbsUpCount: true,
+      thumbsDownCount: true,
+      preferredDays: true,
     },
   });
 
-  const rotationHistory = await getSmartRotationHistory(user.id, weekStart);
-  const { selectedMeals, repeatedLastWeekCombination } = selectMealsWithSmartRotation(
-    allMeals,
-    DAY_ORDER.length,
-    rotationHistory
-  );
+  const daySignalsRaw = await prisma.mealDaySignal.findMany({
+    where: { userId: user.id },
+  });
 
-  if (allMeals.length < DAY_ORDER.length || selectedMeals.length < DAY_ORDER.length) {
+  const signalsMap = new Map();
+  for (const signal of daySignalsRaw) {
+    signalsMap.set(`${signal.mealId}:${signal.day.toLowerCase()}`, signal);
+  }
+
+  const rotationHistory = await getSmartRotationHistory(user.id, weekStart);
+
+  const { selectedMeals, repeatedLastWeekCombination } =
+    selectMealsWithDayAwareSmartRotation(
+      allMeals,
+      DAY_ORDER,
+      rotationHistory,
+      signalsMap,
+    );
+
+  if (
+    allMeals.length < DAY_ORDER.length ||
+    selectedMeals.length < DAY_ORDER.length
+  ) {
     return {
-      error: "Du behöver minst 5 rätter i din lista för att kunna skapa en plan. Lägg till fler rätter.",
+      error:
+        "Du behöver minst 5 rätter i din lista för att kunna skapa en plan. Lägg till fler rätter.",
     };
   }
 
@@ -302,7 +344,7 @@ export async function generateWeeklyPlan(options?: { force?: boolean; revalidate
       day: DAY_ORDER[index],
       mealId: meal.id,
       servings: meal.defaultServings,
-    }))
+    })),
   );
 
   await prisma.mealHistory.createMany({
@@ -314,16 +356,23 @@ export async function generateWeeklyPlan(options?: { force?: boolean; revalidate
     })),
   });
   await Promise.all(
-    selectedMeals.map((meal, index) => recordMealDayShown(user.id, meal.id, DAY_ORDER[index]))
+    selectedMeals.map((meal, index) =>
+      recordMealDayShown(user.id, meal.id, DAY_ORDER[index]),
+    ),
   );
   try {
-    await regenerateShoppingListForUser(user.id, weekStart, { revalidate: false });
-  } catch (error) {
-    console.error("Failed to regenerate shopping list after weekly plan generation", {
-      userId: user.id,
-      weekStart: weekStart.toISOString(),
-      error,
+    await regenerateShoppingListForUser(user.id, weekStart, {
+      revalidate: false,
     });
+  } catch (error) {
+    console.error(
+      "Failed to regenerate shopping list after weekly plan generation",
+      {
+        userId: user.id,
+        weekStart: weekStart.toISOString(),
+        error,
+      },
+    );
   }
 
   const planWithEntries = await prisma.weeklyPlan.findUnique({
@@ -371,14 +420,21 @@ export async function getWeekInfo() {
   };
 }
 
-function applySwapFilters(candidates: SwapCandidate[], filters?: SwapFilterInput): SwapCandidate[] {
+function applySwapFilters(
+  candidates: SwapCandidate[],
+  filters?: SwapFilterInput,
+): SwapCandidate[] {
   let filtered = [...candidates];
 
   if (filters?.complexity) {
-    filtered = filtered.filter((candidate) => candidate.complexity === filters.complexity);
+    filtered = filtered.filter(
+      (candidate) => candidate.complexity === filters.complexity,
+    );
   }
   if (filters?.rating === "THUMBS_UP") {
-    filtered = filtered.filter((candidate) => candidate.thumbsUpCount > candidate.thumbsDownCount);
+    filtered = filtered.filter(
+      (candidate) => candidate.thumbsUpCount > candidate.thumbsDownCount,
+    );
   }
   if (filters?.recency === "FRESH_ONLY") {
     filtered = filtered.filter((candidate) => !candidate.isRecent);
@@ -389,16 +445,26 @@ function applySwapFilters(candidates: SwapCandidate[], filters?: SwapFilterInput
 
 function buildCounts(candidates: SwapCandidate[]) {
   return {
-    simple: candidates.filter((candidate) => candidate.complexity === "SIMPLE").length,
-    medium: candidates.filter((candidate) => candidate.complexity === "MEDIUM").length,
-    complex: candidates.filter((candidate) => candidate.complexity === "COMPLEX").length,
-    thumbsUp: candidates.filter((candidate) => candidate.thumbsUpCount > candidate.thumbsDownCount).length,
+    simple: candidates.filter((candidate) => candidate.complexity === "SIMPLE")
+      .length,
+    medium: candidates.filter((candidate) => candidate.complexity === "MEDIUM")
+      .length,
+    complex: candidates.filter(
+      (candidate) => candidate.complexity === "COMPLEX",
+    ).length,
+    thumbsUp: candidates.filter(
+      (candidate) => candidate.thumbsUpCount > candidate.thumbsDownCount,
+    ).length,
     fresh: candidates.filter((candidate) => !candidate.isRecent).length,
     total: candidates.length,
   };
 }
 
-async function getSwapCandidatesForDay(userId: string, day: Day, weekStart: Date): Promise<SwapCandidate[]> {
+async function getSwapCandidatesForDay(
+  userId: string,
+  day: Day,
+  weekStart: Date,
+): Promise<SwapCandidate[]> {
   const plan = await prisma.weeklyPlan.findUnique({
     where: {
       userId_weekStartDate: {
@@ -422,22 +488,37 @@ async function getSwapCandidatesForDay(userId: string, day: Day, weekStart: Date
 
   const recentMealIds = await getRecentMealIds(userId, weekStart);
   const currentPlanMeals = new Set<string>(
-    [plan.monday, plan.tuesday, plan.wednesday, plan.thursday, plan.friday].filter(
-      (meal): meal is string => meal !== null
-    )
+    [
+      plan.monday,
+      plan.tuesday,
+      plan.wednesday,
+      plan.thursday,
+      plan.friday,
+    ].filter((meal): meal is string => meal !== null),
   );
 
   const entries = plan.entries ?? [];
   const currentMealForDay = plan[day];
-  const currentMealIdForDay = entries.find((entry) => entry.day === dayToEnum(day))?.mealId ?? null;
-  const occupiedMealIds = new Set(entries.filter((entry) => entry.mealId !== currentMealIdForDay).map((entry) => entry.mealId));
+  const currentMealIdForDay =
+    entries.find((entry) => entry.day === dayToEnum(day))?.mealId ?? null;
+  const occupiedMealIds = new Set(
+    entries
+      .filter((entry) => entry.mealId !== currentMealIdForDay)
+      .map((entry) => entry.mealId),
+  );
   if (currentMealForDay) {
     currentPlanMeals.delete(currentMealForDay);
   }
 
   const allMeals = await prisma.meal.findMany({
     where: { userId },
-    select: { id: true, name: true, complexity: true, thumbsUpCount: true, thumbsDownCount: true },
+    select: {
+      id: true,
+      name: true,
+      complexity: true,
+      thumbsUpCount: true,
+      thumbsDownCount: true,
+    },
   });
 
   return allMeals
@@ -473,18 +554,26 @@ export async function getSwapOptions(day: Day, filters?: SwapFilterInput) {
   }
 
   const filteredCandidates = applySwapFilters(candidates, filters);
-  const usingFilters = Boolean(filters?.complexity || filters?.rating || filters?.recency);
+  const usingFilters = Boolean(
+    filters?.complexity || filters?.rating || filters?.recency,
+  );
   const orderedFiltered = selectMeals(
     filteredCandidates,
     Math.min(limit, filteredCandidates.length),
-    new Set<string>()
+    new Set<string>(),
   );
   const options = orderedFiltered.map((meal) => ({
     id: meal.id,
     name: meal.name,
-    complexity: candidates.find((candidate) => candidate.id === meal.id)?.complexity ?? "MEDIUM",
-    thumbsUpCount: candidates.find((candidate) => candidate.id === meal.id)?.thumbsUpCount ?? 0,
-    thumbsDownCount: candidates.find((candidate) => candidate.id === meal.id)?.thumbsDownCount ?? 0,
+    complexity:
+      candidates.find((candidate) => candidate.id === meal.id)?.complexity ??
+      "MEDIUM",
+    thumbsUpCount:
+      candidates.find((candidate) => candidate.id === meal.id)?.thumbsUpCount ??
+      0,
+    thumbsDownCount:
+      candidates.find((candidate) => candidate.id === meal.id)
+        ?.thumbsDownCount ?? 0,
   }));
 
   if (options.length > 0 || !usingFilters) {
@@ -496,13 +585,23 @@ export async function getSwapOptions(day: Day, filters?: SwapFilterInput) {
     };
   }
 
-  const fallbackRaw = selectMeals(candidates, Math.min(limit, candidates.length), new Set<string>());
+  const fallbackRaw = selectMeals(
+    candidates,
+    Math.min(limit, candidates.length),
+    new Set<string>(),
+  );
   const fallbackOptions = fallbackRaw.map((meal) => ({
     id: meal.id,
     name: meal.name,
-    complexity: candidates.find((candidate) => candidate.id === meal.id)?.complexity ?? "MEDIUM",
-    thumbsUpCount: candidates.find((candidate) => candidate.id === meal.id)?.thumbsUpCount ?? 0,
-    thumbsDownCount: candidates.find((candidate) => candidate.id === meal.id)?.thumbsDownCount ?? 0,
+    complexity:
+      candidates.find((candidate) => candidate.id === meal.id)?.complexity ??
+      "MEDIUM",
+    thumbsUpCount:
+      candidates.find((candidate) => candidate.id === meal.id)?.thumbsUpCount ??
+      0,
+    thumbsDownCount:
+      candidates.find((candidate) => candidate.id === meal.id)
+        ?.thumbsDownCount ?? 0,
   }));
 
   return {
@@ -551,14 +650,23 @@ export async function swapDayMealWithChoice(day: Day, mealId: string) {
   }
 
   const occupiedMeals = new Set<string>(
-    [plan.monday, plan.tuesday, plan.wednesday, plan.thursday, plan.friday].filter(
-      (mealName): mealName is string => mealName !== null
-    )
+    [
+      plan.monday,
+      plan.tuesday,
+      plan.wednesday,
+      plan.thursday,
+      plan.friday,
+    ].filter((mealName): mealName is string => mealName !== null),
   );
   occupiedMeals.delete(plan[day] ?? "");
   const entries = plan.entries ?? [];
-  const currentMealIdForDay = entries.find((entry) => entry.day === dayToEnum(day))?.mealId ?? null;
-  const occupiedMealIds = new Set(entries.filter((entry) => entry.mealId !== currentMealIdForDay).map((entry) => entry.mealId));
+  const currentMealIdForDay =
+    entries.find((entry) => entry.day === dayToEnum(day))?.mealId ?? null;
+  const occupiedMealIds = new Set(
+    entries
+      .filter((entry) => entry.mealId !== currentMealIdForDay)
+      .map((entry) => entry.mealId),
+  );
 
   if (occupiedMeals.has(meal.name) || occupiedMealIds.has(meal.id)) {
     return { error: "Måltiden finns redan i veckoplanen" };
@@ -615,7 +723,9 @@ export async function swapDayMealWithChoice(day: Day, mealId: string) {
     await recordMealSwappedAway(user.id, previousMeal.id, day);
   }
   try {
-    await regenerateShoppingListForUser(user.id, weekStart, { revalidate: false });
+    await regenerateShoppingListForUser(user.id, weekStart, {
+      revalidate: false,
+    });
   } catch (error) {
     console.error("Failed to regenerate shopping list after day swap", {
       userId: user.id,
@@ -665,13 +775,15 @@ export async function swapDayMeal(day: Day) {
   }
 
   // Get all meals currently in the plan
-  const currentPlanMeals = new Set<string>([
-    plan.monday,
-    plan.tuesday,
-    plan.wednesday,
-    plan.thursday,
-    plan.friday,
-  ].filter((m): m is string => m !== null));
+  const currentPlanMeals = new Set<string>(
+    [
+      plan.monday,
+      plan.tuesday,
+      plan.wednesday,
+      plan.thursday,
+      plan.friday,
+    ].filter((m): m is string => m !== null),
+  );
 
   const recentMealIds = await getRecentMealIds(user.id, weekStart);
 
@@ -757,7 +869,9 @@ export async function swapDayMeal(day: Day) {
     await recordMealSwappedAway(user.id, previousMeal.id, day);
   }
   try {
-    await regenerateShoppingListForUser(user.id, weekStart, { revalidate: false });
+    await regenerateShoppingListForUser(user.id, weekStart, {
+      revalidate: false,
+    });
   } catch (error) {
     console.error("Failed to regenerate shopping list after quick swap", {
       userId: user.id,
@@ -769,7 +883,11 @@ export async function swapDayMeal(day: Day) {
 
   revalidatePath("/");
   revalidatePath("/plan");
-  return { success: true, newMeal, servings: clampServings(newMeals[0].defaultServings) };
+  return {
+    success: true,
+    newMeal,
+    servings: clampServings(newMeals[0].defaultServings),
+  };
 }
 
 export async function setDayServings(day: Day, servings: number) {
@@ -826,7 +944,9 @@ export async function setDayServings(day: Day, servings: number) {
     },
   });
   try {
-    await regenerateShoppingListForUser(user.id, weekStart, { revalidate: false });
+    await regenerateShoppingListForUser(user.id, weekStart, {
+      revalidate: false,
+    });
   } catch (error) {
     console.error("Failed to regenerate shopping list after servings update", {
       userId: user.id,

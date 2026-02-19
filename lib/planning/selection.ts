@@ -6,7 +6,12 @@ export type CandidateMeal = {
   defaultServings?: number | null;
 };
 
-export type PlannerDay = "monday" | "tuesday" | "wednesday" | "thursday" | "friday";
+export type PlannerDay =
+  | "monday"
+  | "tuesday"
+  | "wednesday"
+  | "thursday"
+  | "friday";
 
 export type PreferredDay =
   | "MONDAY"
@@ -62,7 +67,10 @@ function voteWeight(meal: CandidateMeal): number {
   return 1;
 }
 
-function weightedOrder(items: CandidateMeal[], randomFn: () => number): CandidateMeal[] {
+function weightedOrder(
+  items: CandidateMeal[],
+  randomFn: () => number,
+): CandidateMeal[] {
   const pool = [...items];
   const ordered: CandidateMeal[] = [];
 
@@ -102,7 +110,10 @@ function rotationWeight(mealId: string, history: SmartRotationHistory): number {
       : 1;
 
   const occurrences = history.occurrencesLast4Weeks.get(mealId) ?? 0;
-  const frequencyMultiplier = Math.max(MIN_ROTATION_WEIGHT, 1 - occurrences * 0.1);
+  const frequencyMultiplier = Math.max(
+    MIN_ROTATION_WEIGHT,
+    1 - occurrences * 0.1,
+  );
   return Math.max(MIN_ROTATION_WEIGHT, recencyWeight * frequencyMultiplier);
 }
 
@@ -110,14 +121,20 @@ function weightedPickUnique(
   allMeals: CandidateMeal[],
   count: number,
   getWeight: (meal: CandidateMeal) => number,
-  randomFn: () => number
+  randomFn: () => number,
 ): CandidateMeal[] {
   const pool = [...allMeals];
   const selected: CandidateMeal[] = [];
 
   while (pool.length > 0 && selected.length < count) {
-    const weightedPool = pool.map((meal) => ({ meal, weight: Math.max(MIN_ROTATION_WEIGHT, getWeight(meal)) }));
-    const totalWeight = weightedPool.reduce((sum, item) => sum + item.weight, 0);
+    const weightedPool = pool.map((meal) => ({
+      meal,
+      weight: Math.max(MIN_ROTATION_WEIGHT, getWeight(meal)),
+    }));
+    const totalWeight = weightedPool.reduce(
+      (sum, item) => sum + item.weight,
+      0,
+    );
 
     let pickedIndex = 0;
     if (totalWeight <= 0) {
@@ -141,7 +158,10 @@ function weightedPickUnique(
   return selected;
 }
 
-function haveSameMealSet(meals: CandidateMeal[], expectedIds: Set<string>): boolean {
+function haveSameMealSet(
+  meals: CandidateMeal[],
+  expectedIds: Set<string>,
+): boolean {
   if (meals.length !== expectedIds.size) {
     return false;
   }
@@ -194,9 +214,18 @@ function dayToPreferred(day: PlannerDay): PreferredDay {
   }
 }
 
-function dayScore(meal: DayAwareCandidateMeal, day: PlannerDay, signal: AdaptiveDaySignal | undefined): number {
+function dayScore(
+  meal: DayAwareCandidateMeal,
+  day: PlannerDay,
+  signal: AdaptiveDaySignal | undefined,
+): number {
   const preferred = meal.preferredDays?.includes(dayToPreferred(day)) ? 1.2 : 0;
-  return voteScore(meal) + preferred + adaptiveScore(signal) + explorationScore(signal);
+  return (
+    voteScore(meal) +
+    preferred +
+    adaptiveScore(signal) +
+    explorationScore(signal)
+  );
 }
 
 function weightedPickByDay(
@@ -206,15 +235,21 @@ function weightedPickByDay(
   blockedFavoriteIds: Set<string>,
   signals: Map<string, AdaptiveDaySignal>,
   randomFn: () => number,
-  warnings: Set<SelectionWarning>
+  warnings: Set<SelectionWarning>,
 ): DayAwareCandidateMeal | null {
   if (meals.length === 0) {
     return null;
   }
 
-  const strict = meals.filter((meal) => !recentMealIds.has(meal.id) && !blockedFavoriteIds.has(meal.id));
-  const recentFallback = meals.filter((meal) => recentMealIds.has(meal.id) && !blockedFavoriteIds.has(meal.id));
-  const favoriteFallback = meals.filter((meal) => blockedFavoriteIds.has(meal.id));
+  const strict = meals.filter(
+    (meal) => !recentMealIds.has(meal.id) && !blockedFavoriteIds.has(meal.id),
+  );
+  const recentFallback = meals.filter(
+    (meal) => recentMealIds.has(meal.id) && !blockedFavoriteIds.has(meal.id),
+  );
+  const favoriteFallback = meals.filter((meal) =>
+    blockedFavoriteIds.has(meal.id),
+  );
 
   const pool =
     strict.length > 0
@@ -268,13 +303,15 @@ export function selectMeals(
   allMeals: CandidateMeal[],
   count: number,
   excludedMealIds: Set<string>,
-  randomFn: () => number = Math.random
+  randomFn: () => number = Math.random,
 ): CandidateMeal[] {
   if (allMeals.length === 0 || count <= 0) {
     return [];
   }
 
-  const nonRecentMeals = allMeals.filter((meal) => !excludedMealIds.has(meal.id));
+  const nonRecentMeals = allMeals.filter(
+    (meal) => !excludedMealIds.has(meal.id),
+  );
   const availableMeals = nonRecentMeals.length > 0 ? nonRecentMeals : allMeals;
 
   if (availableMeals.length < count) {
@@ -293,19 +330,21 @@ export function selectMealsWithConstraints(
   count: number,
   recentMealIds: Set<string>,
   blockedFavoriteIds: Set<string>,
-  randomFn: () => number = Math.random
+  randomFn: () => number = Math.random,
 ): { selectedMeals: CandidateMeal[]; warnings: SelectionWarning[] } {
   if (allMeals.length === 0 || count <= 0) {
     return { selectedMeals: [], warnings: [] };
   }
 
   const strict = allMeals.filter(
-    (meal) => !recentMealIds.has(meal.id) && !blockedFavoriteIds.has(meal.id)
+    (meal) => !recentMealIds.has(meal.id) && !blockedFavoriteIds.has(meal.id),
   );
   const recentFallback = allMeals.filter(
-    (meal) => recentMealIds.has(meal.id) && !blockedFavoriteIds.has(meal.id)
+    (meal) => recentMealIds.has(meal.id) && !blockedFavoriteIds.has(meal.id),
   );
-  const favoriteFallback = allMeals.filter((meal) => blockedFavoriteIds.has(meal.id));
+  const favoriteFallback = allMeals.filter((meal) =>
+    blockedFavoriteIds.has(meal.id),
+  );
 
   const selected: CandidateMeal[] = [];
   const selectedIds = new Set<string>();
@@ -352,7 +391,7 @@ export function selectMealsByDay(
   recentMealIds: Set<string>,
   blockedFavoriteIds: Set<string>,
   signals: Map<string, AdaptiveDaySignal>,
-  randomFn: () => number = Math.random
+  randomFn: () => number = Math.random,
 ): { selectedMeals: DayAwareCandidateMeal[]; warnings: SelectionWarning[] } {
   if (allMeals.length === 0 || days.length === 0) {
     return { selectedMeals: [], warnings: [] };
@@ -377,7 +416,7 @@ export function selectMealsByDay(
       blockedFavoriteIds,
       signals,
       randomFn,
-      warnings
+      warnings,
     );
 
     if (!picked) {
@@ -403,7 +442,7 @@ export function selectMealsWithSmartRotation(
   allMeals: CandidateMeal[],
   count: number,
   history: SmartRotationHistory,
-  randomFn: () => number = Math.random
+  randomFn: () => number = Math.random,
 ): { selectedMeals: CandidateMeal[]; repeatedLastWeekCombination: boolean } {
   if (allMeals.length === 0 || count <= 0) {
     return { selectedMeals: [], repeatedLastWeekCombination: false };
@@ -418,13 +457,17 @@ export function selectMealsWithSmartRotation(
       allMeals,
       count,
       (meal) => rotationWeight(meal.id, history),
-      randomFn
+      randomFn,
     );
 
   const previousWeekMealIds = history.previousWeekMealIds;
   let selected = pickWithRotation();
 
-  if (!previousWeekMealIds || previousWeekMealIds.size === 0 || !haveSameMealSet(selected, previousWeekMealIds)) {
+  if (
+    !previousWeekMealIds ||
+    previousWeekMealIds.size === 0 ||
+    !haveSameMealSet(selected, previousWeekMealIds)
+  ) {
     return { selectedMeals: selected, repeatedLastWeekCombination: false };
   }
 
@@ -435,7 +478,9 @@ export function selectMealsWithSmartRotation(
     }
   }
 
-  const alternatives = allMeals.filter((meal) => !previousWeekMealIds.has(meal.id));
+  const alternatives = allMeals.filter(
+    (meal) => !previousWeekMealIds.has(meal.id),
+  );
   if (alternatives.length === 0) {
     return { selectedMeals: selected, repeatedLastWeekCombination: true };
   }
@@ -444,27 +489,191 @@ export function selectMealsWithSmartRotation(
     alternatives,
     1,
     (meal) => rotationWeight(meal.id, history),
-    randomFn
+    randomFn,
   )[0];
 
   if (!replacement) {
     return { selectedMeals: selected, repeatedLastWeekCombination: true };
   }
 
-  const replacementIndex = selected.reduce(
-    (bestIndex, meal, index, arr) => {
-      const currentWeight = rotationWeight(meal.id, history);
-      const bestWeight = rotationWeight(arr[bestIndex].id, history);
-      return currentWeight < bestWeight ? index : bestIndex;
-    },
-    0
-  );
+  const replacementIndex = selected.reduce((bestIndex, meal, index, arr) => {
+    const currentWeight = rotationWeight(meal.id, history);
+    const bestWeight = rotationWeight(arr[bestIndex].id, history);
+    return currentWeight < bestWeight ? index : bestIndex;
+  }, 0);
 
   selected = [...selected];
   selected[replacementIndex] = replacement;
 
   return {
     selectedMeals: selected,
+    repeatedLastWeekCombination: haveSameMealSet(selected, previousWeekMealIds),
+  };
+}
+
+export function selectMealsWithDayAwareSmartRotation(
+  allMeals: DayAwareCandidateMeal[],
+  days: PlannerDay[],
+  history: SmartRotationHistory,
+  signals: Map<string, AdaptiveDaySignal>,
+  randomFn: () => number = Math.random,
+): {
+  selectedMeals: DayAwareCandidateMeal[];
+  warnings: SelectionWarning[];
+  repeatedLastWeekCombination: boolean;
+} {
+  if (allMeals.length === 0 || days.length === 0) {
+    return {
+      selectedMeals: [],
+      warnings: [],
+      repeatedLastWeekCombination: false,
+    };
+  }
+
+  const pickWithDayAwareSmartRotation = () => {
+    const selected: DayAwareCandidateMeal[] = [];
+    const selectedIds = new Set<string>();
+    const warnings = new Set<SelectionWarning>();
+
+    for (const day of days) {
+      const uniquePool = allMeals.filter((meal) => !selectedIds.has(meal.id));
+      const candidatePool = uniquePool.length > 0 ? uniquePool : allMeals;
+
+      if (uniquePool.length === 0) {
+        warnings.add("repeated_meal_due_to_small_library");
+      }
+
+      const scored = candidatePool.map((meal) => {
+        const signal = signals.get(`${meal.id}:${day}`);
+        return {
+          meal,
+          score: dayScore(meal, day, signal),
+        };
+      });
+
+      const temperature = 0.9;
+      const weighted = scored.map((item) => {
+        const baseWeight = Math.exp(item.score / temperature);
+        const rotationMultiplier = rotationWeight(item.meal.id, history);
+        return {
+          meal: item.meal,
+          weight: Math.max(
+            MIN_ROTATION_WEIGHT,
+            baseWeight * rotationMultiplier,
+          ),
+        };
+      });
+
+      const totalWeight = weighted.reduce((sum, item) => sum + item.weight, 0);
+
+      let picked: DayAwareCandidateMeal | null = null;
+      if (totalWeight <= 0) {
+        picked = shuffle(candidatePool, randomFn)[0] ?? null;
+      } else {
+        const target = randomFn() * totalWeight;
+        let cumulative = 0;
+        for (const item of weighted) {
+          cumulative += item.weight;
+          if (target <= cumulative) {
+            picked = item.meal;
+            break;
+          }
+        }
+        if (!picked) {
+          picked = weighted[weighted.length - 1]?.meal ?? null;
+        }
+      }
+
+      // Safety check, should always find a meal if allMeals is not empty.
+      if (!picked) {
+        break;
+      }
+
+      selected.push(picked);
+      selectedIds.add(picked.id);
+    }
+
+    // Fill remaining days if needed (extreme edge case)
+    const finalWarnings = new Set<SelectionWarning>(warnings);
+    if (selected.length < days.length) {
+      finalWarnings.add("repeated_meal_due_to_small_library");
+      const baseCycle = selected.length > 0 ? [...selected] : [...allMeals];
+      for (let i = selected.length; i < days.length; i++) {
+        selected.push(baseCycle[i % baseCycle.length]);
+      }
+    }
+
+    return { selected, warnings: Array.from(finalWarnings) };
+  };
+
+  const previousWeekMealIds = history.previousWeekMealIds;
+  let { selected, warnings } = pickWithDayAwareSmartRotation();
+
+  // If we don't have previous week data or it doesn't match exactly, we're good
+  if (
+    !previousWeekMealIds ||
+    previousWeekMealIds.size === 0 ||
+    !haveSameMealSet(selected, previousWeekMealIds)
+  ) {
+    return {
+      selectedMeals: selected,
+      warnings,
+      repeatedLastWeekCombination: false,
+    };
+  }
+
+  // Try to generate a different combination
+  for (let attempt = 0; attempt < 24; attempt++) {
+    const candidateResult = pickWithDayAwareSmartRotation();
+    if (!haveSameMealSet(candidateResult.selected, previousWeekMealIds)) {
+      return {
+        selectedMeals: candidateResult.selected,
+        warnings: candidateResult.warnings,
+        repeatedLastWeekCombination: false,
+      };
+    }
+  }
+
+  // Fallback: manually force out one meal to break the exact combination combo
+  const alternatives = allMeals.filter(
+    (meal) => !previousWeekMealIds.has(meal.id),
+  );
+  if (alternatives.length === 0) {
+    return {
+      selectedMeals: selected,
+      warnings,
+      repeatedLastWeekCombination: true,
+    };
+  }
+
+  // Pick one replacement using just rotation weights for simplicity
+  const replacement = weightedPickUnique(
+    alternatives,
+    1,
+    (meal) => rotationWeight(meal.id, history),
+    randomFn,
+  )[0];
+
+  if (!replacement) {
+    return {
+      selectedMeals: selected,
+      warnings,
+      repeatedLastWeekCombination: true,
+    };
+  }
+
+  const replacementIndex = selected.reduce((bestIndex, meal, index, arr) => {
+    const currentWeight = rotationWeight(meal.id, history);
+    const bestWeight = rotationWeight(arr[bestIndex].id, history);
+    return currentWeight < bestWeight ? index : bestIndex;
+  }, 0);
+
+  selected = [...selected];
+  selected[replacementIndex] = replacement;
+
+  return {
+    selectedMeals: selected,
+    warnings,
     repeatedLastWeekCombination: haveSameMealSet(selected, previousWeekMealIds),
   };
 }

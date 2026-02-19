@@ -5,14 +5,14 @@ const {
   mockRevalidatePath,
   mockRegenerateShoppingListForUser,
   mockSelectMeals,
-  mockSelectMealsWithSmartRotation,
+  mockSelectMealsWithDayAwareSmartRotation,
   prismaMock,
 } = vi.hoisted(() => ({
   mockGetCurrentUser: vi.fn(),
   mockRevalidatePath: vi.fn(),
   mockRegenerateShoppingListForUser: vi.fn(),
   mockSelectMeals: vi.fn(),
-  mockSelectMealsWithSmartRotation: vi.fn(),
+  mockSelectMealsWithDayAwareSmartRotation: vi.fn(),
   prismaMock: {
     weeklyPlan: {
       findUnique: vi.fn(),
@@ -31,6 +31,7 @@ const {
     },
     mealDaySignal: {
       upsert: vi.fn(),
+      findMany: vi.fn(),
     },
     $transaction: vi.fn(),
   },
@@ -54,7 +55,8 @@ vi.mock("@/lib/actions/shopping-list", () => ({
 
 vi.mock("@/lib/planning/selection", () => ({
   selectMeals: mockSelectMeals,
-  selectMealsWithSmartRotation: mockSelectMealsWithSmartRotation,
+  selectMealsWithDayAwareSmartRotation:
+    mockSelectMealsWithDayAwareSmartRotation,
 }));
 
 import { generateWeeklyPlan } from "@/lib/actions/plans";
@@ -91,11 +93,20 @@ describe("generateWeeklyPlan API contract (smart rotation)", () => {
 
     mockGetCurrentUser.mockResolvedValue({ id: "user_1", name: "Test User" });
     mockRegenerateShoppingListForUser.mockResolvedValue({ success: true });
-    mockSelectMeals.mockImplementation((allMeals: unknown[], count: number) => allMeals.slice(0, count));
-    mockSelectMealsWithSmartRotation.mockImplementation((allMeals: unknown[], count: number) => ({
-      selectedMeals: allMeals.slice(0, count),
-      repeatedLastWeekCombination: false,
-    }));
+    mockSelectMeals.mockImplementation((allMeals: unknown[], count: number) =>
+      allMeals.slice(0, count),
+    );
+    mockSelectMealsWithDayAwareSmartRotation.mockImplementation(
+      (
+        allMeals: unknown[],
+        _days: unknown[],
+        _history: unknown,
+        _signals: unknown,
+      ) => ({
+        selectedMeals: allMeals.slice(0, 5),
+        repeatedLastWeekCombination: false,
+      }),
+    );
 
     prismaMock.$transaction.mockImplementation(async (ops: unknown) => {
       if (Array.isArray(ops)) {
@@ -114,6 +125,7 @@ describe("generateWeeklyPlan API contract (smart rotation)", () => {
     prismaMock.mealHistory.createMany.mockResolvedValue({ count: 5 });
     prismaMock.weeklyPlanEntry.upsert.mockResolvedValue({});
     prismaMock.mealDaySignal.upsert.mockResolvedValue({});
+    prismaMock.mealDaySignal.findMany.mockResolvedValue([]);
   });
 
   it("returns unauthorized error when no current user exists", async () => {
@@ -139,9 +151,13 @@ describe("generateWeeklyPlan API contract (smart rotation)", () => {
 
     const result = await generateWeeklyPlan();
 
-    expect(result).toEqual({ success: true, plan: existing, warning: undefined });
+    expect(result).toEqual({
+      success: true,
+      plan: existing,
+      warning: undefined,
+    });
     expect(prismaMock.meal.findMany).not.toHaveBeenCalled();
-    expect(mockSelectMealsWithSmartRotation).not.toHaveBeenCalled();
+    expect(mockSelectMealsWithDayAwareSmartRotation).not.toHaveBeenCalled();
   });
 
   it("continues generation when force is true even if plan already exists", async () => {
@@ -153,7 +169,7 @@ describe("generateWeeklyPlan API contract (smart rotation)", () => {
 
     expect(result).toMatchObject({ success: true });
     expect(prismaMock.meal.findMany).toHaveBeenCalledTimes(1);
-    expect(mockSelectMealsWithSmartRotation).toHaveBeenCalledTimes(1);
+    expect(mockSelectMealsWithDayAwareSmartRotation).toHaveBeenCalledTimes(1);
   });
 
   it("passes 4-week history context to smart rotation selector", async () => {
@@ -178,10 +194,11 @@ describe("generateWeeklyPlan API contract (smart rotation)", () => {
     const historyQuery = prismaMock.mealHistory.findMany.mock.calls[0][0];
     expect(historyQuery.where.userId).toBe("user_1");
     const gte = historyQuery.where.weekStartDate.gte as Date;
-    const lt = historyQuery.where.weekStartDate.lt as Date;
-    expect(lt.getTime() - gte.getTime()).toBe(28 * 24 * 60 * 60 * 1000);
+    const lT = historyQuery.where.weekStartDate.lt as Date;
+    expect(lT.getTime() - gte.getTime()).toBe(28 * 24 * 60 * 60 * 1000);
 
-    const historyArg = mockSelectMealsWithSmartRotation.mock.calls[0][2];
+    const historyArg =
+      mockSelectMealsWithDayAwareSmartRotation.mock.calls[0][2];
     expect(Array.from(historyArg.lastWeekMealIds)).toEqual(["m1"]);
     expect(Array.from(historyArg.twoWeeksAgoMealIds)).toEqual(["m2"]);
     expect(historyArg.occurrencesLast4Weeks.get("m1")).toBe(2);
@@ -204,7 +221,9 @@ describe("generateWeeklyPlan API contract (smart rotation)", () => {
     const weekUpsertPayload = prismaMock.weeklyPlan.upsert.mock.calls[0][0];
     const weekStart = weekUpsertPayload.create.weekStartDate as Date;
     const payload = prismaMock.mealHistory.createMany.mock.calls[0][0];
-    const assigned = payload.data.map((row: { dateAssigned: Date }) => row.dateAssigned.getTime());
+    const assigned = payload.data.map((row: { dateAssigned: Date }) =>
+      row.dateAssigned.getTime(),
+    );
 
     expect(assigned).toHaveLength(5);
     assigned.forEach((timestamp: number, index: number) => {
@@ -217,31 +236,44 @@ describe("generateWeeklyPlan API contract (smart rotation)", () => {
     prismaMock.weeklyPlan.findUnique
       .mockResolvedValueOnce(null)
       .mockResolvedValueOnce({ id: "plan_1", entries: [] });
-    mockSelectMealsWithSmartRotation.mockImplementation((allMeals: unknown[], count: number) => ({
-      selectedMeals: allMeals.slice(0, count),
-      repeatedLastWeekCombination: true,
-    }));
+    mockSelectMealsWithDayAwareSmartRotation.mockImplementation(
+      (
+        allMeals: unknown[],
+        _days: unknown[],
+        _history: unknown,
+        _signals: unknown,
+      ) => ({
+        selectedMeals: allMeals.slice(0, 5),
+        repeatedLastWeekCombination: true,
+        warnings: [],
+      }),
+    );
 
     const result = await generateWeeklyPlan({ revalidate: false });
 
     expect(result).toMatchObject({
       success: true,
-      warning: "Vi kunde inte undvika samma veckokombination som förra veckan. Lägg till fler måltider för mer variation.",
+      warning:
+        "Vi kunde inte undvika samma veckokombination som förra veckan. Lägg till fler måltider för mer variation.",
     });
   });
 
   it("returns a minimum-meals error when fewer than 5 meals exist", async () => {
     prismaMock.weeklyPlan.findUnique.mockResolvedValueOnce(null);
     prismaMock.meal.findMany.mockResolvedValueOnce(makeMeals(4));
-    mockSelectMealsWithSmartRotation.mockImplementation((allMeals: unknown[]) => ({
-      selectedMeals: allMeals,
-      repeatedLastWeekCombination: false,
-    }));
+    mockSelectMealsWithDayAwareSmartRotation.mockImplementation(
+      (allMeals: unknown[]) => ({
+        selectedMeals: allMeals,
+        warnings: [],
+        repeatedLastWeekCombination: false,
+      }),
+    );
 
     const result = await generateWeeklyPlan({ revalidate: false });
 
     expect(result).toEqual({
-      error: "Du behöver minst 5 rätter i din lista för att kunna skapa en plan. Lägg till fler rätter.",
+      error:
+        "Du behöver minst 5 rätter i din lista för att kunna skapa en plan. Lägg till fler rätter.",
     });
     expect(prismaMock.weeklyPlan.upsert).not.toHaveBeenCalled();
     expect(prismaMock.mealHistory.createMany).not.toHaveBeenCalled();
@@ -251,7 +283,9 @@ describe("generateWeeklyPlan API contract (smart rotation)", () => {
     prismaMock.weeklyPlan.findUnique
       .mockResolvedValueOnce(null)
       .mockResolvedValueOnce({ id: "plan_1", entries: [] });
-    mockRegenerateShoppingListForUser.mockRejectedValueOnce(new Error("shopping failed"));
+    mockRegenerateShoppingListForUser.mockRejectedValueOnce(
+      new Error("shopping failed"),
+    );
 
     const result = await generateWeeklyPlan({ revalidate: false });
 
