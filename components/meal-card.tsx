@@ -121,7 +121,10 @@ export function MealCard({
   }
 
   return (
-    <div className="group relative mx-0 w-full snap-start aspect-[16/9] overflow-hidden rounded-none bg-black ring-1 ring-white/10 shadow-2xl shadow-black/80 transition-all duration-500 group-hover:ring-white/30 group-hover:shadow-black md:w-[320px] md:aspect-[3/4] md:rounded-2xl lg:w-[340px]">
+    <div
+      data-testid={`meal-card-${day}`}
+      className="group relative mx-0 w-full snap-start aspect-[16/9] overflow-hidden rounded-none bg-black ring-1 ring-white/10 shadow-2xl shadow-black/80 transition-all duration-500 group-hover:ring-white/30 group-hover:shadow-black md:w-[320px] md:aspect-[3/4] md:rounded-2xl lg:w-[340px]"
+    >
       <img
         src={resolvedImage}
         alt={currentMeal || "Meal"}
@@ -143,7 +146,10 @@ export function MealCard({
       </div>
 
       <div className="absolute inset-x-0 bottom-0 p-4 pr-20 md:pr-24">
-        <h3 className="mb-1 line-clamp-3 max-w-[85%] text-2xl font-bold leading-tight text-white drop-shadow-sm md:text-3xl lg:text-[1.75rem]">
+        <h3
+          data-testid={`meal-name-${day}`}
+          className="mb-1 line-clamp-3 max-w-[85%] text-2xl font-bold leading-tight text-white drop-shadow-sm md:text-3xl lg:text-[1.75rem]"
+        >
           {currentMeal || "Ingen måltid planerad"}
         </h3>
       </div>
@@ -153,6 +159,7 @@ export function MealCard({
           onClick={handleQuickSwap}
           disabled={loading}
           aria-label={loading ? "Byter måltid" : "Byt måltid"}
+          data-testid={`swap-button-${day}`}
           className={`flex h-10 w-10 items-center justify-center rounded-full border border-white/20 bg-black/35 text-white backdrop-blur-sm transition-opacity duration-300 ${loading ? "opacity-100" : "opacity-70 hover:opacity-100 md:opacity-0 md:group-hover:opacity-100"} disabled:cursor-not-allowed`}
         >
           <svg

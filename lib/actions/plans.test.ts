@@ -26,7 +26,7 @@ const {
       findFirst: vi.fn(),
       updateMany: vi.fn(),
     },
-    usageHistory: {
+    mealHistory: {
       findMany: vi.fn(),
       createMany: vi.fn(),
       create: vi.fn(),
@@ -81,11 +81,10 @@ describe("plans actions (phase 6)", () => {
     prismaMock.weeklyPlanEntry.upsert.mockResolvedValue({});
   });
 
-  it("generateWeeklyPlan writes UsageHistory entries for selected meals", async () => {
+  it("generateWeeklyPlan writes MealHistory entries for selected meals", async () => {
     mockGetCurrentUser.mockResolvedValue({ id: "user_1", name: "Test User" });
     prismaMock.weeklyPlan.findUnique.mockResolvedValueOnce(null);
-    prismaMock.usageHistory.findMany.mockResolvedValueOnce([]);
-    prismaMock.usageHistory.findMany.mockResolvedValueOnce([]);
+    prismaMock.mealHistory.findMany.mockResolvedValueOnce([]);
     prismaMock.mealDaySignal.findMany.mockResolvedValueOnce([]);
     prismaMock.meal.findMany.mockResolvedValueOnce([
       { id: "m1", name: "Meal 1" },
@@ -95,37 +94,36 @@ describe("plans actions (phase 6)", () => {
       { id: "m5", name: "Meal 5" },
     ]);
     prismaMock.weeklyPlan.upsert.mockResolvedValueOnce({ id: "p1" });
-    prismaMock.usageHistory.createMany.mockResolvedValueOnce({ count: 5 });
+    prismaMock.mealHistory.createMany.mockResolvedValueOnce({ count: 5 });
 
     const result = await generateWeeklyPlan();
 
     expect(result).toMatchObject({ success: true });
-    expect(prismaMock.usageHistory.createMany).toHaveBeenCalledTimes(1);
-    const payload = prismaMock.usageHistory.createMany.mock.calls[0][0];
+    expect(prismaMock.mealHistory.createMany).toHaveBeenCalledTimes(1);
+    const payload = prismaMock.mealHistory.createMany.mock.calls[0][0];
     expect(payload.data).toHaveLength(5);
     expect(prismaMock.meal.updateMany).not.toHaveBeenCalled();
   });
 
-  it("returns warning when meal library is too small and repeats are required", async () => {
+  it("returns error when meal library is too small for a unique week", async () => {
     mockGetCurrentUser.mockResolvedValue({ id: "user_1", name: "Test User" });
     prismaMock.weeklyPlan.findUnique.mockResolvedValueOnce(null);
-    prismaMock.usageHistory.findMany.mockResolvedValueOnce([]);
-    prismaMock.usageHistory.findMany.mockResolvedValueOnce([]);
+    prismaMock.mealHistory.findMany.mockResolvedValueOnce([]);
     prismaMock.mealDaySignal.findMany.mockResolvedValueOnce([]);
     prismaMock.meal.findMany.mockResolvedValueOnce([
       { id: "m1", name: "Meal 1" },
       { id: "m2", name: "Meal 2" },
     ]);
     prismaMock.weeklyPlan.upsert.mockResolvedValueOnce({ id: "p1" });
-    prismaMock.usageHistory.createMany.mockResolvedValueOnce({ count: 5 });
+    prismaMock.mealHistory.createMany.mockResolvedValueOnce({ count: 5 });
 
     const result = await generateWeeklyPlan();
 
-    expect(result).toMatchObject({ success: true });
-    expect(result.warning).toBeDefined();
+    expect(result).toMatchObject({ error: expect.any(String) });
+    expect(prismaMock.weeklyPlan.upsert).not.toHaveBeenCalled();
   });
 
-  it("swapDayMeal logs selected replacement to UsageHistory", async () => {
+  it("swapDayMeal logs selected replacement to MealHistory", async () => {
     mockGetCurrentUser.mockResolvedValue({ id: "user_1", name: "Test User" });
     prismaMock.weeklyPlan.findUnique.mockResolvedValueOnce({
       id: "p1",
@@ -135,7 +133,7 @@ describe("plans actions (phase 6)", () => {
       thursday: "Meal D",
       friday: "Meal E",
     });
-    prismaMock.usageHistory.findMany.mockResolvedValueOnce([]);
+    prismaMock.mealHistory.findMany.mockResolvedValueOnce([]);
     prismaMock.meal.findMany
       .mockResolvedValueOnce([
         { id: "mA", name: "Meal A" },
@@ -153,12 +151,12 @@ describe("plans actions (phase 6)", () => {
         { id: "mF", name: "Meal F" },
       ]);
     prismaMock.weeklyPlan.update.mockResolvedValueOnce({ id: "p1" });
-    prismaMock.usageHistory.create.mockResolvedValueOnce({ id: "u1" });
+    prismaMock.mealHistory.create.mockResolvedValueOnce({ id: "u1" });
 
     const result = await swapDayMeal("monday");
 
     expect(result).toMatchObject({ success: true, newMeal: "Meal F" });
-    expect(prismaMock.usageHistory.create).toHaveBeenCalledTimes(1);
+    expect(prismaMock.mealHistory.create).toHaveBeenCalledTimes(1);
     expect(prismaMock.meal.updateMany).not.toHaveBeenCalled();
   });
 
@@ -172,7 +170,7 @@ describe("plans actions (phase 6)", () => {
       thursday: "Meal D",
       friday: "Meal E",
     });
-    prismaMock.usageHistory.findMany.mockResolvedValueOnce([]);
+    prismaMock.mealHistory.findMany.mockResolvedValueOnce([]);
     prismaMock.meal.findMany.mockResolvedValueOnce([
       { id: "mA", name: "Meal A", complexity: "SIMPLE", thumbsUpCount: 3, thumbsDownCount: 0 },
       { id: "mF", name: "Meal F", complexity: "SIMPLE", thumbsUpCount: 3, thumbsDownCount: 0 },
@@ -191,7 +189,7 @@ describe("plans actions (phase 6)", () => {
     expect(result.counts.simple).toBeGreaterThanOrEqual(1);
   });
 
-  it("swapDayMealWithChoice updates plan and writes usage history", async () => {
+  it("swapDayMealWithChoice updates plan and writes meal history", async () => {
     mockGetCurrentUser.mockResolvedValue({ id: "user_1", name: "Test User" });
     prismaMock.weeklyPlan.findUnique.mockResolvedValueOnce({
       id: "p1",
@@ -207,7 +205,7 @@ describe("plans actions (phase 6)", () => {
       userId: "user_1",
     });
     prismaMock.weeklyPlan.update.mockResolvedValueOnce({ id: "p1" });
-    prismaMock.usageHistory.create.mockResolvedValueOnce({ id: "u1" });
+    prismaMock.mealHistory.create.mockResolvedValueOnce({ id: "u1" });
     prismaMock.meal.findFirst.mockResolvedValueOnce({ id: "mA" });
     prismaMock.mealDaySignal.upsert.mockResolvedValue({});
 
@@ -215,7 +213,7 @@ describe("plans actions (phase 6)", () => {
 
     expect(result).toMatchObject({ success: true, newMeal: "Meal Z", mealId: "mZ" });
     expect(prismaMock.weeklyPlan.update).toHaveBeenCalledTimes(1);
-    expect(prismaMock.usageHistory.create).toHaveBeenCalledTimes(1);
+    expect(prismaMock.mealHistory.create).toHaveBeenCalledTimes(1);
   });
 
   it("swapDayMealWithChoice rejects selecting a meal already assigned on another day by id", async () => {
@@ -243,7 +241,7 @@ describe("plans actions (phase 6)", () => {
 
     expect(result).toEqual({ error: "Måltiden finns redan i veckoplanen" });
     expect(prismaMock.weeklyPlan.update).not.toHaveBeenCalled();
-    expect(prismaMock.usageHistory.create).not.toHaveBeenCalled();
+    expect(prismaMock.mealHistory.create).not.toHaveBeenCalled();
   });
 
   it("getSwapOptions returns fallback options when filters have zero matches", async () => {
@@ -255,7 +253,7 @@ describe("plans actions (phase 6)", () => {
       thursday: "Meal D",
       friday: "Meal E",
     });
-    prismaMock.usageHistory.findMany.mockResolvedValueOnce([]);
+    prismaMock.mealHistory.findMany.mockResolvedValueOnce([]);
     prismaMock.meal.findMany.mockResolvedValueOnce([
       { id: "mA", name: "Meal A", complexity: "SIMPLE", thumbsUpCount: 3, thumbsDownCount: 0 },
       { id: "mF", name: "Meal F", complexity: "MEDIUM", thumbsUpCount: 1, thumbsDownCount: 1 },
@@ -288,7 +286,7 @@ describe("plans actions (phase 6)", () => {
         { day: "TUESDAY", mealId: "mB" },
       ],
     });
-    prismaMock.usageHistory.findMany.mockResolvedValueOnce([]);
+    prismaMock.mealHistory.findMany.mockResolvedValueOnce([]);
     prismaMock.meal.findMany.mockResolvedValueOnce([
       { id: "mA", name: "Meal A (Renamed)", complexity: "SIMPLE", thumbsUpCount: 0, thumbsDownCount: 0 },
       { id: "mF", name: "Meal F", complexity: "MEDIUM", thumbsUpCount: 0, thumbsDownCount: 0 },
