@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700;800&family=DM+Sans:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@1,9..144,300;1,9..144,400&family=Playfair+Display:wght@600;700;800&family=DM+Sans:wght@400;500;600;700&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -239,3 +239,43 @@ nav {
     text-wrap: balance;
   }
 }
+
+/* Dark-mode inputs for the meal editor */
+.dark-inputs input[type="text"],
+.dark-inputs input[type="url"],
+.dark-inputs input[type="number"],
+.dark-inputs textarea {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.1);
+  color: white;
+}
+.dark-inputs input::placeholder,
+.dark-inputs textarea::placeholder {
+  color: rgba(255, 255, 255, 0.2);
+}
+.dark-inputs input:focus,
+.dark-inputs textarea:focus {
+  border-color: var(--terracotta);
+  box-shadow: 0 0 0 3px rgba(216, 101, 75, 0.15);
+}
+.dark-inputs input[type="number"]::-webkit-inner-spin-button {
+  filter: invert(1) brightness(0.4);
+}
+
+.font-fraunces {
+  font-family: 'Fraunces', Georgia, serif;
+  font-style: italic;
+}
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-up {
+  animation: fadeUp 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.animate-fade-up-delay-1 { animation-delay: 0.1s; }
+.animate-fade-up-delay-2 { animation-delay: 0.2s; }
+.animate-fade-up-delay-3 { animation-delay: 0.35s; }
