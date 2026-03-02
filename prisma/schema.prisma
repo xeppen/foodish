@@ -63,12 +63,15 @@ model Meal {
 model CommonMeal {
   id        String     @id @default(cuid())
   name      String     @unique
+  locale    String     @default("sv")
+  cuisine   String?
   complexity Complexity @default(MEDIUM)
   imageUrl  String?
   sortOrder Int        @default(0)
   createdAt DateTime   @default(now())
   updatedAt DateTime   @updatedAt
 
+  @@index([locale, sortOrder])
   @@index([sortOrder])
 }
 

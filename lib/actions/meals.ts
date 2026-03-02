@@ -201,6 +201,10 @@ function inferIngredients(name: string): string[] {
   return ingredients;
 }
 
+function normalizeMealName(name: string): string {
+  return name.trim().toLowerCase();
+}
+
 function inferStructuredIngredients(name: string): MealIngredientInput[] {
   return inferIngredients(name).map((ingredient, index) => ({
     position: index,
@@ -355,6 +359,61 @@ export async function initializeStarterMeals() {
   return { success: true, message: "Startmåltider har lagts till" };
 }
 
+export async function addStarterMealToUserMeals(commonMealId: string) {
+  const user = await getCurrentUser();
+  if (!user) {
+    return { error: "Ej behörig" };
+  }
+
+  const starterMeal = await prisma.commonMeal.findUnique({
+    where: { id: commonMealId },
+  });
+  if (!starterMeal) {
+    return { error: "Startmåltiden hittades inte" };
+  }
+
+  const existingMeals = await prisma.meal.findMany({
+    where: { userId: user.id },
+    select: { id: true, name: true },
+  });
+  const normalizedStarterName = normalizeMealName(starterMeal.name);
+  const existingByName = existingMeals.find(
+    (meal) => normalizeMealName(meal.name) === normalizedStarterName
+  );
+  if (existingByName) {
+    return {
+      success: true,
+      alreadyAdded: true,
+      mealId: existingByName.id,
+    };
+  }
+
+  const createdMeal = await prisma.meal.create({
+    data: {
+      name: starterMeal.name,
+      userId: user.id,
+      complexity: starterMeal.complexity,
+      tags: inferTags(starterMeal.name),
+      ingredients: inferIngredients(starterMeal.name),
+      imagePrompt: buildImagePrompt(starterMeal.name),
+      imageUrl: starterMeal.imageUrl ?? buildImageUrl(starterMeal.name),
+      mealIngredients: {
+        create: inferStructuredIngredients(starterMeal.name),
+      },
+    },
+    select: { id: true },
+  });
+
+  revalidatePath("/");
+  revalidatePath("/meals");
+
+  return {
+    success: true,
+    alreadyAdded: false,
+    mealId: createdMeal.id,
+  };
+}
+
 export async function getMeals() {
   const user = await getCurrentUser();
   if (!user) {
@@ -362,7 +421,7 @@ export async function getMeals() {
   }
 
   try {
-    let meals = await prisma.meal.findMany({
+    const meals = await prisma.meal.findMany({
       where: { userId: user.id },
       include: {
         mealIngredients: {
@@ -371,19 +430,6 @@ export async function getMeals() {
       },
       orderBy: { createdAt: "desc" },
     });
-
-    if (meals.length === 0) {
-      await initializeStarterMeals();
-      meals = await prisma.meal.findMany({
-        where: { userId: user.id },
-        include: {
-          mealIngredients: {
-            orderBy: { position: "asc" },
-          },
-        },
-        orderBy: { createdAt: "desc" },
-      });
-    }
 
     return meals;
   } catch (error) {
