@@ -79,6 +79,50 @@ describe("shopping list actions", () => {
     expect(potatis).toMatchObject({ amount: 2000, unit: "g" });
   });
 
+  it("excludes blocked days from shopping list aggregation", async () => {
+    prismaMock.weeklyPlan.findUnique.mockResolvedValue({
+      id: "p1",
+      monday: "Meal A",
+      tuesday: "Meal B",
+      entries: [
+        {
+          blocked: false,
+          servings: 4,
+          meal: {
+            id: "m1",
+            name: "Meal A",
+            ingredients: null,
+            defaultServings: 4,
+            mealIngredients: [{ name: "Potatis", canonicalName: "potatis", amount: 1, unit: "kg" }],
+          },
+        },
+        {
+          blocked: true,
+          servings: 4,
+          meal: {
+            id: "m2",
+            name: "Meal B",
+            ingredients: null,
+            defaultServings: 4,
+            mealIngredients: [{ name: "Ris", canonicalName: "ris", amount: 4, unit: "dl" }],
+          },
+        },
+      ],
+    });
+    prismaMock.shoppingList.upsert.mockResolvedValue({ id: "sl1" });
+
+    const result = await generateCurrentWeekShoppingList();
+
+    expect(result).toMatchObject({ success: true, listId: "sl1" });
+    const payload = prismaMock.shoppingListItem.createMany.mock.calls[0][0];
+    expect(payload.data.some((row: any) => row.canonicalName === "potatis")).toBe(
+      true,
+    );
+    expect(payload.data.some((row: any) => row.canonicalName === "ris")).toBe(
+      false,
+    );
+  });
+
   it("toggles checked state for shopping item", async () => {
     prismaMock.shoppingListItem.findUnique.mockResolvedValue({
       id: "item1",

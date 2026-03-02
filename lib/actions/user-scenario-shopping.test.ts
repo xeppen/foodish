@@ -126,7 +126,7 @@ const { mockGetCurrentUser, mockRevalidatePath, prismaMock, state } = vi.hoisted
         return meal ? { id: meal.id } : null;
       }),
     },
-    usageHistory: {
+    mealHistory: {
       findMany: vi.fn(async () => []),
       createMany: vi.fn(async () => ({ count: 5 })),
       create: vi.fn(async () => ({ id: "u1" })),
@@ -172,6 +172,15 @@ vi.mock("@/lib/planning/selection", async () => {
     selectMealsByDay: (allMeals: any[], dayOrder: string[]) => ({
       selectedMeals: allMeals.slice(0, dayOrder.length),
       warnings: [],
+    }),
+    selectMealsWithSmartRotation: (allMeals: any[], count: number) => ({
+      selectedMeals: allMeals.slice(0, count),
+      repeatedLastWeekCombination: false,
+    }),
+    selectMealsWithDayAwareSmartRotation: (allMeals: any[], dayOrder: string[]) => ({
+      selectedMeals: allMeals.slice(0, dayOrder.length),
+      warnings: [],
+      repeatedLastWeekCombination: false,
     }),
     selectMeals: (allMeals: any[], count: number) => allMeals.slice(0, count),
   };
@@ -291,8 +300,11 @@ describe("user scenario: plan -> swaps -> shopping list", () => {
     const planResult = await generateWeeklyPlan({ force: true, revalidate: false });
     expect(planResult).toMatchObject({ success: true });
 
-    await swapDayMealWithChoice("monday", "m6");
-    await swapDayMealWithChoice("friday", "m7");
+    const mondaySwap = await swapDayMealWithChoice("monday", "m6");
+    expect(mondaySwap).toMatchObject({ success: true, mealId: "m6" });
+
+    const fridaySwap = await swapDayMealWithChoice("friday", "m7");
+    expect(fridaySwap).toMatchObject({ success: true, mealId: "m7" });
 
     const listResult = await generateCurrentWeekShoppingList();
     expect(listResult).toMatchObject({ success: true });

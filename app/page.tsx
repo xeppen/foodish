@@ -38,8 +38,7 @@ export default async function HomePage() {
   const shoppingList = await getCurrentWeekShoppingList();
   const forceRegenerateOnLoad =
     process.env.FORCE_REGENERATE_WEEKLY_PLAN_ON_LOAD === "1" ||
-    process.env.FORCE_REGENERATE_WEEKLY_PLAN_ON_LOAD === "true" ||
-    process.env.NODE_ENV !== "production";
+    process.env.FORCE_REGENERATE_WEEKLY_PLAN_ON_LOAD === "true";
 
   let plan = forceRegenerateOnLoad ? null : await getCurrentWeekPlan();
   if (!plan || forceRegenerateOnLoad) {

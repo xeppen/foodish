@@ -160,11 +160,16 @@ export async function regenerateShoppingListForUser(
     }>;
   };
 
-  let planMeals: Array<{ meal: MealWithRows; servings: number | null }> = plan.entries.map((entry) => ({
-    meal: entry.meal,
-    servings: entry.servings ?? null,
-  }));
-  if (planMeals.length === 0) {
+  const hasEntries = plan.entries.length > 0;
+  let planMeals: Array<{ meal: MealWithRows; servings: number | null }> =
+    plan.entries
+      .filter((entry) => !entry.blocked)
+      .map((entry) => ({
+        meal: entry.meal,
+        servings: entry.servings ?? null,
+      }));
+
+  if (!hasEntries) {
     const mealNames = [plan.monday, plan.tuesday, plan.wednesday, plan.thursday, plan.friday].filter(
       (value): value is string => Boolean(value)
     );
