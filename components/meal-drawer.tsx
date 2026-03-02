@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Plus, RotateCcw, Sparkles, X } from "lucide-react";
+import { ArrowLeft, Plus, RotateCcw, Sparkles, X } from "lucide-react";
 import { MealList } from "@/components/meal-list";
 import { LoginButton } from "@/components/login-button";
 import { SignOutButton } from "@/components/sign-out-button";
@@ -67,9 +67,11 @@ export function MealDrawer({
   const [starterMessage, setStarterMessage] = useState<string | null>(null);
   const [pendingStarterId, setPendingStarterId] = useState<string | null>(null);
   const [addedStarterIds, setAddedStarterIds] = useState<Set<string>>(new Set());
+  const [isStarterPanelOpen, setIsStarterPanelOpen] = useState(false);
   const [editorMode, setEditorMode] = useState<{ type: "create" } | { type: "edit"; meal: Meal } | null>(null);
   const router = useRouter();
   const mealsMissingIngredientsCount = meals.filter((meal) => (meal.mealIngredients?.length ?? 0) === 0).length;
+  const isFirstTimeUser = meals.length === 0;
   const importedMealNames = useMemo(
     () => new Set(meals.map((meal) => meal.name.trim().toLowerCase())),
     [meals],
@@ -82,6 +84,12 @@ export function MealDrawer({
     return () => {
       document.body.style.overflow = originalOverflow;
     };
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) {
+      setIsStarterPanelOpen(false);
+    }
   }, [isOpen]);
 
   useEffect(() => {
@@ -220,56 +228,16 @@ export function MealDrawer({
                   {bulkMessage && (
                     <p className="px-1 text-xs text-white/35">{bulkMessage}</p>
                   )}
+
+                  <button
+                    type="button"
+                    onClick={() => setIsStarterPanelOpen(true)}
+                    className="flex w-full items-center justify-center gap-2 rounded-2xl border border-white/[0.08] px-4 py-2.5 text-xs font-semibold text-white/50 transition hover:bg-white/5 hover:text-white/80"
+                  >
+                    <Sparkles className="h-3.5 w-3.5" />
+                    Browse starter meals
+                  </button>
                 </div>
-
-                {/* Starter meals */}
-                {starterMeals.length > 0 && (
-                  <section>
-                    <p className="mb-3 text-[9px] font-bold uppercase tracking-[0.4em] text-white/25">
-                      Utforska starträtter
-                    </p>
-                    <div className="overflow-hidden rounded-2xl border border-white/[0.06]">
-                      {starterMeals.map((starterMeal, index) => {
-                        const alreadyImported =
-                          importedMealNames.has(starterMeal.name.trim().toLowerCase()) ||
-                          addedStarterIds.has(starterMeal.id);
-
-                        return (
-                          <div
-                            key={starterMeal.id}
-                            className={`flex items-center justify-between gap-3 px-4 py-3 transition hover:bg-white/[0.04] ${
-                              index > 0 ? "border-t border-white/[0.05]" : ""
-                            }`}
-                          >
-                            <div className="min-w-0">
-                              <p className="truncate text-sm font-medium text-white/75">
-                                {starterMeal.name}
-                              </p>
-                              {starterMeal.cuisine && (
-                                <p className="text-[11px] text-white/25">{starterMeal.cuisine}</p>
-                              )}
-                            </div>
-                            {alreadyImported ? (
-                              <span className="shrink-0 text-xs font-semibold text-emerald-400">✓</span>
-                            ) : (
-                              <button
-                                type="button"
-                                onClick={() => void handleAddStarterMeal(starterMeal)}
-                                disabled={pendingStarterId === starterMeal.id}
-                                className="shrink-0 rounded-full border border-white/[0.12] px-3 py-1 text-[11px] font-semibold text-white/50 transition hover:border-white/25 hover:text-white disabled:opacity-40"
-                              >
-                                {pendingStarterId === starterMeal.id ? "…" : "+ Lägg till"}
-                              </button>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                    {starterMessage && (
-                      <p className="mt-2 px-1 text-xs text-white/35">{starterMessage}</p>
-                    )}
-                  </section>
-                )}
 
                 {/* Your meals */}
                 <section>
@@ -279,7 +247,19 @@ export function MealDrawer({
                   {meals.length === 0 ? (
                     <div className="rounded-2xl border border-dashed border-white/[0.08] px-4 py-10 text-center">
                       <p className="text-sm font-medium text-white/25">Inga måltider än</p>
-                      <p className="mt-1 text-xs text-white/15">Lägg till din första ovan</p>
+                      <p className="mt-1 text-xs text-white/15">
+                        Börja snabbt med startbiblioteket eller lägg till din första manuellt
+                      </p>
+                      {isFirstTimeUser && (
+                        <button
+                          type="button"
+                          onClick={() => setIsStarterPanelOpen(true)}
+                          className="mt-4 inline-flex items-center gap-2 rounded-full border border-white/[0.12] px-4 py-1.5 text-xs font-semibold text-white/60 transition hover:border-white/30 hover:text-white"
+                        >
+                          <Sparkles className="h-3 w-3" />
+                          Öppna starter meals
+                        </button>
+                      )}
                     </div>
                   ) : (
                     <MealList
@@ -328,6 +308,75 @@ export function MealDrawer({
             onClose={() => setEditorMode(null)}
             onSaved={onMealSaved}
           />
+        )}
+
+        {isStarterPanelOpen && (
+          <div className="absolute inset-0 z-20 flex flex-col bg-[#111111]">
+            <header className="flex shrink-0 items-center justify-between border-b border-white/[0.06] px-5 py-4">
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => setIsStarterPanelOpen(false)}
+                  className="flex h-8 w-8 items-center justify-center rounded-full text-white/40 transition hover:bg-white/8 hover:text-white"
+                  aria-label="Tillbaka"
+                >
+                  <ArrowLeft className="h-4 w-4" />
+                </button>
+                <div>
+                  <p className="text-[9px] font-bold uppercase tracking-[0.45em] text-white/25">Setup</p>
+                  <h3 className="text-lg font-bold text-white">Starter meals</h3>
+                </div>
+              </div>
+            </header>
+
+            <div className="flex-1 overflow-y-auto px-4 py-5">
+              <p className="mb-4 text-xs text-white/40">
+                Importera färdiga svenska favoriter med ett klick. Du kan alltid redigera dem efteråt.
+              </p>
+              <div className="overflow-hidden rounded-2xl border border-white/[0.06]">
+                {starterMeals.map((starterMeal, index) => {
+                  const alreadyImported =
+                    importedMealNames.has(starterMeal.name.trim().toLowerCase()) ||
+                    addedStarterIds.has(starterMeal.id);
+
+                  return (
+                    <div
+                      key={starterMeal.id}
+                      className={`flex items-center justify-between gap-3 px-4 py-3 transition hover:bg-white/[0.04] ${
+                        index > 0 ? "border-t border-white/[0.05]" : ""
+                      }`}
+                    >
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium text-white/75">
+                          {starterMeal.name}
+                        </p>
+                        {starterMeal.cuisine && (
+                          <p className="text-[11px] text-white/25">{starterMeal.cuisine}</p>
+                        )}
+                      </div>
+                      {alreadyImported ? (
+                        <span className="shrink-0 rounded-full border border-emerald-500/30 px-3 py-1 text-[11px] font-semibold text-emerald-400">
+                          Added
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => void handleAddStarterMeal(starterMeal)}
+                          disabled={pendingStarterId === starterMeal.id}
+                          className="shrink-0 rounded-full border border-white/[0.12] px-3 py-1 text-[11px] font-semibold text-white/50 transition hover:border-white/25 hover:text-white disabled:opacity-40"
+                        >
+                          {pendingStarterId === starterMeal.id ? "…" : "Add to my meals"}
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+              {starterMessage && (
+                <p className="mt-3 px-1 text-xs text-white/35">{starterMessage}</p>
+              )}
+            </div>
+          </div>
         )}
       </aside>
     </div>
