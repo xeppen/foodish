@@ -16,6 +16,7 @@ import {
 } from "@/lib/planning/day-signals";
 
 type Day = "monday" | "tuesday" | "wednesday" | "thursday" | "friday";
+type BlockableDay = Day | "saturday" | "sunday";
 const DAY_ORDER: Day[] = [
   "monday",
   "tuesday",
@@ -23,6 +24,18 @@ const DAY_ORDER: Day[] = [
   "thursday",
   "friday",
 ];
+const DAY_TO_WEEKDAY_ENUM: Record<
+  BlockableDay,
+  "MONDAY" | "TUESDAY" | "WEDNESDAY" | "THURSDAY" | "FRIDAY" | "SATURDAY" | "SUNDAY"
+> = {
+  monday: "MONDAY",
+  tuesday: "TUESDAY",
+  wednesday: "WEDNESDAY",
+  thursday: "THURSDAY",
+  friday: "FRIDAY",
+  saturday: "SATURDAY",
+  sunday: "SUNDAY",
+};
 
 type SwapFilterInput = {
   complexity?: "SIMPLE" | "MEDIUM" | "COMPLEX";
@@ -39,6 +52,10 @@ type SwapCandidate = {
   thumbsDownCount: number;
   isRecent: boolean;
 };
+
+function dayToWeekdayEnum(day: BlockableDay) {
+  return DAY_TO_WEEKDAY_ENUM[day];
+}
 
 async function syncWeeklyPlanEntries(
   weeklyPlanId: string,
@@ -67,12 +84,14 @@ async function syncWeeklyPlanEntries(
         update: {
           mealId: assignment.mealId,
           servings: clampServings(assignment.servings ?? null),
+          blocked: false,
         },
         create: {
           weeklyPlanId,
           day: dayToEnum(day),
           mealId: assignment.mealId,
           servings: clampServings(assignment.servings ?? null),
+          blocked: false,
         },
       }),
     ),
@@ -220,6 +239,7 @@ export async function getCurrentWeekPlan() {
           select: {
             day: true,
             servings: true,
+            blocked: true,
           },
         },
       },
@@ -260,6 +280,7 @@ export async function generateWeeklyPlan(options?: {
         select: {
           day: true,
           servings: true,
+          blocked: true,
         },
       },
     },
@@ -267,6 +288,12 @@ export async function generateWeeklyPlan(options?: {
 
   if (existingPlan && !options?.force) {
     return { success: true, plan: existingPlan, warning: undefined };
+  }
+  if (existingPlan && options?.force) {
+    await prisma.weeklyPlanEntry.updateMany({
+      where: { weeklyPlanId: existingPlan.id },
+      data: { blocked: false },
+    });
   }
 
   const allMeals = await prisma.meal.findMany({
@@ -387,6 +414,7 @@ export async function generateWeeklyPlan(options?: {
         select: {
           day: true,
           servings: true,
+          blocked: true,
         },
       },
     },
@@ -477,6 +505,7 @@ async function getSwapCandidatesForDay(
         select: {
           day: true,
           mealId: true,
+          blocked: true,
         },
       },
     },
@@ -498,9 +527,15 @@ async function getSwapCandidatesForDay(
   );
 
   const entries = plan.entries ?? [];
+  const currentEntryForDay = entries.find(
+    (entry) => entry.day === dayToEnum(day),
+  );
+  if (currentEntryForDay?.blocked) {
+    return { error: "Dagen är blockerad. Avblockera dagen för att byta rätt." };
+  }
   const currentMealForDay = plan[day];
   const currentMealIdForDay =
-    entries.find((entry) => entry.day === dayToEnum(day))?.mealId ?? null;
+    currentEntryForDay?.mealId ?? null;
   const occupiedMealIds = new Set(
     entries
       .filter((entry) => entry.mealId !== currentMealIdForDay)
@@ -764,7 +799,9 @@ export async function swapDayMeal(day: Day) {
     include: {
       entries: {
         select: {
+          day: true,
           mealId: true,
+          blocked: true,
         },
       },
     },
@@ -772,6 +809,12 @@ export async function swapDayMeal(day: Day) {
 
   if (!plan) {
     return { error: "Ingen plan hittades för den här veckan" };
+  }
+  const currentEntryForDay = (plan.entries ?? []).find(
+    (entry) => entry.day === dayToEnum(day),
+  );
+  if (currentEntryForDay?.blocked) {
+    return { error: "Dagen är blockerad. Avblockera dagen för att byta rätt." };
   }
 
   // Get all meals currently in the plan
@@ -904,10 +947,27 @@ export async function setDayServings(day: Day, servings: number) {
         weekStartDate: weekStart,
       },
     },
+    include: {
+      entries: {
+        select: {
+          day: true,
+          blocked: true,
+        },
+      },
+    },
   });
 
   if (!plan) {
     return { error: "Ingen plan hittades för den här veckan" };
+  }
+  const currentEntryForDay = (plan.entries ?? []).find(
+    (entry) => entry.day === dayToEnum(day),
+  );
+  if (currentEntryForDay?.blocked) {
+    return {
+      error:
+        "Dagen är blockerad. Avblockera dagen för att ändra portionsstorlek.",
+    };
   }
 
   const normalizedServings = clampServings(servings);
@@ -958,4 +1018,69 @@ export async function setDayServings(day: Day, servings: number) {
 
   revalidatePath("/");
   return { success: true, servings: normalizedServings };
+}
+
+export async function toggleDayBlocked(day: BlockableDay, blocked?: boolean) {
+  const user = await getCurrentUser();
+  if (!user) {
+    return { error: "Ej behörig" };
+  }
+
+  const weekStart = getWeekStart();
+  const plan = await prisma.weeklyPlan.findUnique({
+    where: {
+      userId_weekStartDate: {
+        userId: user.id,
+        weekStartDate: weekStart,
+      },
+    },
+    include: {
+      entries: {
+        select: {
+          day: true,
+          blocked: true,
+        },
+      },
+    },
+  });
+
+  if (!plan) {
+    return { error: "Ingen plan hittades för den här veckan" };
+  }
+
+  const weekday = dayToWeekdayEnum(day);
+  const currentEntry = plan.entries.find((entry) => entry.day === weekday);
+  if (!currentEntry) {
+    return { error: "Ingen planerad måltid att blockera för dagen" };
+  }
+
+  const nextBlocked =
+    typeof blocked === "boolean" ? blocked : !currentEntry.blocked;
+
+  await prisma.weeklyPlanEntry.update({
+    where: {
+      weeklyPlanId_day: {
+        weeklyPlanId: plan.id,
+        day: weekday,
+      },
+    },
+    data: { blocked: nextBlocked },
+  });
+
+  try {
+    await regenerateShoppingListForUser(user.id, weekStart, {
+      revalidate: false,
+    });
+  } catch (error) {
+    console.error("Failed to regenerate shopping list after block toggle", {
+      userId: user.id,
+      day,
+      weekStart: weekStart.toISOString(),
+      error,
+    });
+  }
+
+  revalidatePath("/");
+  revalidatePath("/plan");
+  return { success: true, blocked: nextBlocked };
 }

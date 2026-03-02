@@ -19,6 +19,8 @@ const {
       deleteMany: vi.fn(),
       createMany: vi.fn(),
       upsert: vi.fn(),
+      updateMany: vi.fn(),
+      update: vi.fn(),
     },
     meal: {
       findMany: vi.fn(),
@@ -61,6 +63,7 @@ import {
   setDayServings,
   swapDayMeal,
   swapDayMealWithChoice,
+  toggleDayBlocked,
 } from "@/lib/actions/plans";
 
 describe("plans actions (phase 6)", () => {
@@ -79,6 +82,8 @@ describe("plans actions (phase 6)", () => {
     prismaMock.weeklyPlanEntry.deleteMany.mockResolvedValue({ count: 0 });
     prismaMock.weeklyPlanEntry.createMany.mockResolvedValue({ count: 5 });
     prismaMock.weeklyPlanEntry.upsert.mockResolvedValue({});
+    prismaMock.weeklyPlanEntry.updateMany.mockResolvedValue({ count: 0 });
+    prismaMock.weeklyPlanEntry.update.mockResolvedValue({});
   });
 
   it("generateWeeklyPlan writes MealHistory entries for selected meals", async () => {
@@ -319,5 +324,64 @@ describe("plans actions (phase 6)", () => {
         create: expect.objectContaining({ servings: 6 }),
       })
     );
+  });
+
+  it("toggleDayBlocked updates blocked state and regenerates shopping list", async () => {
+    mockGetCurrentUser.mockResolvedValue({ id: "user_1", name: "Test User" });
+    prismaMock.weeklyPlan.findUnique.mockResolvedValueOnce({
+      id: "p1",
+      entries: [{ day: "MONDAY", blocked: false }],
+    });
+
+    const result = await toggleDayBlocked("monday", true);
+
+    expect(result).toEqual({ success: true, blocked: true });
+    expect(prismaMock.weeklyPlanEntry.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: { blocked: true },
+      }),
+    );
+    expect(mockRegenerateShoppingListForUser).toHaveBeenCalledTimes(1);
+  });
+
+  it("swapDayMeal rejects blocked day", async () => {
+    mockGetCurrentUser.mockResolvedValue({ id: "user_1", name: "Test User" });
+    prismaMock.weeklyPlan.findUnique.mockResolvedValueOnce({
+      id: "p1",
+      monday: "Meal A",
+      tuesday: "Meal B",
+      wednesday: "Meal C",
+      thursday: "Meal D",
+      friday: "Meal E",
+      entries: [{ day: "MONDAY", mealId: "mA", blocked: true }],
+    });
+
+    const result = await swapDayMeal("monday");
+
+    expect(result).toEqual({
+      error: "Dagen är blockerad. Avblockera dagen för att byta rätt.",
+    });
+    expect(prismaMock.weeklyPlan.update).not.toHaveBeenCalled();
+  });
+
+  it("setDayServings rejects blocked day", async () => {
+    mockGetCurrentUser.mockResolvedValue({ id: "user_1", name: "Test User" });
+    prismaMock.weeklyPlan.findUnique.mockResolvedValueOnce({
+      id: "p1",
+      monday: "Meal A",
+      tuesday: "Meal B",
+      wednesday: "Meal C",
+      thursday: "Meal D",
+      friday: "Meal E",
+      entries: [{ day: "MONDAY", blocked: true }],
+    });
+
+    const result = await setDayServings("monday", 6);
+
+    expect(result).toEqual({
+      error:
+        "Dagen är blockerad. Avblockera dagen för att ändra portionsstorlek.",
+    });
+    expect(prismaMock.weeklyPlanEntry.upsert).not.toHaveBeenCalled();
   });
 });

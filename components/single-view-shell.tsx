@@ -20,6 +20,7 @@ type WeeklyPlan = {
   entries?: Array<{
     day: "MONDAY" | "TUESDAY" | "WEDNESDAY" | "THURSDAY" | "FRIDAY" | "SATURDAY" | "SUNDAY";
     servings: number | null;
+    blocked: boolean;
   }>;
 };
 

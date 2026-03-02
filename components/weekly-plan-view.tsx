@@ -9,6 +9,10 @@ type WeeklyPlan = {
   wednesday: string | null;
   thursday: string | null;
   friday: string | null;
+  entries?: Array<{
+    day: "MONDAY" | "TUESDAY" | "WEDNESDAY" | "THURSDAY" | "FRIDAY" | "SATURDAY" | "SUNDAY";
+    blocked: boolean;
+  }>;
 };
 
 const DAYS = [
@@ -30,6 +34,14 @@ export function WeeklyPlanView({
   onAuthRequired: () => void;
   mealImageByName?: Record<string, string>;
 }) {
+  const blockedByDay = (plan.entries ?? []).reduce<Record<string, boolean>>(
+    (acc, entry) => {
+      acc[entry.day.toLowerCase()] = entry.blocked;
+      return acc;
+    },
+    {},
+  );
+
   return (
     <div className="w-full md:mx-auto md:max-w-6xl">
       <div className="flex snap-y snap-mandatory flex-col gap-3 px-0 pb-4 md:snap-none md:flex-row md:flex-wrap md:justify-center md:gap-8 md:pb-8">
@@ -42,6 +54,7 @@ export function WeeklyPlanView({
                 day={key}
                 dayLabel={label}
                 mealName={meal}
+                isBlocked={blockedByDay[key] ?? false}
                 mealImageByName={mealImageByName}
                 isAuthenticated={isAuthenticated}
                 onAuthRequired={onAuthRequired}

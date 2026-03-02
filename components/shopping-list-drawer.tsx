@@ -40,6 +40,7 @@ type Props = {
     entries?: Array<{
       day: DayEnum;
       servings: number | null;
+      blocked: boolean;
     }>;
   };
   mealNameById?: Record<string, string>;
@@ -109,6 +110,13 @@ function mapServingsByDay(planEntries: Props["plan"]["entries"]): Record<string,
     if (typeof entry.servings === "number" && Number.isFinite(entry.servings) && entry.servings > 0) {
       acc[key] = entry.servings;
     }
+    return acc;
+  }, {});
+}
+
+function mapBlockedByDay(planEntries: Props["plan"]["entries"]): Record<string, boolean> {
+  return (planEntries ?? []).reduce<Record<string, boolean>>((acc, entry) => {
+    acc[entry.day.toLowerCase()] = Boolean(entry.blocked);
     return acc;
   }, {});
 }
@@ -239,6 +247,7 @@ export function ShoppingListDrawer({
   const [syncError, setSyncError] = useState<string | null>(null);
   const [localList, setLocalList] = useState<ShoppingListPayload>(initialList);
   const [localServingsByDay, setLocalServingsByDay] = useState<Record<string, number>>(mapServingsByDay(plan.entries));
+  const [localBlockedByDay, setLocalBlockedByDay] = useState<Record<string, boolean>>(mapBlockedByDay(plan.entries));
   const [chooserMealIds, setChooserMealIds] = useState<string[] | null>(null);
   const [attemptedAutoGenerate, setAttemptedAutoGenerate] = useState(false);
   const [sortMode, setSortMode] = useState<SortMode>("grouped");
@@ -250,6 +259,7 @@ export function ShoppingListDrawer({
 
   useEffect(() => {
     setLocalServingsByDay(mapServingsByDay(plan.entries));
+    setLocalBlockedByDay(mapBlockedByDay(plan.entries));
   }, [plan.entries]);
 
   const chooserItems = useMemo(() => {
@@ -377,6 +387,9 @@ export function ShoppingListDrawer({
   }
 
   async function handleUpdateDayServings(day: PlanDay, next: number) {
+    if (localBlockedByDay[day]) {
+      return;
+    }
     const normalized = Math.max(1, Math.min(12, Math.round(next)));
     const current = localServingsByDay[day] ?? 4;
     const mealName = plan[day];
@@ -484,12 +497,14 @@ export function ShoppingListDrawer({
                       return null;
                     }
                     const current = localServingsByDay[day] ?? 4;
-                    const disabled = pendingDay === day || loading;
+                    const isBlocked = localBlockedByDay[day] ?? false;
+                    const disabled = pendingDay === day || loading || isBlocked;
                     return (
                       <div key={day} className="flex items-center justify-between gap-2 rounded-md border border-white/10 bg-black/20 px-2 py-1.5">
                         <div className="min-w-0">
                           <p className="text-xs font-semibold text-white/80">{DAY_LABELS[day]}</p>
                           <p className="truncate text-xs text-white/65">{mealName}</p>
+                          {isBlocked && <p className="text-[11px] font-semibold text-amber-200">Blockerad dag</p>}
                         </div>
                         <div className="inline-flex items-center gap-1">
                           <button

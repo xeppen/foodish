@@ -21,6 +21,7 @@ const {
     },
     weeklyPlanEntry: {
       upsert: vi.fn(),
+      updateMany: vi.fn(),
     },
     meal: {
       findMany: vi.fn(),
@@ -124,6 +125,7 @@ describe("generateWeeklyPlan API contract (smart rotation)", () => {
     prismaMock.mealHistory.findMany.mockResolvedValue([]);
     prismaMock.mealHistory.createMany.mockResolvedValue({ count: 5 });
     prismaMock.weeklyPlanEntry.upsert.mockResolvedValue({});
+    prismaMock.weeklyPlanEntry.updateMany.mockResolvedValue({ count: 0 });
     prismaMock.mealDaySignal.upsert.mockResolvedValue({});
     prismaMock.mealDaySignal.findMany.mockResolvedValue([]);
   });
