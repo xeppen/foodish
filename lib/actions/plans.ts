@@ -531,7 +531,7 @@ async function getSwapCandidatesForDay(
     (entry) => entry.day === dayToEnum(day),
   );
   if (currentEntryForDay?.blocked) {
-    return { error: "Dagen är blockerad. Avblockera dagen för att byta rätt." };
+    return [];
   }
   const currentMealForDay = plan[day];
   const currentMealIdForDay =
