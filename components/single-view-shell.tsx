@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { ShoppingBasket, UtensilsCrossed } from "lucide-react";
 import { useClerk } from "@clerk/nextjs";
 import { WeeklyPlanView } from "@/components/weekly-plan-view";
@@ -37,6 +37,7 @@ type WeekInfo = {
 type Meal = {
   id: string;
   name: string;
+  sourceCommonMealId?: string | null;
   complexity: "SIMPLE" | "MEDIUM" | "COMPLEX";
   preferredDays: ("MONDAY" | "TUESDAY" | "WEDNESDAY" | "THURSDAY" | "FRIDAY" | "SATURDAY" | "SUNDAY")[];
   thumbsUpCount: number;
@@ -93,6 +94,7 @@ const SWEDISH_MONTHS = [
   "jan", "feb", "mar", "apr", "maj", "jun",
   "jul", "aug", "sep", "okt", "nov", "dec",
 ];
+const STARTER_SETUP_DISMISSED_STORAGE_KEY = "foodish:starterSetupDismissed";
 
 function formatWeekRange(weekInfo: WeekInfo): string {
   const [, , mDayStr] = weekInfo.monday.split("-");
@@ -115,10 +117,34 @@ export function SingleViewShell({
 }: SingleViewShellProps) {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [isShoppingOpen, setIsShoppingOpen] = useState(false);
+  const [isStarterSetupOpen, setIsStarterSetupOpen] = useState(false);
+  const [isStarterSetupDismissed, setIsStarterSetupDismissed] = useState(false);
+  const [hasStarterSetupPreference, setHasStarterSetupPreference] = useState(false);
   const [authPrompt, setAuthPrompt] = useState<string | null>(null);
   const [requestedMealEditorId, setRequestedMealEditorId] = useState<string | null>(null);
   const [returnToShoppingAfterEdit, setReturnToShoppingAfterEdit] = useState(false);
   const { openSignIn } = useClerk();
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+    setIsStarterSetupDismissed(localStorage.getItem(STARTER_SETUP_DISMISSED_STORAGE_KEY) === "1");
+    setHasStarterSetupPreference(true);
+  }, []);
+
+  useEffect(() => {
+    if (!isAuthenticated || meals.length > 0) {
+      setIsStarterSetupOpen(false);
+      return;
+    }
+    if (!hasStarterSetupPreference) {
+      return;
+    }
+    if (!isStarterSetupDismissed) {
+      setIsStarterSetupOpen(true);
+    }
+  }, [hasStarterSetupPreference, isAuthenticated, isStarterSetupDismissed, meals.length]);
 
   const commonImageByName = useMemo(
     () =>
@@ -164,6 +190,20 @@ export function SingleViewShell({
     setIsDrawerOpen(true);
   }
 
+  function openStarterSetup() {
+    setAuthPrompt(null);
+    setIsStarterSetupOpen(true);
+    setIsDrawerOpen(true);
+  }
+
+  const dismissStarterSetup = useCallback(() => {
+    setIsStarterSetupOpen(false);
+    setIsStarterSetupDismissed(true);
+    if (typeof window !== "undefined") {
+      localStorage.setItem(STARTER_SETUP_DISMISSED_STORAGE_KEY, "1");
+    }
+  }, []);
+
   function handleRequestEditMealFromShopping(mealId: string) {
     setRequestedMealEditorId(mealId);
     setReturnToShoppingAfterEdit(true);
@@ -176,6 +216,9 @@ export function SingleViewShell({
   }
 
   function handleMealSaved() {
+    if (isStarterSetupOpen) {
+      setIsStarterSetupOpen(false);
+    }
     if (!returnToShoppingAfterEdit) return;
     setIsDrawerOpen(false);
     setIsShoppingOpen(true);
@@ -270,6 +313,18 @@ export function SingleViewShell({
               <p className="text-xs font-medium text-amber-200/80">{planNotice}</p>
             </div>
           )}
+
+          {isAuthenticated && meals.length === 0 && hasStarterSetupPreference && !isStarterSetupOpen && (
+            <div className="animate-fade-up animate-fade-up-delay-3 mt-5 inline-flex rounded-full border border-white/20 bg-black/45 px-5 py-2 backdrop-blur-md" style={{ opacity: 0 }}>
+              <button
+                type="button"
+                onClick={openStarterSetup}
+                className="text-xs font-semibold text-white/80 transition hover:text-white"
+              >
+                Öppna startguide
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Plan cards */}
@@ -309,16 +364,27 @@ export function SingleViewShell({
       />
 
       <MealDrawer
-        isOpen={isDrawerOpen}
+        isOpen={isDrawerOpen || isStarterSetupOpen}
         isAuthenticated={isAuthenticated}
         meals={meals}
         starterMeals={commonMeals ?? []}
         commonMealImageByName={commonImageByName}
-        onClose={() => setIsDrawerOpen(false)}
+        onClose={() => {
+          setIsDrawerOpen(false);
+          if (isStarterSetupOpen) {
+            dismissStarterSetup();
+          }
+        }}
         onAuthRequired={promptLogin}
         openMealEditorForId={requestedMealEditorId}
         onMealEditorRequestConsumed={handleMealEditorRequestConsumed}
         onMealSaved={handleMealSaved}
+        startInStarterPanel={isStarterSetupOpen}
+        setupMode={isStarterSetupOpen}
+        onSetupDismissed={() => {
+          dismissStarterSetup();
+          setIsDrawerOpen(false);
+        }}
       />
     </div>
   );
