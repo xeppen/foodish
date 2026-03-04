@@ -201,6 +201,75 @@ function inferIngredients(name: string): string[] {
   return ingredients;
 }
 
+function normalizeMealName(name: string): string {
+  return name.trim().toLowerCase();
+}
+
+const mealForEditorSelect = {
+  id: true,
+  name: true,
+  complexity: true,
+  sourceCommonMealId: true,
+  imageUrl: true,
+  defaultServings: true,
+  preferredDays: true,
+  ingredients: true,
+  thumbsUpCount: true,
+  thumbsDownCount: true,
+  createdAt: true,
+  mealIngredients: {
+    orderBy: { position: "asc" as const },
+    select: {
+      name: true,
+      amount: true,
+      unit: true,
+      note: true,
+      optional: true,
+      confidence: true,
+      needsReview: true,
+    },
+  },
+} as const;
+
+async function getMealForEditor(id: string) {
+  return prisma.meal.findUnique({
+    where: { id },
+    select: mealForEditorSelect,
+  });
+}
+
+async function findExistingStarterMealBySource(userId: string, starterMealId: string) {
+  const existingBySource = await prisma.meal.findFirst({
+    where: { userId, sourceCommonMealId: starterMealId },
+    select: { id: true },
+  });
+
+  if (existingBySource) {
+    return getMealForEditor(existingBySource.id);
+  }
+
+  return null;
+}
+
+async function findStarterNameConflictMeal(userId: string, starterMealId: string, starterMealName: string) {
+  const existingMeals = await prisma.meal.findMany({
+    where: { userId },
+    orderBy: { updatedAt: "desc" },
+    select: { id: true, name: true, sourceCommonMealId: true },
+  });
+  const normalizedStarterName = normalizeMealName(starterMealName);
+  const conflictMeal = existingMeals.find(
+    (meal) =>
+      normalizeMealName(meal.name) === normalizedStarterName && meal.sourceCommonMealId !== starterMealId
+  );
+
+  if (!conflictMeal) {
+    return null;
+  }
+
+  return getMealForEditor(conflictMeal.id);
+}
+
 function inferStructuredIngredients(name: string): MealIngredientInput[] {
   return inferIngredients(name).map((ingredient, index) => ({
     position: index,
@@ -337,6 +406,7 @@ export async function initializeStarterMeals() {
         data: {
           name: commonMeal.name,
           userId: user.id,
+          sourceCommonMealId: commonMeal.id,
           complexity: commonMeal.complexity,
           tags: inferTags(commonMeal.name),
           ingredients: inferIngredients(commonMeal.name),
@@ -355,6 +425,138 @@ export async function initializeStarterMeals() {
   return { success: true, message: "Startmåltider har lagts till" };
 }
 
+export async function addStarterMealToUserMeals(commonMealId: string) {
+  const user = await getCurrentUser();
+  if (!user) {
+    return { error: "Ej behörig" };
+  }
+
+  const starterMeal = await prisma.commonMeal.findUnique({
+    where: { id: commonMealId },
+  });
+  if (!starterMeal) {
+    return { error: "Startmåltiden hittades inte" };
+  }
+
+  const existingMeal = await findExistingStarterMealBySource(user.id, starterMeal.id);
+  if (existingMeal) {
+    return {
+      success: true,
+      alreadyAdded: true,
+      mealId: existingMeal.id,
+      meal: existingMeal,
+    };
+  }
+
+  const conflictingMeal = await findStarterNameConflictMeal(user.id, starterMeal.id, starterMeal.name);
+  if (conflictingMeal) {
+    return {
+      success: true,
+      alreadyAdded: false,
+      nameConflict: true,
+      mealId: conflictingMeal.id,
+      meal: conflictingMeal,
+      message: `Du har redan en måltid med namnet "${starterMeal.name}". Byt namn på den först om du vill lägga till startmåltiden separat.`,
+    };
+  }
+
+  let createdMeal: NonNullable<Awaited<ReturnType<typeof getMealForEditor>>>;
+  try {
+    createdMeal = await prisma.meal.create({
+      data: {
+        name: starterMeal.name,
+        userId: user.id,
+        sourceCommonMealId: starterMeal.id,
+        complexity: starterMeal.complexity,
+        tags: inferTags(starterMeal.name),
+        ingredients: inferIngredients(starterMeal.name),
+        imagePrompt: buildImagePrompt(starterMeal.name),
+        imageUrl: starterMeal.imageUrl ?? buildImageUrl(starterMeal.name),
+        mealIngredients: {
+          create: inferStructuredIngredients(starterMeal.name),
+        },
+      },
+      select: mealForEditorSelect,
+    });
+  } catch (error) {
+    if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== "P2002") {
+      throw error;
+    }
+    const existingAfterRace = await findExistingStarterMealBySource(user.id, starterMeal.id);
+    if (existingAfterRace) {
+      return {
+        success: true,
+        alreadyAdded: true,
+        mealId: existingAfterRace.id,
+        meal: existingAfterRace,
+      };
+    }
+    throw error;
+  }
+
+  revalidatePath("/");
+  revalidatePath("/meals");
+
+  return {
+    success: true,
+    alreadyAdded: false,
+    mealId: createdMeal.id,
+    meal: createdMeal,
+  };
+}
+
+export async function getStarterMealImportState(commonMealId: string) {
+  const user = await getCurrentUser();
+  if (!user) {
+    return { error: "Ej behörig" };
+  }
+
+  const starterMeal = await prisma.commonMeal.findUnique({
+    where: { id: commonMealId },
+    select: {
+      id: true,
+      name: true,
+      complexity: true,
+      imageUrl: true,
+      locale: true,
+      cuisine: true,
+    },
+  });
+  if (!starterMeal) {
+    return { error: "Startmåltiden hittades inte" };
+  }
+
+  const existingMeal = await findExistingStarterMealBySource(user.id, starterMeal.id);
+  if (existingMeal) {
+    return {
+      success: true,
+      alreadyAdded: true,
+      mealId: existingMeal.id,
+      meal: existingMeal,
+      starterMeal,
+    };
+  }
+
+  const conflictingMeal = await findStarterNameConflictMeal(user.id, starterMeal.id, starterMeal.name);
+  if (conflictingMeal) {
+    return {
+      success: true,
+      alreadyAdded: false,
+      nameConflict: true,
+      mealId: conflictingMeal.id,
+      meal: conflictingMeal,
+      message: `Du har redan en måltid med namnet "${starterMeal.name}". Byt namn på den först om du vill lägga till startmåltiden separat.`,
+      starterMeal,
+    };
+  }
+
+  return {
+    success: true,
+    alreadyAdded: false,
+    starterMeal,
+  };
+}
+
 export async function getMeals() {
   const user = await getCurrentUser();
   if (!user) {
@@ -362,7 +564,7 @@ export async function getMeals() {
   }
 
   try {
-    let meals = await prisma.meal.findMany({
+    const meals = await prisma.meal.findMany({
       where: { userId: user.id },
       include: {
         mealIngredients: {
@@ -371,19 +573,6 @@ export async function getMeals() {
       },
       orderBy: { createdAt: "desc" },
     });
-
-    if (meals.length === 0) {
-      await initializeStarterMeals();
-      meals = await prisma.meal.findMany({
-        where: { userId: user.id },
-        include: {
-          mealIngredients: {
-            orderBy: { position: "asc" },
-          },
-        },
-        orderBy: { createdAt: "desc" },
-      });
-    }
 
     return meals;
   } catch (error) {
@@ -416,6 +605,7 @@ export async function addMeal(formData: FormData) {
   const preferredDaysInput = formData.getAll("preferredDays");
   const image = formData.get("image");
   const imageUrlInput = (formData.get("imageUrl") as string) ?? "";
+  const sourceCommonMealIdInput = (formData.get("sourceCommonMealId") as string) ?? "";
   const defaultServingsInput = formData.get("defaultServings");
   const validation = mealSchema.safeParse({
     name,
@@ -455,22 +645,45 @@ export async function addMeal(formData: FormData) {
     }
   }
 
-  await prisma.meal.create({
-    data: {
-      name: validation.data.name,
-      userId: user.id,
-      complexity: validation.data.complexity ?? enriched.complexity,
-      tags: enriched.tags,
-      ingredients: structuredIngredients.map((ingredient) => ingredient.name),
-      imagePrompt: enriched.imagePrompt,
-      preferredDays: validation.data.preferredDays,
-      defaultServings: validation.data.defaultServings,
-      imageUrl: uploadedImageUrl ?? providedImageUrl ?? enriched.imageUrl,
-      mealIngredients: {
-        create: structuredIngredients,
+  const sourceCommonMealId = sourceCommonMealIdInput.trim() || undefined;
+  if (sourceCommonMealId) {
+    const starterExists = await prisma.commonMeal.findUnique({
+      where: { id: sourceCommonMealId },
+      select: { id: true },
+    });
+    if (!starterExists) {
+      return { error: "Startmåltiden hittades inte" };
+    }
+  }
+
+  try {
+    await prisma.meal.create({
+      data: {
+        name: validation.data.name,
+        userId: user.id,
+        sourceCommonMealId,
+        complexity: validation.data.complexity ?? enriched.complexity,
+        tags: enriched.tags,
+        ingredients: structuredIngredients.map((ingredient) => ingredient.name),
+        imagePrompt: enriched.imagePrompt,
+        preferredDays: validation.data.preferredDays,
+        defaultServings: validation.data.defaultServings,
+        imageUrl: uploadedImageUrl ?? providedImageUrl ?? enriched.imageUrl,
+        mealIngredients: {
+          create: structuredIngredients,
+        },
       },
-    },
-  });
+    });
+  } catch (error) {
+    if (
+      sourceCommonMealId &&
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2002"
+    ) {
+      return { error: "Den här startmåltiden finns redan i dina måltider." };
+    }
+    throw error;
+  }
 
   if (hasShoppingListClient()) {
     try {

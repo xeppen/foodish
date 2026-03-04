@@ -1,36 +1,39 @@
 import { prisma } from "@/lib/prisma";
 import { type Complexity } from "@prisma/client";
+import starterCommonMealsSv from "@/prisma/starter-common-meals.sv.json";
 
 type SeedCommonMeal = {
   name: string;
   complexity?: Complexity;
   imageUrl?: string | null;
+  locale?: string;
+  cuisine?: string | null;
 };
 
 export const ADMIN_EMAIL = "xeppen@gmail.com";
 
-export const DEFAULT_COMMON_MEALS: SeedCommonMeal[] = [
-  { name: "Köttbullar med potatis och brunsås" },
-  { name: "Pasta med köttfärssås" },
-  { name: "Tacos" },
-  { name: "Falukorv i ugn med potatismos" },
-  { name: "Makaroner och köttbullar" },
-  { name: "Korv stroganoff med ris" },
-  { name: "Fiskpinnar med potatis och remouladsås" },
-  { name: "Pannkakor med sylt" },
-  { name: "Ugnsstekt kyckling med ris" },
-  { name: "Spaghetti med köttbullar" },
-  { name: "Hamburgare med bröd" },
-  { name: "Kycklingnuggets med pommes" },
-  { name: "Lasagne" },
-  { name: "Köttfärslimpa med potatis" },
-  { name: "Pytt i panna med ägg" },
-  { name: "Grillad korv med bröd" },
-  { name: "Pasta med skinksås" },
-  { name: "Stekt lax med potatis" },
-  { name: "Köttfärssoppa" },
-  { name: "Hemmagjord pizza" },
-];
+const starterCommonMealsSvData = starterCommonMealsSv as Array<{
+  name: string;
+  complexity?: string;
+  imageUrl?: string | null;
+  locale?: string;
+  cuisine?: string | null;
+}>;
+
+function normalizeComplexity(value: string | undefined): Complexity {
+  if (value === "SIMPLE" || value === "MEDIUM" || value === "COMPLEX") {
+    return value;
+  }
+  return "MEDIUM";
+}
+
+export const DEFAULT_COMMON_MEALS: SeedCommonMeal[] = starterCommonMealsSvData.map((meal) => ({
+  name: meal.name,
+  complexity: normalizeComplexity(meal.complexity),
+  imageUrl: meal.imageUrl ?? null,
+  locale: meal.locale ?? "sv",
+  cuisine: meal.cuisine ?? null,
+}));
 
 function buildFallbackCommonMeals() {
   const now = new Date();
@@ -39,30 +42,37 @@ function buildFallbackCommonMeals() {
     name: meal.name,
     complexity: meal.complexity ?? "MEDIUM",
     imageUrl: meal.imageUrl ?? null,
+    locale: meal.locale ?? "sv",
+    cuisine: meal.cuisine ?? null,
     sortOrder: index,
     createdAt: now,
     updatedAt: now,
   }));
 }
 
-export async function listCommonMeals() {
+export async function listCommonMeals(locale = "sv") {
   try {
     let meals = await prisma.commonMeal.findMany({
+      where: { locale },
       orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
     });
 
     if (meals.length === 0) {
+      const localeMeals = DEFAULT_COMMON_MEALS.filter((meal) => (meal.locale ?? "sv") === locale);
       await prisma.commonMeal.createMany({
-        data: DEFAULT_COMMON_MEALS.map((meal, index) => ({
+        data: localeMeals.map((meal, index) => ({
           name: meal.name,
           complexity: meal.complexity ?? "MEDIUM",
           imageUrl: meal.imageUrl ?? null,
+          locale: meal.locale ?? "sv",
+          cuisine: meal.cuisine ?? null,
           sortOrder: index,
         })),
         skipDuplicates: true,
       });
 
       meals = await prisma.commonMeal.findMany({
+        where: { locale },
         orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
       });
     }

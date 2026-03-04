@@ -39,6 +39,7 @@ model Meal {
   id              String         @id @default(cuid())
   name            String
   userId          String // Clerk user ID
+  sourceCommonMealId String?
   complexity      Complexity     @default(MEDIUM)
   thumbsUpCount   Int            @default(0)
   thumbsDownCount Int            @default(0)
@@ -57,18 +58,23 @@ model Meal {
   planEntries     WeeklyPlanEntry[]
 
   @@index([userId])
+  @@index([sourceCommonMealId])
   @@index([userId, complexity])
+  @@unique([userId, sourceCommonMealId])
 }
 
 model CommonMeal {
   id        String     @id @default(cuid())
   name      String     @unique
+  locale    String     @default("sv")
+  cuisine   String?
   complexity Complexity @default(MEDIUM)
   imageUrl  String?
   sortOrder Int        @default(0)
   createdAt DateTime   @default(now())
   updatedAt DateTime   @updatedAt
 
+  @@index([locale, sortOrder])
   @@index([sortOrder])
 }
 

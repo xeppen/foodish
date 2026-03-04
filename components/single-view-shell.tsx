@@ -1,8 +1,8 @@
 "use client";
 
 import Image from "next/image";
-import { useCallback, useMemo, useState } from "react";
-import { List, ShoppingBasket } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { ShoppingBasket, UtensilsCrossed } from "lucide-react";
 import { useClerk } from "@clerk/nextjs";
 import { WeeklyPlanView } from "@/components/weekly-plan-view";
 import { MealDrawer } from "@/components/meal-drawer";
@@ -37,6 +37,7 @@ type WeekInfo = {
 type Meal = {
   id: string;
   name: string;
+  sourceCommonMealId?: string | null;
   complexity: "SIMPLE" | "MEDIUM" | "COMPLEX";
   preferredDays: ("MONDAY" | "TUESDAY" | "WEDNESDAY" | "THURSDAY" | "FRIDAY" | "SATURDAY" | "SUNDAY")[];
   thumbsUpCount: number;
@@ -59,6 +60,8 @@ type CommonMeal = {
   id: string;
   name: string;
   complexity: "SIMPLE" | "MEDIUM" | "COMPLEX";
+  locale: string;
+  cuisine: string | null;
   imageUrl: string | null;
   sortOrder: number;
   createdAt: Date | string;
@@ -87,6 +90,22 @@ type SingleViewShellProps = {
   } | null;
 };
 
+const SWEDISH_MONTHS = [
+  "jan", "feb", "mar", "apr", "maj", "jun",
+  "jul", "aug", "sep", "okt", "nov", "dec",
+];
+const STARTER_SETUP_DISMISSED_STORAGE_KEY = "foodish:starterSetupDismissed";
+
+function formatWeekRange(weekInfo: WeekInfo): string {
+  const [, , mDayStr] = weekInfo.monday.split("-");
+  const [fYearStr, fMonthStr, fDayStr] = weekInfo.friday.split("-");
+  const mDay = parseInt(mDayStr, 10);
+  const fDay = parseInt(fDayStr, 10);
+  const fMonth = parseInt(fMonthStr, 10) - 1;
+  const fYear = parseInt(fYearStr, 10);
+  return `${mDay}–${fDay} ${SWEDISH_MONTHS[fMonth].toUpperCase()} ${fYear}`;
+}
+
 export function SingleViewShell({
   plan,
   weekInfo,
@@ -98,10 +117,35 @@ export function SingleViewShell({
 }: SingleViewShellProps) {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [isShoppingOpen, setIsShoppingOpen] = useState(false);
+  const [isStarterSetupOpen, setIsStarterSetupOpen] = useState(false);
+  const [isStarterSetupDismissed, setIsStarterSetupDismissed] = useState(false);
+  const [hasStarterSetupPreference, setHasStarterSetupPreference] = useState(false);
   const [authPrompt, setAuthPrompt] = useState<string | null>(null);
   const [requestedMealEditorId, setRequestedMealEditorId] = useState<string | null>(null);
   const [returnToShoppingAfterEdit, setReturnToShoppingAfterEdit] = useState(false);
   const { openSignIn } = useClerk();
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+    setIsStarterSetupDismissed(localStorage.getItem(STARTER_SETUP_DISMISSED_STORAGE_KEY) === "1");
+    setHasStarterSetupPreference(true);
+  }, []);
+
+  useEffect(() => {
+    if (!isAuthenticated || meals.length > 0) {
+      setIsStarterSetupOpen(false);
+      return;
+    }
+    if (!hasStarterSetupPreference) {
+      return;
+    }
+    if (!isStarterSetupDismissed) {
+      setIsStarterSetupOpen(true);
+    }
+  }, [hasStarterSetupPreference, isAuthenticated, isStarterSetupDismissed, meals.length]);
+
   const commonImageByName = useMemo(
     () =>
       (commonMeals ?? []).reduce<Record<string, string>>((acc, meal) => {
@@ -111,8 +155,9 @@ export function SingleViewShell({
         }
         return acc;
       }, {}),
-    [commonMeals]
+    [commonMeals],
   );
+
   const mealImageByName = useMemo(() => {
     return meals.reduce<Record<string, string>>((acc, meal) => {
       const key = meal.name.trim().toLowerCase();
@@ -121,18 +166,20 @@ export function SingleViewShell({
       return acc;
     }, {});
   }, [commonImageByName, meals]);
+
   const shoppingCount = shoppingList?.items.length ?? 0;
+
   const mealNameById = useMemo(
     () =>
       meals.reduce<Record<string, string>>((acc, meal) => {
         acc[meal.id] = meal.name;
         return acc;
       }, {}),
-    [meals]
+    [meals],
   );
 
   const promptLogin = useCallback(() => {
-    setAuthPrompt("Login to curate your own meals");
+    setAuthPrompt("Logga in för att spara din plan");
     if (openSignIn) {
       void openSignIn({ redirectUrl: "/" });
     }
@@ -142,6 +189,20 @@ export function SingleViewShell({
     setAuthPrompt(null);
     setIsDrawerOpen(true);
   }
+
+  function openStarterSetup() {
+    setAuthPrompt(null);
+    setIsStarterSetupOpen(true);
+    setIsDrawerOpen(true);
+  }
+
+  const dismissStarterSetup = useCallback(() => {
+    setIsStarterSetupOpen(false);
+    setIsStarterSetupDismissed(true);
+    if (typeof window !== "undefined") {
+      localStorage.setItem(STARTER_SETUP_DISMISSED_STORAGE_KEY, "1");
+    }
+  }, []);
 
   function handleRequestEditMealFromShopping(mealId: string) {
     setRequestedMealEditorId(mealId);
@@ -155,85 +216,143 @@ export function SingleViewShell({
   }
 
   function handleMealSaved() {
-    if (!returnToShoppingAfterEdit) {
-      return;
+    if (isStarterSetupOpen) {
+      setIsStarterSetupOpen(false);
     }
+    if (!returnToShoppingAfterEdit) return;
     setIsDrawerOpen(false);
     setIsShoppingOpen(true);
     setReturnToShoppingAfterEdit(false);
   }
 
+  const weekRange = formatWeekRange(weekInfo);
+
   return (
-    <div className="relative min-h-screen bg-black">
+    <div className="relative min-h-screen bg-black overflow-x-hidden">
+      {/* Background */}
       <div className="fixed inset-0 z-0">
         <Image
           src="/hero-dinner.png"
           alt="Dinner table background"
           fill
-          className="object-cover opacity-60"
+          className="object-cover opacity-45"
           quality={100}
           priority
           sizes="100vw"
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-black/60" />
+        {/* Cinematic gradient: dark top, clear middle, dark bottom */}
+        <div className="absolute inset-0 bg-gradient-to-b from-black/80 via-black/20 to-black/85" />
       </div>
 
-      <header className="relative z-20 px-4 pt-6 sm:px-6 lg:px-8">
-        <div className="mx-auto flex w-full max-w-7xl items-center justify-end">
-          <button
-            type="button"
-            onClick={openManager}
-            className="inline-flex items-center gap-2 rounded-xl border border-white/25 bg-black/40 px-3 py-2 text-sm font-semibold text-white backdrop-blur-md hover:bg-black/55 md:fixed md:right-6 md:top-6 md:z-30"
-          >
-            <List className="h-4 w-4" />
-            <span>Måltider</span>
-          </button>
-        </div>
+      {/* Top navigation */}
+      <header className="fixed left-0 right-0 top-0 z-30 flex items-center justify-between px-5 py-5 sm:px-8">
+        {/* Wordmark */}
+        <span className="select-none text-[10px] font-bold uppercase tracking-[0.45em] text-white/50">
+          Foodish
+        </span>
+
+        {/* Meals button */}
+        <button
+          type="button"
+          onClick={openManager}
+          className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-black/40 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.1em] text-white/75 backdrop-blur-md transition-all duration-200 hover:bg-white/10 hover:text-white"
+        >
+          <UtensilsCrossed className="h-3.5 w-3.5" />
+          Måltider
+        </button>
       </header>
 
-      <main className="relative z-10 mx-auto flex min-h-screen w-full max-w-7xl items-start px-0 pb-10 pt-12 sm:px-6 lg:px-8">
-        <section className="w-full">
-          <div className="mb-6 px-4 text-center sm:mb-10 sm:px-0">
-            <h1 className="text-5xl font-bold text-white drop-shadow-lg sm:text-6xl">Veckans middagsplan</h1>
+      {/* Main content */}
+      <main className="relative z-10 flex min-h-screen flex-col">
+        {/* Hero title section */}
+        <div className="flex-none px-5 pb-6 pt-24 text-center sm:pb-10 sm:pt-28">
+          {/* Week range label */}
+          <p
+            className="animate-fade-up mb-5 text-[10px] font-semibold uppercase tracking-[0.5em] text-white/35"
+            style={{ opacity: 0 }}
+          >
+            {weekRange}
+          </p>
+
+          {/* Display title */}
+          <div className="animate-fade-up animate-fade-up-delay-1 space-y-0" style={{ opacity: 0 }}>
+            <h1
+              className="font-fraunces block text-[17vw] font-light leading-[0.85] text-white sm:text-[9rem] lg:text-[10rem]"
+            >
+              Veckans
+            </h1>
+            <p className="mt-2 text-[5vw] font-light uppercase tracking-[0.3em] text-white/55 sm:text-2xl lg:text-3xl">
+              middagsplan
+            </p>
           </div>
 
+          {/* Thin rule */}
+          <div
+            className="animate-fade-up animate-fade-up-delay-2 mx-auto mt-7 h-px w-16 bg-white/15"
+            style={{ opacity: 0 }}
+          />
+
+          {/* Auth notice */}
           {!isAuthenticated && (
-            <div className="mx-4 mb-6 flex flex-col items-center gap-3 rounded-2xl border border-[var(--terracotta)]/40 bg-black/45 px-4 py-3 text-center backdrop-blur-md sm:mx-auto sm:max-w-xl sm:flex-row sm:justify-center sm:text-left">
-              <p className="text-sm font-semibold text-white">
-                {authPrompt ?? "Login to Save"}
+            <div
+              className="animate-fade-up animate-fade-up-delay-3 mt-6 inline-flex items-center gap-3 rounded-full border border-white/15 bg-black/45 px-5 py-2.5 backdrop-blur-md"
+              style={{ opacity: 0 }}
+            >
+              <p className="text-xs font-medium text-white/60">
+                {authPrompt ?? "Logga in för att spara din plan"}
               </p>
-              <LoginButton className="rounded-lg bg-[var(--terracotta)] px-3 py-1.5 text-xs font-bold uppercase tracking-wide text-white hover:bg-[var(--terracotta-dark)]">
+              <LoginButton className="rounded-full bg-[var(--terracotta)] px-3.5 py-1 text-[11px] font-bold uppercase tracking-wider text-white transition-colors hover:bg-[var(--terracotta-dark)]">
                 Logga in
               </LoginButton>
             </div>
           )}
 
+          {/* Plan notice */}
           {planNotice && isAuthenticated && (
-            <div className="mx-4 mb-6 rounded-2xl border border-amber-300/40 bg-amber-500/10 px-4 py-3 text-center backdrop-blur-md sm:mx-auto sm:max-w-3xl">
-              <p className="text-sm font-medium text-amber-100">{planNotice}</p>
+            <div className="animate-fade-up animate-fade-up-delay-3 mt-5 inline-flex rounded-full border border-amber-400/25 bg-amber-500/10 px-5 py-2 backdrop-blur-md" style={{ opacity: 0 }}>
+              <p className="text-xs font-medium text-amber-200/80">{planNotice}</p>
             </div>
           )}
 
+          {isAuthenticated && meals.length === 0 && hasStarterSetupPreference && !isStarterSetupOpen && (
+            <div className="animate-fade-up animate-fade-up-delay-3 mt-5 inline-flex rounded-full border border-white/20 bg-black/45 px-5 py-2 backdrop-blur-md" style={{ opacity: 0 }}>
+              <button
+                type="button"
+                onClick={openStarterSetup}
+                className="text-xs font-semibold text-white/80 transition hover:text-white"
+              >
+                Öppna startguide
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Plan cards */}
+        <div className="flex-1 pb-28">
           <WeeklyPlanView
             plan={plan}
             isAuthenticated={isAuthenticated}
             onAuthRequired={promptLogin}
             mealImageByName={mealImageByName}
           />
-        </section>
+        </div>
       </main>
 
+      {/* Shopping list button */}
       <button
         type="button"
         onClick={() => setIsShoppingOpen((current) => !current)}
-        className="fixed bottom-5 right-5 z-30 inline-flex items-center gap-2 rounded-full border border-white/20 bg-black/55 px-4 py-3 text-sm font-semibold text-white shadow-xl backdrop-blur-md hover:bg-black/70 md:bottom-6 md:right-6"
+        className="fixed bottom-5 right-5 z-30 inline-flex items-center gap-2 rounded-full border border-white/20 bg-black/55 px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em] text-white shadow-2xl shadow-black/50 backdrop-blur-md transition-all duration-200 hover:bg-black/70"
       >
         <ShoppingBasket className="h-4 w-4" />
         <span>Inköp</span>
-        <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-[var(--terracotta)] px-1.5 text-[11px] font-bold text-white">
-          {shoppingCount}
-        </span>
+        {shoppingCount > 0 && (
+          <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-[var(--terracotta)] px-1.5 text-[10px] font-bold text-white">
+            {shoppingCount}
+          </span>
+        )}
       </button>
+
       <ShoppingListDrawer
         isOpen={isShoppingOpen}
         onClose={() => setIsShoppingOpen(false)}
@@ -245,15 +364,27 @@ export function SingleViewShell({
       />
 
       <MealDrawer
-        isOpen={isDrawerOpen}
+        isOpen={isDrawerOpen || isStarterSetupOpen}
         isAuthenticated={isAuthenticated}
         meals={meals}
+        starterMeals={commonMeals ?? []}
         commonMealImageByName={commonImageByName}
-        onClose={() => setIsDrawerOpen(false)}
+        onClose={() => {
+          setIsDrawerOpen(false);
+          if (isStarterSetupOpen) {
+            dismissStarterSetup();
+          }
+        }}
         onAuthRequired={promptLogin}
         openMealEditorForId={requestedMealEditorId}
         onMealEditorRequestConsumed={handleMealEditorRequestConsumed}
         onMealSaved={handleMealSaved}
+        startInStarterPanel={isStarterSetupOpen}
+        setupMode={isStarterSetupOpen}
+        onSetupDismissed={() => {
+          dismissStarterSetup();
+          setIsDrawerOpen(false);
+        }}
       />
     </div>
   );

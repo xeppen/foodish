@@ -10,10 +10,14 @@ const { mockGetCurrentUser, mockRevalidatePath, mockGenerateIngredientDraft, pri
         count: vi.fn(),
         createMany: vi.fn(),
         findMany: vi.fn(),
+        findFirst: vi.fn(),
         create: vi.fn(),
         findUnique: vi.fn(),
         update: vi.fn(),
         delete: vi.fn(),
+      },
+      commonMeal: {
+        findUnique: vi.fn(),
       },
       mealIngredient: {
         deleteMany: vi.fn(),
@@ -43,7 +47,14 @@ vi.mock("@/lib/ai/ingredients", () => ({
   generateIngredientDraft: mockGenerateIngredientDraft,
 }));
 
-import { addMeal, bulkGenerateMealIngredients, resetMealLearning, updateMeal, voteMeal } from "@/lib/actions/meals";
+import {
+  addMeal,
+  addStarterMealToUserMeals,
+  bulkGenerateMealIngredients,
+  resetMealLearning,
+  updateMeal,
+  voteMeal,
+} from "@/lib/actions/meals";
 import { deleteMeal } from "@/lib/actions/meals";
 
 describe("meals actions", () => {
@@ -324,5 +335,151 @@ describe("meals actions", () => {
     const result = await bulkGenerateMealIngredients({ overwrite: true });
 
     expect(result).toMatchObject({ success: true, updated: 0, skipped: 0, failed: 1, total: 1 });
+  });
+
+  it("addStarterMealToUserMeals rejects unauthenticated users", async () => {
+    mockGetCurrentUser.mockResolvedValue(null);
+
+    const result = await addStarterMealToUserMeals("cm_1");
+
+    expect(result).toEqual({ error: "Ej behörig" });
+  });
+
+  it("addStarterMealToUserMeals returns error when starter meal is missing", async () => {
+    prismaMock.commonMeal.findUnique.mockResolvedValue(null);
+
+    const result = await addStarterMealToUserMeals("cm_missing");
+
+    expect(result).toEqual({ error: "Startmåltiden hittades inte" });
+  });
+
+  it("addStarterMealToUserMeals returns existing meal when starter source is already linked", async () => {
+    prismaMock.commonMeal.findUnique.mockResolvedValue({
+      id: "cm_1",
+      name: "Köttbullar med potatismos",
+      complexity: "MEDIUM",
+      imageUrl: null,
+    });
+    prismaMock.meal.findFirst.mockResolvedValue({ id: "m_existing" });
+    prismaMock.meal.findUnique.mockResolvedValue({
+      id: "m_existing",
+      name: "Köttbullar med potatismos",
+      complexity: "MEDIUM",
+      sourceCommonMealId: "cm_1",
+      imageUrl: null,
+      defaultServings: 4,
+      preferredDays: [],
+      ingredients: ["Köttbullar"],
+      thumbsUpCount: 0,
+      thumbsDownCount: 0,
+      createdAt: new Date("2026-01-01T00:00:00.000Z"),
+      mealIngredients: [],
+    });
+
+    const result = await addStarterMealToUserMeals("cm_1");
+
+    expect(result).toMatchObject({
+      success: true,
+      alreadyAdded: true,
+      mealId: "m_existing",
+      meal: expect.objectContaining({
+        id: "m_existing",
+        name: "Köttbullar med potatismos",
+      }),
+    });
+    expect(prismaMock.meal.create).not.toHaveBeenCalled();
+  });
+
+  it("addStarterMealToUserMeals reports name conflict instead of silently linking by name", async () => {
+    prismaMock.commonMeal.findUnique.mockResolvedValue({
+      id: "cm_1",
+      name: "Köttbullar med potatismos",
+      complexity: "MEDIUM",
+      imageUrl: null,
+    });
+    prismaMock.meal.findFirst.mockResolvedValue(null);
+    prismaMock.meal.findMany.mockResolvedValue([
+      { id: "m_conflict", name: "KÖTTBULLAR MED POTATISMOS", sourceCommonMealId: null },
+    ]);
+    prismaMock.meal.findUnique.mockResolvedValue({
+      id: "m_conflict",
+      name: "Köttbullar med potatismos",
+      complexity: "MEDIUM",
+      sourceCommonMealId: null,
+      imageUrl: null,
+      defaultServings: 4,
+      preferredDays: [],
+      ingredients: ["Köttbullar"],
+      thumbsUpCount: 0,
+      thumbsDownCount: 0,
+      createdAt: new Date("2026-01-01T00:00:00.000Z"),
+      mealIngredients: [],
+    });
+
+    const result = await addStarterMealToUserMeals("cm_1");
+
+    expect(result).toMatchObject({
+      success: true,
+      alreadyAdded: false,
+      nameConflict: true,
+      mealId: "m_conflict",
+      meal: expect.objectContaining({
+        id: "m_conflict",
+        name: "Köttbullar med potatismos",
+      }),
+    });
+    expect(prismaMock.meal.create).not.toHaveBeenCalled();
+  });
+
+  it("addStarterMealToUserMeals creates user meal from starter library", async () => {
+    prismaMock.commonMeal.findUnique.mockResolvedValue({
+      id: "cm_2",
+      name: "Tacos med nötfärs",
+      complexity: "SIMPLE",
+      imageUrl: "https://images.example.com/tacos.jpg",
+    });
+    prismaMock.meal.findFirst.mockResolvedValue(null);
+    prismaMock.meal.findMany.mockResolvedValue([]);
+    prismaMock.meal.create.mockResolvedValue({
+      id: "m_new",
+      name: "Tacos med nötfärs",
+      complexity: "SIMPLE",
+      sourceCommonMealId: "cm_2",
+      imageUrl: "https://images.example.com/tacos.jpg",
+      defaultServings: 4,
+      preferredDays: [],
+      ingredients: ["Tacoskal"],
+      thumbsUpCount: 0,
+      thumbsDownCount: 0,
+      createdAt: new Date("2026-01-01T00:00:00.000Z"),
+      mealIngredients: [],
+    });
+
+    const result = await addStarterMealToUserMeals("cm_2");
+
+    expect(result).toMatchObject({
+      success: true,
+      alreadyAdded: false,
+      mealId: "m_new",
+      meal: expect.objectContaining({
+        id: "m_new",
+        name: "Tacos med nötfärs",
+      }),
+    });
+    expect(prismaMock.meal.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          name: "Tacos med nötfärs",
+          userId: "user_1",
+          sourceCommonMealId: "cm_2",
+          complexity: "SIMPLE",
+          imageUrl: "https://images.example.com/tacos.jpg",
+        }),
+        select: expect.objectContaining({
+          id: true,
+          mealIngredients: expect.any(Object),
+        }),
+      }),
+    );
   });
 });
